@@ -1,73 +1,148 @@
-# Welcome to your Lovable project
+# 🧠 OneMFin – Smart SaaS for Mutual Fund Distributors
 
-## Project info
+**OneMFin** is a lightweight, AI-powered SaaS platform built to automate lead management, risk assessment, meeting scheduling, product suggestions, and onboarding for **Mutual Fund Distributors (MFDs)**.
 
-**URL**: https://lovable.dev/projects/74b32cda-e81b-4e0f-96f7-1998c8587f5e
+It helps MFDs spend less time managing leads and more time converting them.
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## 🔥 Features
 
-**Use Lovable**
+- ✅ Smart Public Form for Lead Capture
+- 🤖 AI-Based Risk Assessment Engine
+- 🎯 Product Recommendation System (Custom or AI)
+- 📅 Integrated Meeting Scheduler (Calendly / Google)
+- 📊 Dashboard with Lead Status, KYC, Portfolio Tracking
+- 📄 Quarterly Reports & Client Profiles (Planned)
+- 🔐 Subscription Plans with Usage Limits
+- 📥 WhatsApp/Email Integration (Planned)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/74b32cda-e81b-4e0f-96f7-1998c8587f5e) and start prompting.
+---
 
-Changes made via Lovable will be committed automatically to this repo.
+## ⚙️ Tech Stack
 
-**Use your preferred IDE**
+| Layer        | Stack                         |
+|--------------|-------------------------------|
+| Frontend     | Vite + React (Lovable UI)     |
+| Backend      | Node.js + Express             |
+| Database     | Supabase (PostgreSQL)         |
+| AI Services  | OpenAI / Langchain            |
+| Deployment   | Vercel (Frontend), Railway / Supabase Functions |
+| Auth         | Supabase Auth (Email / Phone) |
+| 3rd Party    | Calendly, Google Calendar, Razorpay (Planned)  |
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+---
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🗂️ Folder Structure
 
-Follow these steps:
+/onemfin
+├── frontend/           # Vite + React app
+├── backend/            # Express API logic
+│   ├── routes/
+│   ├── controllers/
+│   ├── services/
+│   ├── middlewares/
+│   └── db/
+├── ai-engine/          # Risk scoring, product suggestion
+├── shared/             # Constants, types, utils
+└── docs/               # Specs, ERDs, Architecture
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+---
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 🚀 Getting Started
 
-# Step 3: Install the necessary dependencies.
-npm i
+### Prerequisites
+- Node.js 18+
+- Supabase account
+- Vercel & Railway (or Supabase Functions)
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### 1. Clone the repo
+```bash
+git clone https://github.com/your-username/onemfin.git
+cd onemfin
+
+2. Install dependencies
+
+cd frontend
+npm install
+
+cd ../backend
+npm install
+
+3. Set up environment variables
+
+Create .env.local in both /frontend and /backend with the following:
+
+# Supabase
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_KEY=
+
+# AI
+OPENAI_API_KEY=
+
+# Calendar Webhooks
+CALENDLY_SECRET=
+
+4. Run locally
+
+cd backend
 npm run dev
-```
 
-**Edit a file directly in GitHub**
+cd ../frontend
+npm run dev
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
 
-**Use GitHub Codespaces**
+⸻
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+📦 API Docs
 
-## What technologies are used for this project?
+Check docs/api-reference.md for all REST endpoints and route contracts.
 
-This project is built with:
+⸻
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+🛡️ Security
+	•	Supabase Auth + Row-Level Security
+	•	Subscription-based feature gating
+	•	Token validation middleware for all protected routes
 
-## How can I deploy this project?
+⸻
 
-Simply open [Lovable](https://lovable.dev/projects/74b32cda-e81b-4e0f-96f7-1998c8587f5e) and click on Share -> Publish.
+🧠 AI Modules
+	•	Risk Profile Classifier
+	•	Product Match Engine
+	•	Feedback Loop for AI improvement
 
-## Can I connect a custom domain to my Lovable project?
+⸻
 
-Yes, you can!
+📈 Roadmap
+	•	AI Explainable Reports
+	•	Razorpay Integration
+	•	WhatsApp Notifications
+	•	Admin Panel
+	•	Team Collaboration for MFDs
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+⸻
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+🙌 Contributing
+
+PRs welcome! See CONTRIBUTING.md for guidelines.
+
+⸻
+
+📄 License
+
+MIT License
+
+⸻
+
+✨ Inspiration
+
+Inspired by tools like dub.co for UX simplicity and offflight.work for visual minimalism.
+
+⸻
+
+Built with ❤️ by [One Moment]
+- Create a lighter version for public marketing?
+
+Let me know.
