@@ -24,6 +24,13 @@ export default function AppLayout() {
               </div>
             </div>
           </header>
+          <div className="border-b bg-muted/30 p-3 text-sm flex items-center justify-between">
+            <div><strong>Trial plan</strong> — 8 days left</div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="cta">Upgrade Plan</Button>
+              <Button size="sm" variant="outline">View Usage</Button>
+            </div>
+          </div>
           <main className="p-4">
             <Outlet />
           </main>
