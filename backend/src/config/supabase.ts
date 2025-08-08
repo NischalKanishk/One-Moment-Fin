@@ -9,7 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Create Supabase client with service role key for backend operations
-// For now, use anon key if service role key is not available
+// This client bypasses RLS policies and should be used for admin operations
 export const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey, {
   auth: {
     autoRefreshToken: false,
@@ -22,6 +22,13 @@ console.log('Supabase Configuration:');
 console.log('- URL:', supabaseUrl);
 console.log('- Service Role Key:', supabaseServiceKey ? 'Set' : 'Not set (using anon key)');
 console.log('- Anon Key:', supabaseAnonKey ? 'Set' : 'Not set');
+
+// Warn if service role key is missing
+if (!supabaseServiceKey) {
+  console.warn('⚠️  WARNING: SUPABASE_SERVICE_ROLE_KEY is not set!');
+  console.warn('   This will cause database operations to fail due to RLS policies.');
+  console.warn('   Please set the service role key in your .env file.');
+}
 
 // Create public client for auth operations
 export const supabasePublic = createClient(

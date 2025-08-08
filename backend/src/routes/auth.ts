@@ -2,6 +2,7 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { supabasePublic, supabase } from '../config/supabase';
 import { authenticateUser } from '../middleware/auth';
+import { UserMigrationService } from '../services/userMigration';
 
 const router = express.Router();
 
@@ -206,9 +207,26 @@ router.post('/signup', [
 
     if (userError) {
       console.error('User table insert error:', userError);
-      // Note: We don't fail here as the auth user was created
+      
+      // Check if it's an API key issue
+      if (userError.message?.includes('Invalid API key')) {
+        console.error('❌ CRITICAL: Invalid Supabase API key detected!');
+        console.error('   Please check your SUPABASE_SERVICE_ROLE_KEY in .env file');
+        return res.status(500).json({ 
+          error: 'Server configuration error. Please contact support.',
+          details: 'Invalid API key - server needs to be configured properly',
+          auth_user_id: data.user.id 
+        });
+      }
+      
+      // For other database errors, return a more specific error
+      return res.status(500).json({ 
+        error: 'User created in auth but failed to create profile. Please contact support.',
+        details: userError.message,
+        auth_user_id: data.user.id 
+      });
     } else {
-      console.log('User created successfully in database');
+      console.log('✅ User created successfully in database');
     }
 
     return res.json({
@@ -336,6 +354,87 @@ router.put('/profile', authenticateUser, [
   } catch (error) {
     console.error('Profile update error:', error);
     return res.status(500).json({ error: 'Profile update failed' });
+  }
+});
+
+// POST /api/auth/migrate-user (Admin endpoint to migrate orphaned auth users)
+router.post('/migrate-user', authenticateUser, [
+  body('auth_user_id').notEmpty().withMessage('Auth user ID is required'),
+  body('full_name').notEmpty().withMessage('Full name is required'),
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('phone').optional().isString().withMessage('Phone must be a string'),
+  body('role').optional().isIn(['mfd', 'admin']).withMessage('Valid role required')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    // Check if user is admin
+    if (req.user!.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { auth_user_id, full_name, email, phone, role } = req.body;
+
+    const result = await UserMigrationService.migrateAuthUser(auth_user_id, {
+      full_name,
+      email,
+      phone,
+      role
+    });
+
+    if (!result.success) {
+      return res.status(500).json({ error: result.error });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error('User migration error:', error);
+    return res.status(500).json({ error: 'Migration failed' });
+  }
+});
+
+// GET /api/auth/orphaned-users (Admin endpoint to list orphaned auth users)
+router.get('/orphaned-users', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    // Check if user is admin
+    if (req.user!.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const result = await UserMigrationService.getOrphanedAuthUsers();
+
+    if (!result.success) {
+      return res.status(500).json({ error: result.error });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error('Get orphaned users error:', error);
+    return res.status(500).json({ error: 'Failed to get orphaned users' });
+  }
+});
+
+// POST /api/auth/bulk-migrate (Admin endpoint to bulk migrate orphaned users)
+router.post('/bulk-migrate', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    // Check if user is admin
+    if (req.user!.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const result = await UserMigrationService.bulkMigrateOrphanedUsers();
+
+    if (!result.success) {
+      return res.status(500).json({ error: result.error });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error('Bulk migration error:', error);
+    return res.status(500).json({ error: 'Bulk migration failed' });
   }
 });
 

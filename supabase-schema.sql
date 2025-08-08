@@ -4,9 +4,9 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. Users table (MFDs)
+-- 1. Users table (MFDs) - Updated to work with Supabase Auth
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY, -- Remove DEFAULT to allow Auth user IDs
     full_name TEXT NOT NULL,
     email TEXT UNIQUE,
     phone TEXT UNIQUE,
@@ -17,6 +17,26 @@ CREATE TABLE users (
     settings JSONB DEFAULT '{}',
     role TEXT DEFAULT 'mfd' CHECK (role IN ('mfd', 'admin'))
 );
+
+-- Enable Row Level Security
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for users table
+-- Allow users to read their own data
+CREATE POLICY "Users can view own data" ON users
+    FOR SELECT USING (auth.uid() = id);
+
+-- Allow users to insert their own data (for signup)
+CREATE POLICY "Users can insert own data" ON users
+    FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Allow users to update their own data
+CREATE POLICY "Users can update own data" ON users
+    FOR UPDATE USING (auth.uid() = id);
+
+-- Allow service role to manage all users (for backend operations)
+CREATE POLICY "Service role can manage all users" ON users
+    FOR ALL USING (auth.role() = 'service_role');
 
 -- 2. Leads table
 CREATE TABLE leads (
@@ -35,6 +55,25 @@ CREATE TABLE leads (
     kyc_status TEXT DEFAULT 'pending' CHECK (kyc_status IN ('pending', 'incomplete', 'completed'))
 );
 
+-- Enable RLS for leads
+ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for leads table
+CREATE POLICY "Users can view own leads" ON leads
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own leads" ON leads
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own leads" ON leads
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own leads" ON leads
+    FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can manage all leads" ON leads
+    FOR ALL USING (auth.role() = 'service_role');
+
 -- 3. Assessments table
 CREATE TABLE assessments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -44,6 +83,25 @@ CREATE TABLE assessments (
     is_active BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Enable RLS for assessments
+ALTER TABLE assessments ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for assessments table
+CREATE POLICY "Users can view own assessments" ON assessments
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own assessments" ON assessments
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own assessments" ON assessments
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own assessments" ON assessments
+    FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can manage all assessments" ON assessments
+    FOR ALL USING (auth.role() = 'service_role');
 
 -- 4. Assessment Questions table
 CREATE TABLE assessment_questions (
@@ -55,6 +113,49 @@ CREATE TABLE assessment_questions (
     weight INTEGER DEFAULT 1,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Enable RLS for assessment_questions
+ALTER TABLE assessment_questions ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for assessment_questions table
+CREATE POLICY "Users can view assessment questions" ON assessment_questions
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM assessments 
+            WHERE assessments.id = assessment_questions.assessment_id 
+            AND assessments.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can insert assessment questions" ON assessment_questions
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM assessments 
+            WHERE assessments.id = assessment_questions.assessment_id 
+            AND assessments.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can update assessment questions" ON assessment_questions
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM assessments 
+            WHERE assessments.id = assessment_questions.assessment_id 
+            AND assessments.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can delete assessment questions" ON assessment_questions
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM assessments 
+            WHERE assessments.id = assessment_questions.assessment_id 
+            AND assessments.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Service role can manage all assessment questions" ON assessment_questions
+    FOR ALL USING (auth.role() = 'service_role');
 
 -- 5. Risk Assessments table
 CREATE TABLE risk_assessments (
@@ -68,6 +169,25 @@ CREATE TABLE risk_assessments (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Enable RLS for risk_assessments
+ALTER TABLE risk_assessments ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for risk_assessments table
+CREATE POLICY "Users can view own risk assessments" ON risk_assessments
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own risk assessments" ON risk_assessments
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own risk assessments" ON risk_assessments
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own risk assessments" ON risk_assessments
+    FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can manage all risk assessments" ON risk_assessments
+    FOR ALL USING (auth.role() = 'service_role');
+
 -- 6. Risk Assessment Answers table
 CREATE TABLE risk_assessment_answers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -76,6 +196,49 @@ CREATE TABLE risk_assessment_answers (
     answer_value TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Enable RLS for risk_assessment_answers
+ALTER TABLE risk_assessment_answers ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for risk_assessment_answers table
+CREATE POLICY "Users can view risk assessment answers" ON risk_assessment_answers
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM risk_assessments 
+            WHERE risk_assessments.id = risk_assessment_answers.risk_assessment_id 
+            AND risk_assessments.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can insert risk assessment answers" ON risk_assessment_answers
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM risk_assessments 
+            WHERE risk_assessments.id = risk_assessment_answers.risk_assessment_id 
+            AND risk_assessments.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can update risk assessment answers" ON risk_assessment_answers
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM risk_assessments 
+            WHERE risk_assessments.id = risk_assessment_answers.risk_assessment_id 
+            AND risk_assessments.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can delete risk assessment answers" ON risk_assessment_answers
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM risk_assessments 
+            WHERE risk_assessments.id = risk_assessment_answers.risk_assessment_id 
+            AND risk_assessments.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Service role can manage all risk assessment answers" ON risk_assessment_answers
+    FOR ALL USING (auth.role() = 'service_role');
 
 -- 7. Product Recommendations table
 CREATE TABLE product_recommendations (
@@ -90,6 +253,25 @@ CREATE TABLE product_recommendations (
     visibility TEXT DEFAULT 'public' CHECK (visibility IN ('public', 'private')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Enable RLS for product_recommendations
+ALTER TABLE product_recommendations ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for product_recommendations table
+CREATE POLICY "Users can view own products" ON product_recommendations
+    FOR SELECT USING (auth.uid() = user_id OR visibility = 'public');
+
+CREATE POLICY "Users can insert own products" ON product_recommendations
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own products" ON product_recommendations
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own products" ON product_recommendations
+    FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can manage all products" ON product_recommendations
+    FOR ALL USING (auth.role() = 'service_role');
 
 -- 8. Meetings table
 CREATE TABLE meetings (
@@ -108,6 +290,25 @@ CREATE TABLE meetings (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Enable RLS for meetings
+ALTER TABLE meetings ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for meetings table
+CREATE POLICY "Users can view own meetings" ON meetings
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own meetings" ON meetings
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own meetings" ON meetings
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own meetings" ON meetings
+    FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can manage all meetings" ON meetings
+    FOR ALL USING (auth.role() = 'service_role');
+
 -- 9. KYC Status table
 CREATE TABLE kyc_status (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -121,6 +322,22 @@ CREATE TABLE kyc_status (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Enable RLS for kyc_status
+ALTER TABLE kyc_status ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for kyc_status table
+CREATE POLICY "Users can view own kyc" ON kyc_status
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own kyc" ON kyc_status
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own kyc" ON kyc_status
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can manage all kyc" ON kyc_status
+    FOR ALL USING (auth.role() = 'service_role');
 
 -- 10. Subscription Plans table
 CREATE TABLE subscription_plans (
@@ -136,6 +353,22 @@ CREATE TABLE subscription_plans (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Enable RLS for subscription_plans
+ALTER TABLE subscription_plans ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for subscription_plans table
+CREATE POLICY "Users can view own subscription plans" ON subscription_plans
+    FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "Users can insert own subscription plans" ON subscription_plans
+    FOR INSERT WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Users can update own subscription plans" ON subscription_plans
+    FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Service role can manage all subscription plans" ON subscription_plans
+    FOR ALL USING (auth.role() = 'service_role');
+
 -- 11. User Subscriptions table
 CREATE TABLE user_subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -150,6 +383,22 @@ CREATE TABLE user_subscriptions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Enable RLS for user_subscriptions
+ALTER TABLE user_subscriptions ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for user_subscriptions table
+CREATE POLICY "Users can view own user subscriptions" ON user_subscriptions
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own user subscriptions" ON user_subscriptions
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own user subscriptions" ON user_subscriptions
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can manage all user subscriptions" ON user_subscriptions
+    FOR ALL USING (auth.role() = 'service_role');
+
 -- 12. AI Feedback table
 CREATE TABLE ai_feedback (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -160,6 +409,22 @@ CREATE TABLE ai_feedback (
     comment TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Enable RLS for ai_feedback
+ALTER TABLE ai_feedback ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for ai_feedback table
+CREATE POLICY "Users can view own ai feedback" ON ai_feedback
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own ai feedback" ON ai_feedback
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own ai feedback" ON ai_feedback
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can manage all ai feedback" ON ai_feedback
+    FOR ALL USING (auth.role() = 'service_role');
 
 -- Create indexes for better performance
 CREATE INDEX idx_leads_user_id ON leads(user_id);
@@ -194,46 +459,3 @@ $$ language 'plpgsql';
 -- Create trigger for kyc_status table
 CREATE TRIGGER update_kyc_status_updated_at BEFORE UPDATE ON kyc_status
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- Enable Row Level Security (RLS)
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
-ALTER TABLE assessments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE assessment_questions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE risk_assessments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE risk_assessment_answers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE product_recommendations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE meetings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE kyc_status ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_subscriptions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ai_feedback ENABLE ROW LEVEL SECURITY;
-
--- Create RLS policies (basic ones - you'll customize these based on your auth logic)
--- Users can only see their own data
-CREATE POLICY "Users can view own data" ON users FOR SELECT USING (auth.uid()::text = id::text);
-CREATE POLICY "Users can update own data" ON users FOR UPDATE USING (auth.uid()::text = id::text);
-
--- Leads policies
-CREATE POLICY "Users can view own leads" ON leads FOR SELECT USING (user_id::text = auth.uid()::text);
-CREATE POLICY "Users can insert own leads" ON leads FOR INSERT WITH CHECK (user_id::text = auth.uid()::text);
-CREATE POLICY "Users can update own leads" ON leads FOR UPDATE USING (user_id::text = auth.uid()::text);
-
--- Assessments policies
-CREATE POLICY "Users can view own assessments" ON assessments FOR SELECT USING (user_id::text = auth.uid()::text);
-CREATE POLICY "Users can insert own assessments" ON assessments FOR INSERT WITH CHECK (user_id::text = auth.uid()::text);
-CREATE POLICY "Users can update own assessments" ON assessments FOR UPDATE USING (user_id::text = auth.uid()::text);
-
--- Product recommendations policies
-CREATE POLICY "Users can view own products" ON product_recommendations FOR SELECT USING (user_id::text = auth.uid()::text OR visibility = 'public');
-CREATE POLICY "Users can insert own products" ON product_recommendations FOR INSERT WITH CHECK (user_id::text = auth.uid()::text);
-CREATE POLICY "Users can update own products" ON product_recommendations FOR UPDATE USING (user_id::text = auth.uid()::text);
-
--- Meetings policies
-CREATE POLICY "Users can view own meetings" ON meetings FOR SELECT USING (user_id::text = auth.uid()::text);
-CREATE POLICY "Users can insert own meetings" ON meetings FOR INSERT WITH CHECK (user_id::text = auth.uid()::text);
-CREATE POLICY "Users can update own meetings" ON meetings FOR UPDATE USING (user_id::text = auth.uid()::text);
-
--- KYC policies
-CREATE POLICY "Users can view own kyc" ON kyc_status FOR SELECT USING (user_id::text = auth.uid()::text);
-CREATE POLICY "Users can insert own kyc" ON kyc_status FOR INSERT WITH CHECK (user_id::text = auth.uid()::text);
-CREATE POLICY "Users can update own kyc" ON kyc_status FOR UPDATE USING (user_id::text = auth.uid()::text);
