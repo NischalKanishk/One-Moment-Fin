@@ -110,4 +110,164 @@ All colors MUST be HSL.
 @layer components {
   .hover-scale { @apply transition-transform duration-200 hover:scale-105; }
   .story-link { @apply relative inline-block after:content-[''] after:absolute after:w-full after:scale-x-0 after:h-0.5 after:bottom-0 after:left-0 after:bg-primary after:origin-bottom-right after:transition-transform after:duration-300 hover:after:scale-x-100 hover:after:origin-bottom-left; }
+  
+  /* Professional Sidebar Navigation */
+  .sidenav {
+    background: hsl(var(--background));
+    border-right: 1px solid hsl(var(--border));
+    width: 240px;
+    padding: 0;
+  }
+  
+  .sidenav-brand {
+    color: hsl(var(--foreground));
+    font-weight: 700;
+    font-size: 1.25rem;
+    padding: 0.75rem 1rem;
+    margin: 0.5rem;
+    border-radius: var(--radius-lg);
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--shadow-sm);
+  }
+  
+  .brand-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    background: hsl(var(--accent));
+    border-radius: 50%;
+    margin-right: 0.5rem;
+  }
+  
+  .sidenav-separator {
+    background: hsl(var(--border));
+    margin: 0 0.75rem;
+  }
+  
+  /* Navigation Items */
+  .nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    margin: 0.125rem 0.75rem;
+    border-radius: var(--radius-lg);
+    color: hsl(var(--muted-foreground));
+    text-decoration: none;
+    outline: none;
+    transition: all 0.2s ease-in-out;
+    font-size: 0.875rem;
+  }
+  
+  .nav-item .active-bar {
+    position: absolute;
+    left: 0;
+    top: 0.375rem;
+    bottom: 0.375rem;
+    width: 0.25rem;
+    border-radius: 0.125rem;
+    background: transparent;
+    transition: background-color 0.2s ease-in-out;
+  }
+  
+  .nav-icon {
+    opacity: 0.7;
+    width: 1.25rem;
+    height: 1.25rem;
+    transition: opacity 0.2s ease-in-out;
+  }
+  
+  .nav-label {
+    font-weight: 400;
+    transition: font-weight 0.2s ease-in-out;
+  }
+  
+  /* Hover State */
+  .nav-item:hover {
+    background: hsl(var(--accent) / 0.08);
+    color: hsl(var(--foreground));
+  }
+  
+  .nav-item:hover .nav-icon {
+    opacity: 0.9;
+  }
+  
+  /* Focus State */
+  .nav-item:focus-visible {
+    outline: 2px solid hsl(var(--accent));
+    outline-offset: 2px;
+    box-shadow: var(--shadow-sm);
+  }
+  
+  /* Active State */
+  .nav-item[data-active="true"] {
+    background: hsl(var(--accent) / 0.12);
+    color: hsl(var(--foreground));
+    font-weight: 600;
+  }
+  
+  .nav-item[data-active="true"] .active-bar {
+    background: hsl(var(--accent));
+  }
+  
+  .nav-item[data-active="true"] .nav-icon {
+    opacity: 1;
+  }
+  
+  .nav-item[data-active="true"] .nav-label {
+    font-weight: 600;
+  }
+  
+  /* Active + Hover State */
+  .nav-item[data-active="true"]:hover {
+    background: hsl(var(--accent) / 0.16);
+  }
+  
+  /* Collapsed State (icon only) */
+  .sidenav[data-collapsed="true"] .nav-item {
+    justify-content: center;
+    padding: 0.5rem;
+  }
+  
+  .sidenav[data-collapsed="true"] .nav-label {
+    display: none;
+  }
+  
+  .sidenav[data-collapsed="true"] .active-bar {
+    width: 0.125rem;
+    left: 0;
+  }
+  
+  /* Dark Mode Enhancements */
+  .dark .sidenav {
+    background: hsl(var(--background));
+    border-right-color: hsl(var(--border));
+  }
+  
+  .dark .nav-item[data-active="true"] {
+    background: hsl(var(--accent) / 0.15);
+  }
+  
+  .dark .nav-item[data-active="true"]:hover {
+    background: hsl(var(--accent) / 0.2);
+  }
+  
+  /* Accessibility Improvements */
+  .nav-item:focus {
+    outline: none;
+  }
+  
+  .nav-item:focus-visible {
+    outline: 2px solid hsl(var(--accent));
+    outline-offset: 2px;
+  }
+  
+  /* Smooth transitions for all states */
+  .nav-item,
+  .nav-item .active-bar,
+  .nav-item .nav-icon,
+  .nav-item .nav-label {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 }

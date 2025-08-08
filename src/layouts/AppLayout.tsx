@@ -34,7 +34,7 @@ export default function AppLayout() {
       <div className="flex w-full min-h-screen">
         <AppSidebar />
         <SidebarInset>
-          <header className="sticky top-0 z-20 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+          <header className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border shadow-sm">
             <div className="h-14 px-4 flex items-center gap-3">
               <SidebarTrigger />
               <div className="flex-1 max-w-xl">
@@ -79,7 +79,7 @@ export default function AppLayout() {
               </div>
             </div>
           </header>
-          <div className="border-b bg-muted/30 p-3 text-sm flex items-center justify-between">
+          <div className="border-b bg-muted/50 p-3 text-sm flex items-center justify-between">
             <div><strong>Trial plan</strong> — 8 days left</div>
             <div className="flex items-center gap-2">
               <Button size="sm" variant="cta">Upgrade Plan</Button>
