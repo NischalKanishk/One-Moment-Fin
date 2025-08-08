@@ -15,6 +15,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import { logger, httpLoggerFormat } from './services/logger';
 import rateLimit from 'express-rate-limit';
 
 // Import routes
@@ -58,8 +59,19 @@ app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Logging middleware
-app.use(morgan('combined'));
+// Logging middleware -> stream to winston; rotate every minute and keep 10 minutes
+app.use(morgan(httpLoggerFormat, {
+  stream: {
+    write: (message: string) => {
+      try {
+        const parsed = JSON.parse(message);
+        logger.info('HTTP_ACCESS', parsed);
+      } catch {
+        logger.info('HTTP_ACCESS', { raw: message });
+      }
+    }
+  }
+}));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -91,7 +103,7 @@ app.use('*', (req, res) => {
 
 // Global error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Global error handler:', err);
+  logger.error('GLOBAL_ERROR', { message: err?.message, stack: err?.stack });
   
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';
@@ -104,9 +116,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 OneMFin Backend running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔗 API Base: http://localhost:${PORT}/api`);
+  logger.info('SERVER_START', { port: PORT, health: `/health`, apiBase: `/api` });
 });
 
 export default app;
