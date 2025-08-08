@@ -57,7 +57,7 @@ OneMFin is a comprehensive SaaS platform designed for Mutual Fund Distributors (
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/nischalkanishk/OneMFin.git
+git clone https://github.com/onemomentproducts/OneMFin.git
 cd OneMFin
 ```
 
