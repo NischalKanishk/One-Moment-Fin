@@ -3,14 +3,62 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { leadsAPI } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { Link } from "react-router-dom";
 
-const rows = [
-  {name:'Rohit Sharma', contact:'+91 90000 11111', age: 36, source:'Link', risk:'Balanced', meeting:'Scheduled', kyc:'Pending', value:'₹3.2L', notes:'Prefers SIP'},
-  {name:'Nisha Verma', contact:'+91 90000 22222', age: 29, source:'Referral', risk:'Conservative', meeting:'Not set', kyc:'Not started', value:'₹0', notes:'New lead'},
-  {name:'Amit Patel', contact:'+91 90000 33333', age: 41, source:'WhatsApp', risk:'Aggressive', meeting:'Done', kyc:'Complete', value:'₹12.4L', notes:'High equity'},
-]
+interface Lead {
+  id: string;
+  full_name: string;
+  email?: string;
+  phone?: string;
+  age?: number;
+  source_link?: string;
+  status: string;
+  created_at: string;
+  notes?: string;
+  risk_assessments?: any[];
+  meetings?: any[];
+  kyc_status?: any[];
+}
 
 export default function Leads(){
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [riskFilter, setRiskFilter] = useState('all');
+  const { toast } = useToast();
+
+  useEffect(() => {
+    loadLeads();
+  }, []);
+
+  const loadLeads = async () => {
+    try {
+      const { leads: leadsData } = await leadsAPI.getAll();
+      setLeads(leadsData);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load leads",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredLeads = leads.filter(lead => {
+    const matchesSearch = lead.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         lead.phone?.includes(searchTerm);
+    
+    const matchesRisk = riskFilter === 'all' || 
+                       lead.risk_assessments?.[0]?.risk_category === riskFilter;
+    
+    return matchesSearch && matchesRisk;
+  });
   return (
     <div className="space-y-6">
       <Helmet>
@@ -20,15 +68,19 @@ export default function Leads(){
 
       <div className="flex flex-col md:flex-row gap-3 items-center md:items-end">
         <div className="flex-1">
-          <Input placeholder="Search leads…" />
+          <Input 
+            placeholder="Search leads…" 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-        <Select>
+        <Select value={riskFilter} onValueChange={setRiskFilter}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Risk" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All</SelectItem>
-            <SelectItem value="cons">Conservative</SelectItem>
-            <SelectItem value="bal">Balanced</SelectItem>
-            <SelectItem value="agg">Aggressive</SelectItem>
+            <SelectItem value="low">Conservative</SelectItem>
+            <SelectItem value="medium">Balanced</SelectItem>
+            <SelectItem value="high">Aggressive</SelectItem>
           </SelectContent>
         </Select>
         <Button variant="outline">Export CSV</Button>
@@ -45,20 +97,45 @@ export default function Leads(){
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((r)=> (
-              <TableRow key={r.name} className="hover:bg-secondary/60">
-                <TableCell className="font-medium"><a href="/app/leads/1" className="underline">{r.name}</a></TableCell>
-                <TableCell>{r.contact}</TableCell>
-                <TableCell>{r.age}</TableCell>
-                <TableCell>{r.source}</TableCell>
-                <TableCell><span className="px-2 py-0.5 text-xs rounded bg-secondary">{r.risk}</span></TableCell>
-                <TableCell>{r.meeting}</TableCell>
-                <TableCell>{r.kyc}</TableCell>
-                <TableCell>{r.value}</TableCell>
-                <TableCell className="text-muted-foreground">{r.notes}</TableCell>
-                <TableCell className="space-x-2"><Button size="sm" variant="outline">Call</Button><Button size="sm" variant="outline">Meet</Button></TableCell>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={10} className="text-center py-8">Loading leads...</TableCell>
               </TableRow>
-            ))}
+            ) : filteredLeads.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={10} className="text-center py-8">No leads found</TableCell>
+              </TableRow>
+            ) : (
+              filteredLeads.map((lead) => (
+                <TableRow key={lead.id} className="hover:bg-secondary/60">
+                  <TableCell className="font-medium">
+                    <Link to={`/app/leads/${lead.id}`} className="underline">
+                      {lead.full_name}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{lead.phone || lead.email || 'N/A'}</TableCell>
+                  <TableCell>{lead.age || 'N/A'}</TableCell>
+                  <TableCell>{lead.source_link ? 'Link' : 'Manual'}</TableCell>
+                  <TableCell>
+                    <span className="px-2 py-0.5 text-xs rounded bg-secondary">
+                      {lead.risk_assessments?.[0]?.risk_category || 'Not assessed'}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {lead.meetings?.[0]?.status || 'Not scheduled'}
+                  </TableCell>
+                  <TableCell>
+                    {lead.kyc_status?.[0]?.status || 'Not started'}
+                  </TableCell>
+                  <TableCell>₹0</TableCell>
+                  <TableCell className="text-muted-foreground">{lead.notes || '-'}</TableCell>
+                  <TableCell className="space-x-2">
+                    <Button size="sm" variant="outline">Call</Button>
+                    <Button size="sm" variant="outline">Meet</Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

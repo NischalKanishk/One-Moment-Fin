@@ -17,6 +17,10 @@ import {
   Legend,
 } from "recharts";
 import { Users, Calendar, ClipboardList, TrendingUp } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { leadsAPI } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 const spark = Array.from({ length: 24 }, (_, i) => ({
   x: i,
@@ -39,6 +43,47 @@ const funnelData = [
 const riskColors = ["hsl(var(--accent))", "hsl(var(--primary))", "hsl(var(--muted))"];
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [stats, setStats] = useState({
+    total: 0,
+    byStatus: { lead: 0, assessment_done: 0, meeting_scheduled: 0, converted: 0, dropped: 0 },
+    thisMonth: 0
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = async () => {
+    try {
+      const { stats: statsData } = await leadsAPI.getStats();
+      setStats(statsData);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard stats",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const riskData = [
+    { name: "Conservative", value: stats.byStatus.lead },
+    { name: "Balanced", value: stats.byStatus.assessment_done },
+    { name: "Aggressive", value: stats.byStatus.converted },
+  ];
+
+  const funnelData = [
+    { stage: "Leads", value: stats.total },
+    { stage: "Assessment Done", value: stats.byStatus.assessment_done },
+    { stage: "Meetings", value: stats.byStatus.meeting_scheduled },
+    { stage: "Converted", value: stats.byStatus.converted },
+  ];
+
   return (
     <div className="space-y-6">
       <Helmet>
@@ -57,10 +102,10 @@ export default function Dashboard() {
       {/* Overview Cards */}
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[
-          { t: "Total leads", v: "2,341" },
-          { t: "Meetings scheduled", v: "18" },
-          { t: "Risk profiles completed", v: "764" },
-          { t: "KYC complete", v: "420" },
+          { t: "Total leads", v: loading ? "..." : stats.total.toString() },
+          { t: "Meetings scheduled", v: loading ? "..." : stats.byStatus.meeting_scheduled.toString() },
+          { t: "Risk profiles completed", v: loading ? "..." : stats.byStatus.assessment_done.toString() },
+          { t: "KYC complete", v: loading ? "..." : "0" }, // TODO: Add KYC stats
         ].map((s) => (
           <Card key={s.t} className="shadow-[var(--shadow-card)]">
             <CardHeader className="pb-2">

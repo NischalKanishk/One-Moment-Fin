@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OneMFin Auth Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .test { margin: 20px 0; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        input, button { margin: 10px 0; padding: 8px; width: 300px; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; }
+        .log { background: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>OneMFin Authentication Debug</h1>
+    
+    <div class="test">
+        <h3>Step 1: Sign Up</h3>
+        <form id="signup-form">
+            <input type="text" id="signup-name" placeholder="Full Name" value="Test User" required><br>
+            <input type="email" id="signup-email" placeholder="Email" value="test@example.com" required><br>
+            <input type="password" id="signup-password" placeholder="Password" value="password123" required><br>
+            <button type="submit">Sign Up</button>
+        </form>
+        <div id="signup-result"></div>
+    </div>
+    
+    <div class="test">
+        <h3>Step 2: Check Local Storage</h3>
+        <button onclick="checkLocalStorage()">Check Local Storage</button>
+        <div id="localstorage-result"></div>
+    </div>
+    
+    <div class="test">
+        <h3>Step 3: Test Profile API</h3>
+        <button onclick="testProfileAPI()">Test Profile API</button>
+        <div id="profile-result"></div>
+    </div>
+
+    <div class="test">
+        <h3>Step 4: Test Login</h3>
+        <form id="signin-form">
+            <input type="email" id="signin-email" placeholder="Email" value="test@example.com" required><br>
+            <input type="password" id="signin-password" placeholder="Password" value="password123" required><br>
+            <button type="submit">Sign In</button>
+        </form>
+        <div id="signin-result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001';
+        
+        function log(message, elementId) {
+            const div = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            div.innerHTML += `<div class="log">[${timestamp}] ${message}</div>`;
+        }
+        
+        document.getElementById('signup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resultDiv = document.getElementById('signup-result');
+            resultDiv.innerHTML = '<div class="info">Starting signup...</div>';
+            
+            try {
+                log('Making signup request...', 'signup-result');
+                
+                const response = await fetch(`${API_BASE}/api/auth/signup`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: document.getElementById('signup-email').value,
+                        password: document.getElementById('signup-password').value,
+                        full_name: document.getElementById('signup-name').value
+                    })
+                });
+                
+                log(`Response status: ${response.status}`, 'signup-result');
+                
+                const data = await response.json();
+                log(`Response data: ${JSON.stringify(data, null, 2)}`, 'signup-result');
+                
+                if (response.ok) {
+                    resultDiv.innerHTML += `
+                        <div class="success">
+                            <h4>✅ Signup Successful!</h4>
+                            <p>User: ${data.user.full_name}</p>
+                            <p>Email: ${data.user.email}</p>
+                            <p>Session: ${data.session ? 'Created' : 'Not created'}</p>
+                        </div>
+                    `;
+                    
+                    // Store session if available
+                    if (data.session?.access_token) {
+                        localStorage.setItem('access_token', data.session.access_token);
+                        if (data.session.refresh_token) {
+                            localStorage.setItem('refresh_token', data.session.refresh_token);
+                        }
+                        log('Session stored in localStorage', 'signup-result');
+                    }
+                } else {
+                    resultDiv.innerHTML += `
+                        <div class="error">
+                            <h4>❌ Signup Failed</h4>
+                            <p>Error: ${data.error}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML += `
+                    <div class="error">
+                        <h4>❌ Network Error</h4>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        });
+        
+        function checkLocalStorage() {
+            const resultDiv = document.getElementById('localstorage-result');
+            const token = localStorage.getItem('access_token');
+            const refreshToken = localStorage.getItem('refresh_token');
+            
+            resultDiv.innerHTML = `
+                <div class="info">
+                    <h4>Local Storage Check</h4>
+                    <p>Access Token: ${token ? 'Present' : 'Not found'}</p>
+                    <p>Refresh Token: ${refreshToken ? 'Present' : 'Not found'}</p>
+                    ${token ? `<p>Token Preview: ${token.substring(0, 20)}...</p>` : ''}
+                </div>
+            `;
+        }
+        
+        async function testProfileAPI() {
+            const resultDiv = document.getElementById('profile-result');
+            const token = localStorage.getItem('access_token');
+            
+            if (!token) {
+                resultDiv.innerHTML = '<div class="error">No access token found</div>';
+                return;
+            }
+            
+            try {
+                log('Making profile API request...', 'profile-result');
+                
+                const response = await fetch(`${API_BASE}/api/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                log(`Profile response status: ${response.status}`, 'profile-result');
+                
+                const data = await response.json();
+                log(`Profile response data: ${JSON.stringify(data, null, 2)}`, 'profile-result');
+                
+                if (response.ok) {
+                    resultDiv.innerHTML += `
+                        <div class="success">
+                            <h4>✅ Profile API Working!</h4>
+                            <p>User: ${data.user.full_name}</p>
+                            <p>Email: ${data.user.email}</p>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML += `
+                        <div class="error">
+                            <h4>❌ Profile API Failed</h4>
+                            <p>Error: ${data.error}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML += `
+                    <div class="error">
+                        <h4>❌ Network Error</h4>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        document.getElementById('signin-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resultDiv = document.getElementById('signin-result');
+            resultDiv.innerHTML = '<div class="info">Starting login...</div>';
+            
+            try {
+                log('Making login request...', 'signin-result');
+                
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: document.getElementById('signin-email').value,
+                        password: document.getElementById('signin-password').value
+                    })
+                });
+                
+                log(`Login response status: ${response.status}`, 'signin-result');
+                
+                const data = await response.json();
+                log(`Login response data: ${JSON.stringify(data, null, 2)}`, 'signin-result');
+                
+                if (response.ok) {
+                    resultDiv.innerHTML += `
+                        <div class="success">
+                            <h4>✅ Login Successful!</h4>
+                            <p>User: ${data.user.full_name}</p>
+                            <p>Email: ${data.user.email}</p>
+                            <p>Session: ${data.session ? 'Created' : 'Not created'}</p>
+                        </div>
+                    `;
+                    
+                    // Store session if available
+                    if (data.session?.access_token) {
+                        localStorage.setItem('access_token', data.session.access_token);
+                        if (data.session.refresh_token) {
+                            localStorage.setItem('refresh_token', data.session.refresh_token);
+                        }
+                        log('Session stored in localStorage', 'signin-result');
+                    }
+                } else {
+                    resultDiv.innerHTML += `
+                        <div class="error">
+                            <h4>❌ Login Failed</h4>
+                            <p>Error: ${data.error}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML += `
+                    <div class="error">
+                        <h4>❌ Network Error</h4>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>
