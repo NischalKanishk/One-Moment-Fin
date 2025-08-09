@@ -6,14 +6,16 @@ import { AIService } from '../services/ai';
 
 const router = express.Router();
 
-// POST /api/leads/create (Public endpoint for lead form submission)
-router.post('/create', [
+// POST /api/leads (Authenticated endpoint for logged-in MFD to create a lead)
+router.post('/', authenticateUser, [
   body('full_name').notEmpty().withMessage('Full name is required'),
   body('email').optional().isEmail().withMessage('Valid email required'),
   body('phone').optional().isMobilePhone('en-IN').withMessage('Valid phone number required'),
   body('age').optional().isInt({ min: 18, max: 100 }).withMessage('Valid age required'),
   body('source_link').notEmpty().withMessage('Source link is required'),
-  body('user_id').notEmpty().withMessage('User ID is required')
+  body('notes').optional().isString().isLength({ max: 1000 }).withMessage('Notes must be a string (max 1000 chars)'),
+  body('status').optional().isIn(['lead', 'assessment done', 'meeting_scheduled', 'converted', 'dropped']).withMessage('Invalid status'),
+  body('kyc_status').optional().isIn(['pending', 'incomplete', 'completed']).withMessage('Invalid KYC status'),
 ], async (req: express.Request, res: express.Response) => {
   try {
     const errors = validationResult(req);
@@ -21,20 +23,11 @@ router.post('/create', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { full_name, email, phone, age, source_link, user_id } = req.body;
+    // Only allow whitelisted fields
+    const { full_name, email, phone, age, source_link, notes, status, kyc_status } = req.body;
+    const user_id = req.user!.id;
 
-    // Verify the user exists
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id, referral_link')
-      .eq('id', user_id)
-      .single();
-
-    if (userError || !userData) {
-      return res.status(404).json({ error: 'Invalid referral link' });
-    }
-
-    // Create the lead
+    // Insert lead, enforce tenant isolation
     const { data: leadData, error: leadError } = await supabase
       .from('leads')
       .insert({
@@ -44,7 +37,9 @@ router.post('/create', [
         phone,
         age,
         source_link,
-        status: 'lead'
+        notes,
+        status: status || 'lead',
+        kyc_status: kyc_status || 'pending',
       })
       .select()
       .single();
@@ -54,10 +49,7 @@ router.post('/create', [
       return res.status(500).json({ error: 'Failed to create lead' });
     }
 
-    return res.json({
-      message: 'Lead created successfully',
-      lead: leadData
-    });
+    return res.json({ message: 'Lead created successfully', lead: leadData });
   } catch (error) {
     console.error('Lead creation error:', error);
     return res.status(500).json({ error: 'Lead creation failed' });

@@ -30,38 +30,167 @@ const SelectTrigger = React.forwardRef<
 ))
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName
 
+// Enhanced scroll button with controlled scrolling
 const SelectScrollUpButton = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.ScrollUpButton>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollUpButton>
->(({ className, ...props }, ref) => (
-  <SelectPrimitive.ScrollUpButton
-    ref={ref}
-    className={cn(
-      "flex cursor-default items-center justify-center py-1",
-      className
-    )}
-    {...props}
-  >
-    <ChevronUp className="h-4 w-4" />
-  </SelectPrimitive.ScrollUpButton>
-))
+>(({ className, ...props }, ref) => {
+  const scrollInterval = React.useRef<NodeJS.Timeout | null>(null)
+
+  const handleMouseEnter = React.useCallback((event: React.MouseEvent) => {
+    // Find the viewport by looking for the closest element with overflow-y-auto
+    const target = event.currentTarget as HTMLElement
+    let viewport: HTMLElement | null = null
+    
+    // Start from the parent and traverse up to find the viewport
+    let parent = target.parentElement
+    while (parent && !viewport) {
+      // Check if this element has scrollable content
+      const computedStyle = window.getComputedStyle(parent)
+      if (computedStyle.overflowY === 'auto' || computedStyle.overflowY === 'scroll') {
+        viewport = parent
+      } else {
+        // Check children for scrollable elements
+        const children = parent.children
+        for (let i = 0; i < children.length; i++) {
+          const child = children[i] as HTMLElement
+          const childStyle = window.getComputedStyle(child)
+          if (childStyle.overflowY === 'auto' || childStyle.overflowY === 'scroll') {
+            viewport = child
+            break
+          }
+        }
+        parent = parent.parentElement
+      }
+    }
+
+    if (viewport) {
+      // Start controlled scrolling with a delay and slower pace
+      scrollInterval.current = setInterval(() => {
+        if (viewport && viewport.scrollTop > 0) {
+          viewport.scrollTop = Math.max(0, viewport.scrollTop - 10) // Scroll up by 10px every 200ms
+        } else {
+          // Stop scrolling if we're at the top
+          if (scrollInterval.current) {
+            clearInterval(scrollInterval.current)
+            scrollInterval.current = null
+          }
+        }
+      }, 200)
+    }
+  }, [])
+
+  const handleMouseLeave = React.useCallback(() => {
+    if (scrollInterval.current) {
+      clearInterval(scrollInterval.current)
+      scrollInterval.current = null
+    }
+  }, [])
+
+  React.useEffect(() => {
+    return () => {
+      if (scrollInterval.current) {
+        clearInterval(scrollInterval.current)
+      }
+    }
+  }, [])
+
+  return (
+    <SelectPrimitive.ScrollUpButton
+      ref={ref}
+      className={cn(
+        "flex cursor-default items-center justify-center py-1 transition-colors hover:bg-accent/50",
+        className
+      )}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      {...props}
+    >
+      <ChevronUp className="h-4 w-4" />
+    </SelectPrimitive.ScrollUpButton>
+  )
+})
 SelectScrollUpButton.displayName = SelectPrimitive.ScrollUpButton.displayName
 
 const SelectScrollDownButton = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.ScrollDownButton>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollDownButton>
->(({ className, ...props }, ref) => (
-  <SelectPrimitive.ScrollDownButton
-    ref={ref}
-    className={cn(
-      "flex cursor-default items-center justify-center py-1",
-      className
-    )}
-    {...props}
-  >
-    <ChevronDown className="h-4 w-4" />
-  </SelectPrimitive.ScrollDownButton>
-))
+>(({ className, ...props }, ref) => {
+  const scrollInterval = React.useRef<NodeJS.Timeout | null>(null)
+
+  const handleMouseEnter = React.useCallback((event: React.MouseEvent) => {
+    // Find the viewport by looking for the closest element with overflow-y-auto
+    const target = event.currentTarget as HTMLElement
+    let viewport: HTMLElement | null = null
+    
+    // Start from the parent and traverse up to find the viewport
+    let parent = target.parentElement
+    while (parent && !viewport) {
+      // Check if this element has scrollable content
+      const computedStyle = window.getComputedStyle(parent)
+      if (computedStyle.overflowY === 'auto' || computedStyle.overflowY === 'scroll') {
+        viewport = parent
+      } else {
+        // Check children for scrollable elements
+        const children = parent.children
+        for (let i = 0; i < children.length; i++) {
+          const child = children[i] as HTMLElement
+          const childStyle = window.getComputedStyle(child)
+          if (childStyle.overflowY === 'auto' || childStyle.overflowY === 'scroll') {
+            viewport = child
+            break
+          }
+        }
+        parent = parent.parentElement
+      }
+    }
+
+    if (viewport) {
+      // Start controlled scrolling with a delay and slower pace
+      scrollInterval.current = setInterval(() => {
+        if (viewport && viewport.scrollTop < viewport.scrollHeight - viewport.clientHeight) {
+          viewport.scrollTop = Math.min(viewport.scrollHeight - viewport.clientHeight, viewport.scrollTop + 10) // Scroll down by 10px every 200ms
+        } else {
+          // Stop scrolling if we're at the bottom
+          if (scrollInterval.current) {
+            clearInterval(scrollInterval.current)
+            scrollInterval.current = null
+          }
+        }
+      }, 200)
+    }
+  }, [])
+
+  const handleMouseLeave = React.useCallback(() => {
+    if (scrollInterval.current) {
+      clearInterval(scrollInterval.current)
+      scrollInterval.current = null
+    }
+  }, [])
+
+  React.useEffect(() => {
+    return () => {
+      if (scrollInterval.current) {
+        clearInterval(scrollInterval.current)
+      }
+    }
+  }, [])
+
+  return (
+    <SelectPrimitive.ScrollDownButton
+      ref={ref}
+      className={cn(
+        "flex cursor-default items-center justify-center py-1 transition-colors hover:bg-accent/50",
+        className
+      )}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      {...props}
+    >
+      <ChevronDown className="h-4 w-4" />
+    </SelectPrimitive.ScrollDownButton>
+  )
+})
 SelectScrollDownButton.displayName =
   SelectPrimitive.ScrollDownButton.displayName
 
@@ -84,7 +213,7 @@ const SelectContent = React.forwardRef<
       <SelectScrollUpButton />
       <SelectPrimitive.Viewport
         className={cn(
-          "p-1",
+          "p-1 scroll-smooth",
           position === "popper" &&
             "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
         )}

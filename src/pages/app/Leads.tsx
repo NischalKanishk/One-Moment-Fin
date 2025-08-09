@@ -8,6 +8,10 @@ import { leadsAPI } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { Textarea } from '@/components/ui/textarea';
+import { useForm } from 'react-hook-form';
 
 interface Lead {
   id: string;
@@ -25,6 +29,33 @@ interface Lead {
   portfolio_value?: number;
 }
 
+interface LeadFormData {
+  full_name: string;
+  email: string;
+  phone: string;
+  age: string;
+  source_link: string;
+  notes: string;
+  status: string;
+  kyc_status: string;
+}
+
+// Common lead sources for MFDs
+const LEAD_SOURCES = [
+  { value: 'sms', label: 'SMS' },
+  { value: 'in_person', label: 'In-Person Meeting' },
+  { value: 'phone_call', label: 'Phone Call' },
+  { value: 'referral', label: 'Referral' },
+  { value: 'social_media', label: 'Social Media' },
+  { value: 'website', label: 'Website' },
+  { value: 'email', label: 'Email' },
+  { value: 'walk_in', label: 'Walk-in' },
+  { value: 'seminar', label: 'Seminar/Event' },
+  { value: 'advertisement', label: 'Advertisement' },
+  { value: 'cold_call', label: 'Cold Call' },
+  { value: 'other', label: 'Other' },
+] as const;
+
 export default function Leads(){
   const { user } = useUser();
   const { getToken } = useAuth();
@@ -33,6 +64,21 @@ export default function Leads(){
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [riskFilter, setRiskFilter] = useState('all');
+  const [addOpen, setAddOpen] = useState(false);
+  
+  const form = useForm<LeadFormData>({
+    defaultValues: {
+      full_name: '',
+      email: '',
+      phone: '',
+      age: '',
+      source_link: 'website',
+      notes: '',
+      status: 'lead',
+      kyc_status: 'pending',
+    },
+    mode: 'onBlur',
+  });
 
   useEffect(() => {
     loadLeads();
@@ -40,7 +86,6 @@ export default function Leads(){
 
   const loadLeads = async () => {
     try {
-      // Get the Clerk token for authentication
       const token = await getToken();
       
       if (!token) {
@@ -50,10 +95,7 @@ export default function Leads(){
       const { leads: leadsData } = await leadsAPI.getAll(token);
       setLeads(leadsData);
     } catch (error) {
-      // Set empty leads on error
       setLeads([]);
-      
-      // Show error toast
       toast({
         title: "Error",
         description: "Failed to load leads. Please try again later.",
@@ -61,6 +103,34 @@ export default function Leads(){
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddLead = async (values: LeadFormData) => {
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('No authentication token available');
+      
+      // Convert age to number if provided
+      const leadData = {
+        ...values,
+        age: values.age ? parseInt(values.age) : undefined,
+      };
+      
+      await leadsAPI.createLead(token, leadData);
+      setAddOpen(false);
+      form.reset();
+      loadLeads();
+      toast({ 
+        title: 'Success', 
+        description: 'Lead created successfully.' 
+      });
+    } catch (err: any) {
+      toast({ 
+        title: 'Error', 
+        description: err.message || 'Failed to create lead', 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -74,6 +144,7 @@ export default function Leads(){
     
     return matchesSearch && matchesRisk;
   });
+
   return (
     <div className="space-y-6">
       <Helmet>
@@ -90,16 +161,230 @@ export default function Leads(){
           />
         </div>
         <Select value={riskFilter} onValueChange={setRiskFilter}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Risk" /></SelectTrigger>
-          <SelectContent>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Risk" />
+          </SelectTrigger>
+          <SelectContent 
+            position="popper" 
+            side="bottom" 
+            align="start"
+            sideOffset={4}
+            className="max-h-[200px] overflow-y-auto"
+          >
             <SelectItem value="all">All</SelectItem>
             <SelectItem value="low">Conservative</SelectItem>
             <SelectItem value="medium">Balanced</SelectItem>
             <SelectItem value="high">Aggressive</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline">Export CSV</Button>
-        <Button variant="cta">Send KYC link</Button>
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogTrigger asChild>
+            <Button variant="cta">Add Lead</Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-visible">
+            <DialogHeader className="pb-4">
+              <DialogTitle className="text-xl font-semibold">Add New Lead</DialogTitle>
+            </DialogHeader>
+            <div 
+              className="max-h-[calc(90vh-120px)] overflow-y-auto scroll-smooth"
+              style={{ 
+                scrollBehavior: 'smooth',
+                scrollbarWidth: 'thin',
+                scrollbarColor: 'hsl(var(--border)) hsl(var(--background))'
+              }}
+            >
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(handleAddLead)} className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="full_name"
+                        rules={{ required: 'Full name is required' }}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Full Name *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter full name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="email"
+                          rules={{ 
+                            pattern: { 
+                              value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i, 
+                              message: 'Invalid email address' 
+                            } 
+                          }}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email</FormLabel>
+                              <FormControl>
+                                <Input type="email" placeholder="Enter email address" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="phone"
+                          rules={{ 
+                            pattern: { 
+                              value: /^[0-9]{10}$/, 
+                              message: 'Phone number must be 10 digits' 
+                            } 
+                          }}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Phone</FormLabel>
+                              <FormControl>
+                                <Input type="tel" placeholder="Enter phone number" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="age"
+                          rules={{ 
+                            min: { value: 18, message: 'Minimum age is 18' },
+                            max: { value: 100, message: 'Maximum age is 100' }
+                          }}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Age</FormLabel>
+                              <FormControl>
+                                <Input type="number" placeholder="Enter age" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="source_link"
+                          rules={{ required: 'Source is required' }}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Source *</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select source" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent 
+                                  position="popper" 
+                                  side="bottom" 
+                                  align="start"
+                                  sideOffset={4}
+                                  className="max-h-[200px] overflow-y-auto"
+                                >
+                                  {LEAD_SOURCES.map((source) => (
+                                    <SelectItem key={source.value} value={source.value}>
+                                      {source.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="status"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Status</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select status" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent 
+                                  position="popper" 
+                                  side="bottom" 
+                                  align="start"
+                                  sideOffset={4}
+                                  className="max-h-[200px] overflow-y-auto"
+                                >
+                                  <SelectItem value="lead">Lead</SelectItem>
+                                  <SelectItem value="assessment done">Assessment Done</SelectItem>
+                                  <SelectItem value="meeting_scheduled">Meeting Scheduled</SelectItem>
+                                  <SelectItem value="converted">Converted</SelectItem>
+                                  <SelectItem value="dropped">Dropped</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="kyc_status"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>KYC Status</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select KYC status" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent 
+                                  position="popper" 
+                                  side="bottom" 
+                                  align="start"
+                                  sideOffset={4}
+                                  className="max-h-[200px] overflow-y-auto"
+                                >
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="incomplete">Incomplete</SelectItem>
+                                  <SelectItem value="completed">Completed</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="notes"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Notes</FormLabel>
+                            <FormControl>
+                              <Textarea placeholder="Add notes (optional)" className="min-h-[80px]" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <DialogFooter className="pt-6">
+                      <Button type="submit" variant="cta">Create Lead</Button>
+                      <DialogClose asChild>
+                        <Button type="button" variant="outline">Cancel</Button>
+                      </DialogClose>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </div>
+            </DialogContent>
+        </Dialog>
       </div>
 
       <div className="border rounded-lg overflow-hidden">
@@ -158,8 +443,6 @@ export default function Leads(){
           </TableBody>
         </Table>
       </div>
-
-
     </div>
   )
 }
