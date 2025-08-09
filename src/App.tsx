@@ -32,13 +32,13 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            
-            {/* Auth routes */}
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/onboarding" element={<Onboarding />} />
+                           <Routes>
+                   <Route path="/" element={<Index />} />
+
+                   {/* Auth routes */}
+                   <Route path="/auth" element={<Auth />} />
+                   <Route path="/signup" element={<Signup />} />
+                   <Route path="/onboarding" element={<Onboarding />} />
 
             {/* Protected app routes */}
             <Route path="/app" element={
