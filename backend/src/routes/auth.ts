@@ -31,23 +31,51 @@ router.post('/logout', authenticateUser, async (req: express.Request, res: expre
 // GET /api/auth/me
 router.get('/me', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
-    // Try to get user data from database (may fail due to API key issues)
-    try {
-      const { data: userData, error } = await supabase
+    const clerkId = req.user!.id;
+    
+    // Try to get user data from database
+    let { data: userData, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('clerk_id', clerkId)
+      .single();
+
+    if (error && error.code === 'PGRST116') {
+      // User doesn't exist, create them with basic info
+      console.log(`Creating new user for Clerk ID: ${clerkId}`);
+      
+      const { data: newUser, error: createError } = await supabase
         .from('users')
-        .select('*')
-        .eq('id', req.user!.id)
+        .insert({
+          clerk_id: clerkId,
+          full_name: req.user!.email?.split('@')[0] || 'New User',
+          email: req.user!.email || null,
+          phone: req.user!.phone || null,
+          auth_provider: 'clerk',
+          role: 'mfd',
+          referral_link: `ref_${clerkId.slice(-8)}`,
+          settings: {}
+        })
+        .select()
         .single();
 
-      if (userData) {
-        return res.json({ user: userData });
+      if (createError) {
+        console.error('Error creating user:', createError);
+        return res.status(500).json({ error: 'Failed to create user profile' });
       }
-    } catch (dbError) {
-      console.error('Database error:', dbError);
+
+      userData = newUser;
+      console.log('New user created:', newUser.id);
+    } else if (error) {
+      console.error('Database error:', error);
       return res.status(500).json({ error: 'Failed to fetch user data from database' });
     }
 
-    // If database fails or user not found, return error
+    if (userData) {
+      return res.json({ user: userData });
+    }
+
+    // If we still don't have user data, return error
     return res.status(404).json({ error: 'User not found in database' });
   } catch (error) {
     console.error('Get user error:', error);
@@ -63,8 +91,19 @@ router.post('/refresh', async (req: express.Request, res: express.Response) => {
 
 // PUT /api/auth/profile
 router.put('/profile', authenticateUser, [
-  body('full_name').optional().notEmpty().withMessage('Full name cannot be empty'),
-  body('phone').optional().isMobilePhone('en-IN').withMessage('Valid phone number required')
+  body('full_name')
+    .optional()
+    .notEmpty().withMessage('Full name cannot be empty')
+    .isLength({ max: 200 }).withMessage('Full name cannot exceed 200 characters'),
+  body('phone')
+    .optional()
+    .isString().withMessage('Phone must be a string')
+    .custom((value) => {
+      if (value && !value.match(/^\+[0-9]{10,15}$/)) {
+        throw new Error('Phone number must be in format +[country code][number] (10-15 digits total)');
+      }
+      return true;
+    })
 ], async (req: express.Request, res: express.Response) => {
   try {
     const errors = validationResult(req);
@@ -73,19 +112,60 @@ router.put('/profile', authenticateUser, [
     }
 
     const { full_name, phone, settings } = req.body;
+    const clerkId = req.user!.id;
 
+    // First, check if user exists in database
+    let { data: existingUser, error: fetchError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('clerk_id', clerkId)
+      .single();
+
+    if (fetchError && fetchError.code === 'PGRST116') {
+      // User doesn't exist, create them
+      console.log(`Creating new user for Clerk ID: ${clerkId}`);
+      
+      const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert({
+          clerk_id: clerkId,
+          full_name: full_name || 'New User',
+          email: req.user!.email || null,
+          phone: phone || req.user!.phone || null,
+          auth_provider: 'clerk',
+          role: 'mfd',
+          referral_link: `ref_${clerkId.slice(-8)}`,
+          settings: settings || {}
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating user:', createError);
+        return res.status(500).json({ error: 'Failed to create user profile' });
+      }
+
+      existingUser = newUser;
+      console.log('New user created:', newUser.id);
+    } else if (fetchError) {
+      console.error('Error fetching user:', fetchError);
+      return res.status(500).json({ error: 'Failed to fetch user profile' });
+    }
+
+    // Now update the user profile
     const { data, error } = await supabase
       .from('users')
       .update({
-        full_name,
-        phone,
-        settings
+        full_name: full_name || existingUser.full_name,
+        phone: phone || existingUser.phone,
+        settings: settings || existingUser.settings
       })
-      .eq('id', req.user!.id)
+      .eq('clerk_id', clerkId)
       .select()
       .single();
 
     if (error) {
+      console.error('Profile update error:', error);
       return res.status(500).json({ error: error?.message || 'Unknown error' });
     }
 

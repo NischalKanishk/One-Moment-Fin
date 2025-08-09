@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import { generateUniqueReferralLink } from './utils'
 
 export interface ClerkUserData {
   id: string
@@ -83,6 +84,12 @@ export class ClerkSupabaseSync {
         role: 'mfd'
       })
 
+      // Generate unique referral link
+      const referralLink = await generateUniqueReferralLink(
+        clerkUserData.firstName || 'user',
+        supabaseClient
+      );
+
       const newUserData = {
         clerk_id: clerkUserData.id,
         full_name: fullName,
@@ -90,7 +97,7 @@ export class ClerkSupabaseSync {
         phone: phone,
         auth_provider: 'clerk',
         profile_image_url: clerkUserData.imageUrl || '',
-        referral_link: this.generateReferralLink(clerkUserData.id),
+        referral_link: referralLink,
         role: 'mfd' as const
       }
 
@@ -209,12 +216,4 @@ export class ClerkSupabaseSync {
     }
   }
 
-  /**
-   * Generate referral link for user
-   */
-  private static generateReferralLink(clerkId: string): string {
-    const shortId = clerkId.substring(0, 8)
-    const randomSuffix = Math.random().toString(36).substring(2, 6)
-    return `${shortId}${randomSuffix}`
-  }
 }

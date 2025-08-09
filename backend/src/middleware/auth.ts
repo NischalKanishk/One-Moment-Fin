@@ -41,10 +41,14 @@ export const authenticateUser = async (
           const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
           console.log('Development: JWT payload:', payload);
           
+          // Extract Clerk user ID from the token
+          // Clerk JWT tokens have 'sub' field with the user ID
+          const clerkUserId = payload.sub || payload.user_id || 'dev-user-id';
+          
           req.user = {
-            id: payload.sub || 'dev-user-id',
-            email: payload.email || 'dev@example.com',
-            phone: payload.phone_number || '+91 99999 99999',
+            id: clerkUserId,
+            email: payload.email || payload.email_address || 'dev@example.com',
+            phone: payload.phone_number || payload.phone || '+91 99999 99999',
             role: 'mfd'
           };
           
@@ -74,8 +78,8 @@ export const authenticateUser = async (
       // Set user information from token
       req.user = {
         id: payload.sub,
-        email: payload.email,
-        phone: payload.phone_number,
+        email: payload.email || payload.email_address,
+        phone: payload.phone_number || payload.phone,
         role: 'mfd' // Default role, can be updated based on user data
       };
 
