@@ -1,22 +1,31 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables')
+function createSafeClient(): SupabaseClient | null {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+  try {
+    return createClient(supabaseUrl, supabaseAnonKey)
+  } catch (e) {
+    return null
+  }
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createSafeClient() as unknown as SupabaseClient
 
 // Database types based on our schema
 export interface User {
   id: string
+  clerk_id: string
   full_name: string
   email?: string
   phone?: string
   auth_provider: string
   created_at: string
+  updated_at?: string
   referral_link?: string
   profile_image_url?: string
   settings: Record<string, any>

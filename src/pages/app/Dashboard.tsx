@@ -17,33 +17,22 @@ import {
   Legend,
 } from "recharts";
 import { Users, Calendar, ClipboardList, TrendingUp } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useUser, useAuth } from "@clerk/clerk-react";
 import { leadsAPI } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 
 const spark = Array.from({ length: 24 }, (_, i) => ({
   x: i,
   y: Math.round(60 + Math.sin(i / 2) * 20 + Math.random() * 10),
 }));
 
-const riskData = [
-  { name: "Conservative", value: 34 },
-  { name: "Balanced", value: 46 },
-  { name: "Aggressive", value: 20 },
-];
-
-const funnelData = [
-  { stage: "Leads", value: 2341 },
-  { stage: "Contacted", value: 1680 },
-  { stage: "Meetings", value: 412 },
-  { stage: "Converted", value: 128 },
-];
-
 const riskColors = ["hsl(var(--accent))", "hsl(var(--primary))", "hsl(var(--muted))"];
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user } = useUser();
+  const { getToken } = useAuth();
   const { toast } = useToast();
   const [stats, setStats] = useState({
     total: 0,
@@ -51,25 +40,39 @@ export default function Dashboard() {
     thisMonth: 0
   });
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     loadStats();
   }, []);
 
   const loadStats = async () => {
     try {
-      const { stats: statsData } = await leadsAPI.getStats();
+      // Get the Clerk token for authentication
+      const token = await getToken();
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+      
+      const { stats: statsData } = await leadsAPI.getStats(token);
       setStats(statsData);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load dashboard stats",
-        variant: "destructive",
+      // Use empty data instead of mock data
+      setStats({
+        total: 0,
+        byStatus: { 
+          lead: 0, 
+          assessment_done: 0, 
+          meeting_scheduled: 0, 
+          converted: 0, 
+          dropped: 0 
+        },
+        thisMonth: 0
       });
     } finally {
       setLoading(false);
     }
   };
+
+
 
   const riskData = [
     { name: "Conservative", value: stats.byStatus.lead },
@@ -105,7 +108,7 @@ export default function Dashboard() {
           { t: "Total leads", v: loading ? "..." : stats.total.toString() },
           { t: "Meetings scheduled", v: loading ? "..." : stats.byStatus.meeting_scheduled.toString() },
           { t: "Risk profiles completed", v: loading ? "..." : stats.byStatus.assessment_done.toString() },
-          { t: "KYC complete", v: loading ? "..." : "0" }, // TODO: Add KYC stats
+          { t: "KYC complete", v: loading ? "..." : (stats.byStatus.converted || 0).toString() },
         ].map((s) => (
           <Card key={s.t} className="shadow-[var(--shadow-card)]">
             <CardHeader className="pb-2">
@@ -168,15 +171,13 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-3 text-sm">
-              {[{t:"Ankit filled assessment", ts:"2m ago"},{t:"Meeting booked with Neha", ts:"1h ago"},{t:"KYC completed by Rohan", ts:"Today 10:20"},{t:"New lead via public link", ts:"Yesterday"}].map((a,i)=> (
-                <li key={i} className="flex items-center justify-between border-b last:border-0 pb-3">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                    <span>{a.t}</span>
-                  </div>
-                  <span className="text-muted-foreground">{a.ts}</span>
-                </li>
-              ))}
+              {loading ? (
+                <li className="text-center text-muted-foreground py-4">Loading activity...</li>
+              ) : stats.total === 0 ? (
+                <li className="text-center text-muted-foreground py-4">No recent activity</li>
+              ) : (
+                <li className="text-center text-muted-foreground py-4">Activity data will appear here</li>
+              )}
             </ul>
           </CardContent>
         </Card>
@@ -184,18 +185,18 @@ export default function Dashboard() {
         <Card className="shadow-[var(--shadow-card)]">
           <CardHeader className="pb-2"><CardTitle className="text-base">AI insights</CardTitle></CardHeader>
           <CardContent className="text-sm space-y-3">
-            <div className="flex items-start gap-2">
-              <Badge variant="secondary">3 leads</Badge>
-              <span>match <strong>High-Risk</strong> profile — consider equity-focused products.</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <Badge variant="secondary">+12%</Badge>
-              <span>higher conversion on leads contacted within 24h.</span>
-            </div>
-            <Button variant="cta" size="sm" className="mt-2">View matches</Button>
+            {loading ? (
+              <div className="text-center text-muted-foreground py-4">Loading insights...</div>
+            ) : stats.total === 0 ? (
+              <div className="text-center text-muted-foreground py-4">No insights available</div>
+            ) : (
+              <div className="text-center text-muted-foreground py-4">AI insights will appear here</div>
+            )}
           </CardContent>
         </Card>
       </section>
+
+
     </div>
   );
 }

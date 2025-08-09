@@ -10,35 +10,38 @@ const api = axios.create({
   },
 });
 
-// Request interceptor to add auth token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+// Function to create authenticated API instance
+export const createAuthenticatedApi = (token: string) => {
+  return axios.create({
+    baseURL: API_BASE_URL,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+  });
+};
 
 // Response interceptor to handle auth errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      window.location.href = '/auth';
-    }
+    // passthrough
     return Promise.reject(error);
   }
 );
 
 // Auth API
 export const authAPI = {
+  loginWithToken: async (token: string) => {
+    const response = await api.post('/api/auth/login', { token });
+    return response.data;
+  },
+
+  signupWithToken: async (token: string, data?: { full_name?: string; phone?: string }) => {
+    const response = await api.post('/api/auth/signup', { token, ...(data || {}) });
+    return response.data;
+  },
+
   login: async (email: string, password: string) => {
     const response = await api.post('/api/auth/login', { email, password });
     return response.data;
@@ -67,38 +70,45 @@ export const authAPI = {
 
 // Leads API
 export const leadsAPI = {
-  create: async (data: { full_name: string; email?: string; phone?: string; age?: number; source_link: string; user_id: string }) => {
-    const response = await api.post('/api/leads/create', data);
+  create: async (token: string, data: { full_name: string; email?: string; phone?: string; age?: number; source_link: string; user_id: string }) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.post('/api/leads/create', data);
     return response.data;
   },
 
-  getAll: async () => {
-    const response = await api.get('/api/leads');
+  getAll: async (token: string) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.get('/api/leads');
     return response.data;
   },
 
-  getById: async (id: string) => {
-    const response = await api.get(`/api/leads/${id}`);
+  getById: async (token: string, id: string) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.get(`/api/leads/${id}`);
     return response.data;
   },
 
-  updateStatus: async (id: string, status: string, notes?: string) => {
-    const response = await api.patch(`/api/leads/${id}/status`, { status, notes });
+  updateStatus: async (token: string, id: string, status: string, notes?: string) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.patch(`/api/leads/${id}/status`, { status, notes });
     return response.data;
   },
 
-  update: async (id: string, data: { full_name?: string; email?: string; phone?: string; age?: number; notes?: string }) => {
-    const response = await api.put(`/api/leads/${id}`, data);
+  update: async (token: string, id: string, data: { full_name?: string; email?: string; phone?: string; age?: number; notes?: string }) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.put(`/api/leads/${id}`, data);
     return response.data;
   },
 
-  delete: async (id: string) => {
-    const response = await api.delete(`/api/leads/${id}`);
+  delete: async (token: string, id: string) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.delete(`/api/leads/${id}`);
     return response.data;
   },
 
-  getStats: async () => {
-    const response = await api.get('/api/leads/stats');
+  getStats: async (token: string) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.get('/api/leads/stats');
     return response.data;
   },
 };

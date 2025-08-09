@@ -1,8 +1,12 @@
 import { Helmet } from "react-helmet-async";
-import heroImage from "@/assets/hero-dashboard.jpg";
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 const Index = () => {
+  const { user, isAuthenticated } = useAuth();
+
   return (
     <div className="min-h-screen bg-background">
       <Helmet>
@@ -20,8 +24,20 @@ const Index = () => {
             <a href="#pricing" className="story-link">Pricing</a>
           </nav>
           <div className="flex items-center gap-2">
-            <a href="/auth" className="hidden sm:inline-flex"><Button variant="outline">Sign in</Button></a>
-            <a href="/auth"><Button variant="cta" className="hover-scale">Try free</Button></a>
+            <SignedOut>
+              <SignInButton mode="modal">
+                <Button variant="outline">Sign In</Button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <Button variant="cta" className="hover-scale">Get Started</Button>
+              </SignUpButton>
+            </SignedOut>
+            <SignedIn>
+              <UserButton afterSignOutUrl="/" />
+              <Link to="/app/dashboard">
+                <Button variant="cta" className="hover-scale">Open Dashboard</Button>
+              </Link>
+            </SignedIn>
           </div>
         </div>
       </header>
@@ -32,8 +48,16 @@ const Index = () => {
             <h1 className="text-4xl md:text-5xl font-semibold leading-tight">AI-powered lead → investor platform for MFDs</h1>
             <p className="text-lg text-muted-foreground">Capture leads, auto‑assess risk, one‑click KYC, smart product suggestions and clean reports. Built for speed and clarity.</p>
             <div className="flex items-center gap-3">
-              <a href="/auth"><Button variant="cta" size="lg">Start in 30s</Button></a>
-              <a href="/app/dashboard"><Button variant="outline" size="lg">View dashboard</Button></a>
+              <SignedOut>
+                <SignUpButton mode="modal">
+                  <Button variant="cta" size="lg">Get Started Free</Button>
+                </SignUpButton>
+              </SignedOut>
+              <SignedIn>
+                <Link to="/app/dashboard">
+                  <Button variant="cta" size="lg">Open Dashboard</Button>
+                </Link>
+              </SignedIn>
             </div>
             <ul className="text-sm text-muted-foreground grid grid-cols-2 gap-2">
               <li>• WhatsApp & Calendar sync</li>
@@ -42,8 +66,11 @@ const Index = () => {
               <li>• Portfolio & reports</li>
             </ul>
           </div>
-          <div className="rounded-lg overflow-hidden shadow-[var(--shadow-card)] border">
-            <img src={heroImage} alt="OneMFin dashboard preview for MFDs" loading="lazy" className="w-full h-auto" />
+          <div className="rounded-lg overflow-hidden shadow-[var(--shadow-card)] border bg-gray-100 p-8">
+            <div className="text-center text-gray-500">
+              <h3 className="text-lg font-medium mb-2">Dashboard Preview</h3>
+              <p>OneMFin dashboard interface will be displayed here</p>
+            </div>
           </div>
         </section>
 

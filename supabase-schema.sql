@@ -4,14 +4,17 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. Users table (MFDs) - Updated to work with Supabase Auth
+-- 1. Users table (MFDs)
+-- Switched to application-managed UUIDs and added Clerk linkage
 CREATE TABLE users (
-    id UUID PRIMARY KEY, -- Remove DEFAULT to allow Auth user IDs
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    clerk_id TEXT UNIQUE, -- Stores Clerk user ID (e.g., 'user_...')
     full_name TEXT NOT NULL,
     email TEXT UNIQUE,
     phone TEXT UNIQUE,
-    auth_provider TEXT NOT NULL DEFAULT 'email',
+    auth_provider TEXT NOT NULL DEFAULT 'clerk',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     referral_link TEXT UNIQUE,
     profile_image_url TEXT,
     settings JSONB DEFAULT '{}',
@@ -19,24 +22,30 @@ CREATE TABLE users (
 );
 
 -- Enable Row Level Security
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE users ENABLE ROW LEVEL SECURITY; -- Temporarily disabled for development
 
 -- RLS Policies for users table
--- Allow users to read their own data
-CREATE POLICY "Users can view own data" ON users
-    FOR SELECT USING (auth.uid() = id);
+-- Updated for Clerk authentication instead of Supabase Auth
+-- Allow users to read their own data (by clerk_id)
+-- CREATE POLICY "Users can view own data" ON users
+--     FOR SELECT USING (clerk_id = current_setting('request.jwt.claims', true)::json->>'sub');
 
--- Allow users to insert their own data (for signup)
-CREATE POLICY "Users can insert own data" ON users
-    FOR INSERT WITH CHECK (auth.uid() = id);
+-- Allow users to insert their own data (by clerk_id)
+-- CREATE POLICY "Users can insert own data" ON users
+--     FOR INSERT WITH CHECK (clerk_id = current_setting('request.jwt.claims', true)::json->>'sub');
 
--- Allow users to update their own data
-CREATE POLICY "Users can update own data" ON users
-    FOR UPDATE USING (auth.uid() = id);
+-- Allow users to update their own data (by clerk_id)
+-- CREATE POLICY "Users can update own data" ON users
+--     FOR UPDATE USING (clerk_id = current_setting('request.jwt.claims', true)::json->>'sub');
 
 -- Allow service role to manage all users (for backend operations)
-CREATE POLICY "Service role can manage all users" ON users
-    FOR ALL USING (auth.role() = 'service_role');
+-- CREATE POLICY "Service role can manage all users" ON users
+--     FOR ALL USING (auth.role() = 'service_role');
+
+-- TEMPORARY: Allow all operations for development (remove in production)
+-- This bypasses RLS temporarily to allow Clerk users to be created
+-- CREATE POLICY "Allow all operations temporarily" ON users
+--     FOR ALL USING (true);
 
 -- 2. Leads table
 CREATE TABLE leads (
@@ -357,14 +366,9 @@ CREATE TABLE subscription_plans (
 ALTER TABLE subscription_plans ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for subscription_plans table
-CREATE POLICY "Users can view own subscription plans" ON subscription_plans
-    FOR SELECT USING (auth.uid() = id);
-
-CREATE POLICY "Users can insert own subscription plans" ON subscription_plans
-    FOR INSERT WITH CHECK (auth.uid() = id);
-
-CREATE POLICY "Users can update own subscription plans" ON subscription_plans
-    FOR UPDATE USING (auth.uid() = id);
+-- Plans are public readable; writes restricted to service role
+CREATE POLICY "Anyone can view plans" ON subscription_plans
+    FOR SELECT USING (true);
 
 CREATE POLICY "Service role can manage all subscription plans" ON subscription_plans
     FOR ALL USING (auth.role() = 'service_role');
@@ -459,3 +463,28 @@ $$ language 'plpgsql';
 -- Create trigger for kyc_status table
 CREATE TRIGGER update_kyc_status_updated_at BEFORE UPDATE ON kyc_status
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Add trigger for users table
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ------------------------------------------------------------------
+-- Backfill foreign key relationships added after table creation
+-- ------------------------------------------------------------------
+
+-- Link leads.meeting_id to meetings.id (nullable)
+ALTER TABLE leads
+    ADD CONSTRAINT fk_leads_meeting
+    FOREIGN KEY (meeting_id)
+    REFERENCES meetings(id)
+    ON DELETE SET NULL;
+
+-- Link leads.risk_profile_id to risk_assessments.id (nullable)
+ALTER TABLE leads
+    ADD CONSTRAINT fk_leads_risk_profile
+    FOREIGN KEY (risk_profile_id)
+    REFERENCES risk_assessments(id)
+    ON DELETE SET NULL;
+
+-- Helpful indexes
+CREATE INDEX IF NOT EXISTS idx_users_clerk_id ON users(clerk_id);

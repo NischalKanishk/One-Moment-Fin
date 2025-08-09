@@ -2,6 +2,10 @@ import { supabase } from './supabase'
 
 export async function testSupabaseConnection() {
   try {
+    if (!supabase) {
+      console.warn('Skipping Supabase test: client not configured')
+      return false
+    }
     // Test basic connection by fetching subscription plans
     const { data, error } = await supabase
       .from('subscription_plans')

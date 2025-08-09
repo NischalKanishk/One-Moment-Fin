@@ -1,10 +1,11 @@
 import { Outlet } from "react-router-dom";
+import { UserButton } from "@clerk/clerk-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Bell, Plus, Calendar as CalendarIcon, LogOut, User } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { Bell, Plus, Calendar as CalendarIcon, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
@@ -17,16 +18,13 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function AppLayout() {
-  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/auth');
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
+
+
+  const handleProfileClick = () => {
+    navigate('/app/settings');
   };
 
   return (
@@ -59,21 +57,21 @@ export default function AppLayout() {
                   <DropdownMenuContent className="w-56" align="end" forceMount>
                     <DropdownMenuLabel className="font-normal">
                       <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{user?.full_name}</p>
+                        <p className="text-sm font-medium leading-none">{user?.full_name || 'User'}</p>
                         <p className="text-xs leading-none text-muted-foreground">
-                          {user?.email}
+                          {user?.email || user?.phone || 'No contact info'}
                         </p>
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleProfileClick}>
                       <User className="mr-2 h-4 w-4" />
                       <span>Profile</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleLogout}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Log out</span>
-                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <div className="px-2 py-1.5">
+                      <UserButton afterSignOutUrl="/" />
+                    </div>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

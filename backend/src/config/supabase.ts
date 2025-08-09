@@ -31,6 +31,8 @@ if (!supabaseServiceKey) {
 }
 
 // Create public client for auth operations
+// Public client is no longer needed for auth (moved to Clerk). For completeness,
+// we keep a lightweight public client in case read-only operations are needed.
 export const supabasePublic = createClient(
   supabaseUrl,
   process.env.SUPABASE_ANON_KEY || ''

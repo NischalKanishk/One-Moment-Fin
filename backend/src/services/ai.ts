@@ -1,9 +1,15 @@
 import OpenAI from 'openai';
 import { supabase } from '../config/supabase';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getOpenAI(): OpenAI | null {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+  try {
+    return new OpenAI({ apiKey });
+  } catch {
+    return null;
+  }
+}
 
 export interface RiskAssessmentResult {
   risk_score: number;
@@ -27,6 +33,21 @@ export class AIService {
     leadAge?: number
   ): Promise<RiskAssessmentResult> {
     try {
+      const client = getOpenAI();
+      if (!client) {
+        // Fallback heuristic when OPENAI_API_KEY is not configured
+        const base = 50;
+        const modifier = Math.min(answers.length * 2, 20);
+        const risk_score = Math.max(1, Math.min(100, base + modifier - (leadAge ? Math.floor(leadAge / 10) : 0)));
+        const risk_category: 'low' | 'medium' | 'high' = risk_score < 40 ? 'low' : risk_score > 65 ? 'high' : 'medium';
+        return {
+          risk_score,
+          risk_category,
+          reasoning: 'Estimated locally without AI due to missing API key. Provide OPENAI_API_KEY to enable AI-generated assessments.',
+          confidence: 50
+        };
+      }
+
       const prompt = `
 You are a financial advisor specializing in mutual fund risk assessment. 
 Analyze the following responses from a potential investor and provide a risk assessment.
@@ -51,7 +72,7 @@ Respond in JSON format:
 }
 `;
 
-      const completion = await openai.chat.completions.create({
+      const completion = await client.chat.completions.create({
         model: "gpt-4",
         messages: [
           {
@@ -91,6 +112,26 @@ Respond in JSON format:
     leadAge?: number
   ): Promise<ProductRecommendation[]> {
     try {
+      const client = getOpenAI();
+      if (!client) {
+        // Simple curated suggestions as fallback when OPENAI_API_KEY is missing
+        const common = (category: 'low' | 'medium' | 'high'): ProductRecommendation[] => {
+          if (category === 'low') return [
+            { title: 'HDFC Short Term Debt Fund', description: 'Short duration debt fund focusing on high-quality papers.', amc_name: 'HDFC Mutual Fund', product_type: 'debt', risk_category: 'low', reasoning: 'Suitable for conservative investors seeking stability.' },
+            { title: 'SBI Equity Hybrid Fund', description: 'Hybrid allocation with higher debt component.', amc_name: 'SBI Mutual Fund', product_type: 'hybrid', risk_category: 'low', reasoning: 'Balanced exposure with lower volatility.' },
+          ];
+          if (category === 'medium') return [
+            { title: 'ICICI Prudential Balanced Advantage Fund', description: 'Dynamic asset allocation based on market valuations.', amc_name: 'ICICI Prudential Mutual Fund', product_type: 'hybrid', risk_category: 'medium', reasoning: 'Adjusts equity exposure to manage risk across cycles.' },
+            { title: 'Kotak Flexicap Fund', description: 'Diversified across market caps.', amc_name: 'Kotak Mutual Fund', product_type: 'equity', risk_category: 'medium', reasoning: 'Balance of growth and risk through flexicap strategy.' },
+          ];
+          return [
+            { title: 'Nippon India Small Cap Fund', description: 'Focus on small cap companies with high growth potential.', amc_name: 'Nippon India Mutual Fund', product_type: 'equity', risk_category: 'high', reasoning: 'Aggressive growth potential with higher volatility.' },
+            { title: 'Axis Midcap Fund', description: 'Midcap focus for higher long-term growth.', amc_name: 'Axis Mutual Fund', product_type: 'equity', risk_category: 'high', reasoning: 'Suitable for investors with higher risk tolerance.' },
+          ];
+        };
+        return common(riskCategory);
+      }
+
       const prompt = `
 You are a mutual fund advisor. Suggest 3-5 mutual fund products for a ${riskCategory} risk investor.
 
@@ -124,7 +165,7 @@ Respond in JSON format:
 ]
 `;
 
-      const completion = await openai.chat.completions.create({
+      const completion = await client.chat.completions.create({
         model: "gpt-4",
         messages: [
           {
@@ -163,6 +204,15 @@ Respond in JSON format:
 
   static async generateLeadSummary(leadData: any, riskAssessment: any): Promise<string> {
     try {
+      const client = getOpenAI();
+      if (!client) {
+        const parts = [
+          `${leadData.full_name} (${leadData.age || 'N/A'}) shows a ${riskAssessment.risk_category} risk profile (score ${riskAssessment.risk_score}).`,
+          `Contact: ${leadData.email || leadData.phone || 'N/A'}.`,
+        ];
+        return parts.join(' ');
+      }
+
       const prompt = `
 Generate a professional summary for a mutual fund lead.
 
@@ -179,7 +229,7 @@ Risk Assessment:
 Create a 2-3 sentence professional summary suitable for a mutual fund distributor to understand the lead quickly.
 `;
 
-      const completion = await openai.chat.completions.create({
+      const completion = await client.chat.completions.create({
         model: "gpt-4",
         messages: [
           {

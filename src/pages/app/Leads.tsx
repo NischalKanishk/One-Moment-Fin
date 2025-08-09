@@ -1,3 +1,4 @@
+import { useUser, useAuth } from "@clerk/clerk-react";
 import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,14 +22,17 @@ interface Lead {
   risk_assessments?: any[];
   meetings?: any[];
   kyc_status?: any[];
+  portfolio_value?: number;
 }
 
 export default function Leads(){
+  const { user } = useUser();
+  const { getToken } = useAuth();
+  const { toast } = useToast();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [riskFilter, setRiskFilter] = useState('all');
-  const { toast } = useToast();
 
   useEffect(() => {
     loadLeads();
@@ -36,12 +40,23 @@ export default function Leads(){
 
   const loadLeads = async () => {
     try {
-      const { leads: leadsData } = await leadsAPI.getAll();
+      // Get the Clerk token for authentication
+      const token = await getToken();
+      
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+      
+      const { leads: leadsData } = await leadsAPI.getAll(token);
       setLeads(leadsData);
     } catch (error) {
+      // Set empty leads on error
+      setLeads([]);
+      
+      // Show error toast
       toast({
         title: "Error",
-        description: "Failed to load leads",
+        description: "Failed to load leads. Please try again later.",
         variant: "destructive",
       });
     } finally {
@@ -103,7 +118,9 @@ export default function Leads(){
               </TableRow>
             ) : filteredLeads.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8">No leads found</TableCell>
+                <TableCell colSpan={10} className="text-center py-8">
+                  <div className="text-muted-foreground">No leads found</div>
+                </TableCell>
               </TableRow>
             ) : (
               filteredLeads.map((lead) => (
@@ -127,7 +144,9 @@ export default function Leads(){
                   <TableCell>
                     {lead.kyc_status?.[0]?.status || 'Not started'}
                   </TableCell>
-                  <TableCell>₹0</TableCell>
+                  <TableCell>
+                    {lead.portfolio_value ? `₹${lead.portfolio_value}` : 'N/A'}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{lead.notes || '-'}</TableCell>
                   <TableCell className="space-x-2">
                     <Button size="sm" variant="outline">Call</Button>
@@ -139,6 +158,8 @@ export default function Leads(){
           </TableBody>
         </Table>
       </div>
+
+
     </div>
   )
 }
