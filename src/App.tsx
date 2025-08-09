@@ -18,10 +18,7 @@ import FormBuilder from "./pages/app/FormBuilder";
 import Assessments from "./pages/app/Assessments";
 import Products from "./pages/app/Products";
 import Meetings from "./pages/app/Meetings";
-import Portfolio from "./pages/app/Portfolio";
-import Reports from "./pages/app/Reports";
 import Settings from "./pages/app/Settings";
-import Admin from "./pages/app/Admin";
 
 const queryClient = new QueryClient();
 
@@ -57,10 +54,7 @@ const App = () => (
               <Route path="assessments" element={<Assessments />} />
               <Route path="products" element={<Products />} />
               <Route path="meetings" element={<Meetings />} />
-              <Route path="portfolio" element={<Portfolio />} />
-              <Route path="reports" element={<Reports />} />
               <Route path="settings" element={<Settings />} />
-              <Route path="admin" element={<Admin />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
