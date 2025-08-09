@@ -1,5 +1,4 @@
 import { SupabaseClient } from '@supabase/supabase-js'
-import { generateUniqueReferralLink } from './utils'
 
 export interface ClerkUserData {
   id: string
@@ -18,29 +17,18 @@ export class ClerkSupabaseSync {
    */
   static async syncUserToSupabase(clerkUserData: ClerkUserData, supabaseClient: SupabaseClient) {
     try {
-      console.log('🔄 Starting Clerk user sync to Supabase...')
-      console.log('📋 Clerk user data:', {
-        id: clerkUserData.id,
-        email: clerkUserData.emailAddresses?.[0]?.emailAddress,
-        name: `${clerkUserData.firstName} ${clerkUserData.lastName}`,
-        phone: clerkUserData.phoneNumbers?.[0]?.phoneNumber
-      })
-
       // Test Supabase connection first
-      console.log('🔌 Testing Supabase connection...')
       const { data: testData, error: testError } = await supabaseClient
         .from('users')
         .select('count')
         .limit(1)
       
       if (testError) {
-        console.error('❌ Supabase connection test failed:', testError)
+        console.error('Supabase connection test failed:', testError)
         return null
       }
-      console.log('✅ Supabase connection successful')
 
       // First, check if user already exists
-      console.log('🔍 Checking if user exists in Supabase...')
       const { data: existingUser, error: fetchError } = await supabaseClient
         .from('users')
         .select('*')
@@ -48,18 +36,16 @@ export class ClerkSupabaseSync {
         .single()
 
       if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('❌ Error fetching existing user:', fetchError)
+        console.error('Error fetching existing user:', fetchError)
       }
 
       if (existingUser) {
-        console.log('✅ User already exists in Supabase, updating...')
         return await this.updateUserInSupabase(clerkUserData, existingUser.id, supabaseClient)
       } else {
-        console.log('🆕 Creating new user in Supabase...')
         return await this.createUserInSupabase(clerkUserData, supabaseClient)
       }
     } catch (error) {
-      console.error('❌ Error syncing user to Supabase:', error)
+      console.error('Error syncing user to Supabase:', error)
       return null
     }
   }
@@ -75,20 +61,8 @@ export class ClerkSupabaseSync {
         .filter(Boolean)
         .join(' ') || 'User'
 
-      console.log('📝 Preparing user data for Supabase:', {
-        clerk_id: clerkUserData.id,
-        full_name: fullName,
-        email: email,
-        phone: phone,
-        auth_provider: 'clerk',
-        role: 'mfd'
-      })
-
-      // Generate unique referral link
-      const referralLink = await generateUniqueReferralLink(
-        clerkUserData.firstName || 'user',
-        supabaseClient
-      );
+      // Generate unique referral link locally to avoid frontend database calls
+      const referralLink = this.generateReferralLinkLocally(clerkUserData.firstName || 'user', clerkUserData.id)
 
       const newUserData = {
         clerk_id: clerkUserData.id,
@@ -101,7 +75,6 @@ export class ClerkSupabaseSync {
         role: 'mfd' as const
       }
 
-      console.log('🚀 Inserting user into Supabase...')
       const { data: newUser, error } = await supabaseClient
         .from('users')
         .insert(newUserData)
@@ -109,24 +82,13 @@ export class ClerkSupabaseSync {
         .single()
 
       if (error) {
-        console.error('❌ Error creating user in Supabase:', error)
-        console.error('❌ Error details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        })
+        console.error('Error creating user in Supabase:', error)
         return null
       }
 
-      console.log('✅ User created successfully in Supabase:', {
-        supabaseId: newUser.id,
-        clerkId: clerkUserData.id,
-        email: newUser.email
-      })
       return newUser
     } catch (error) {
-      console.error('❌ Error in createUserInSupabase:', error)
+      console.error('Error in createUserInSupabase:', error)
       return null
     }
   }
@@ -158,16 +120,36 @@ export class ClerkSupabaseSync {
         .single()
 
       if (error) {
-        console.error('❌ Error updating user in Supabase:', error)
+        console.error('Error updating user in Supabase:', error)
         return null
       }
 
-      console.log('✅ User updated successfully in Supabase:', updatedUser.id)
       return updatedUser
     } catch (error) {
-      console.error('❌ Error in updateUserInSupabase:', error)
+      console.error('Error in updateUserInSupabase:', error)
       return null
     }
+  }
+
+  /**
+   * Generate referral link locally without database calls
+   * This prevents frontend from making direct Supabase calls
+   */
+  private static generateReferralLinkLocally(firstName: string, userId: string): string {
+    if (!firstName || firstName.trim() === '') {
+      firstName = 'user';
+    }
+    
+    // Clean the first name (remove special characters, convert to lowercase)
+    const cleanName = firstName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .substring(0, 10); // Limit length
+    
+    // Use last 6 characters of userId for uniqueness
+    const uniqueId = userId.slice(-6);
+    
+    return `/${cleanName}${uniqueId}`;
   }
 
   /**
@@ -182,13 +164,13 @@ export class ClerkSupabaseSync {
         .single()
 
       if (error) {
-        console.error('❌ Error fetching user from Supabase:', error)
+        console.error('Error fetching user from Supabase:', error)
         return null
       }
 
       return user
     } catch (error) {
-      console.error('❌ Error in getUserByClerkId:', error)
+      console.error('Error in getUserByClerkId:', error)
       return null
     }
   }
@@ -204,14 +186,13 @@ export class ClerkSupabaseSync {
         .eq('clerk_id', clerkId)
 
       if (error) {
-        console.error('❌ Error deleting user from Supabase:', error)
+        console.error('Error deleting user from Supabase:', error)
         return false
       }
 
-      console.log('✅ User deleted successfully from Supabase')
       return true
     } catch (error) {
-      console.error('❌ Error in deleteUserFromSupabase:', error)
+      console.error('Error in deleteUserFromSupabase:', error)
       return false
     }
   }

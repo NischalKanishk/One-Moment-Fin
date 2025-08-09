@@ -32,14 +32,11 @@ export const authenticateUser = async (
     
     // For development, allow any token that looks like a JWT
     if (process.env.NODE_ENV === 'development') {
-      console.log('Development mode: Accepting any JWT token');
-      
       // Check if it looks like a JWT (3 parts separated by dots)
       if (token.split('.').length === 3) {
         try {
           // Try to decode the JWT payload
           const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-          console.log('Development: JWT payload:', payload);
           
           // Extract Clerk user ID from the token
           // Clerk JWT tokens have 'sub' field with the user ID
@@ -54,7 +51,7 @@ export const authenticateUser = async (
           
           return next();
         } catch (decodeError) {
-          console.log('Development: Failed to decode JWT, but allowing anyway');
+          // In development, allow the request to continue with a default user
           req.user = {
             id: 'dev-user-id',
             email: 'dev@example.com',
@@ -63,6 +60,9 @@ export const authenticateUser = async (
           };
           return next();
         }
+      } else {
+        // Token doesn't look like a JWT
+        return res.status(401).json({ error: 'Invalid token format' });
       }
     }
     

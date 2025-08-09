@@ -7,8 +7,6 @@ if (result.error) {
   console.error('Error loading .env file:', result.error);
 } else {
   console.log('Environment variables loaded successfully');
-  console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? 'Set' : 'Not set');
-  console.log('SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? 'Set' : 'Not set');
 }
 
 import express from 'express';

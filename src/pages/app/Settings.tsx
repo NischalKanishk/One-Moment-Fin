@@ -10,7 +10,7 @@ import { useUser, useAuth } from "@clerk/clerk-react";
 import { useAuth as useCustomAuth } from "@/contexts/AuthContext";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { createAuthenticatedApi } from "@/lib/api";
+import { createAuthenticatedApi, authAPI } from "@/lib/api";
 
 export default function Settings(){
   const { user: clerkUser } = useUser();
@@ -90,54 +90,108 @@ export default function Settings(){
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleProfileSave = async () => {
-    if (!validateForm()) {
-      return;
-    }
-
-    setIsSaving(true);
+  // Debug function to test JWT token
+  const testJWTToken = async () => {
     try {
-      // Check if user is authenticated
-      if (!clerkUser) {
-        throw new Error('User not authenticated');
-      }
-
-      // Get Clerk JWT token for Supabase (not the default token)
+      console.log('🔍 Testing JWT token generation...');
+      
       const token = await getToken({ template: 'supabase' });
       
-      if (!token) {
-        throw new Error('No authentication token available');
+      if (token) {
+        console.log('✅ JWT token generated successfully!');
+        console.log('Token length:', token.length);
+        console.log('Token preview:', token.substring(0, 50) + '...');
+        
+        // Decode the JWT to see the payload
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          console.log('JWT Payload:', payload);
+        } catch (e) {
+          console.log('Could not decode JWT payload');
+        }
+        
+        toast.success('JWT token generated successfully! Check console for details.');
+        return token;
+      } else {
+        console.error('❌ JWT token is null or undefined');
+        toast.error('JWT token is null or undefined');
+        return null;
       }
+    } catch (error) {
+      console.error('❌ Error generating JWT token:', error);
+      toast.error('JWT token generation failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      return null;
+    }
+  };
 
-      // Combine country code with phone number
+  const handleProfileSave = async () => {
+    if (!validateForm()) return;
+    
+    setIsSaving(true);
+    try {
+      if (!clerkUser) throw new Error('User not authenticated');
+      
+      console.log('🔍 Starting profile update...');
+      console.log('Profile data to update:', profileData);
+      
       const fullPhoneNumber = profileData.phone ? `${countryCode}${profileData.phone}` : '';
-
-      // Create authenticated API instance
-      const authenticatedApi = createAuthenticatedApi(token);
-
-      // Update profile via API
-      const response = await authenticatedApi.put('/api/auth/profile', {
+      
+      console.log('Full phone number:', fullPhoneNumber);
+      
+      // Test JWT token first
+      const token = await getToken({ template: 'supabase' });
+      if (!token) {
+        throw new Error('Failed to generate JWT token');
+      }
+      
+      console.log('✅ JWT token obtained, length:', token.length);
+      
+      // Use the centralized API function with authentication
+      const result = await authAPI.updateProfileWithToken(token, {
         full_name: profileData.full_name.trim(),
         phone: fullPhoneNumber
       });
-
-      // Sync user data to update local state
-      await syncUser();
       
-      // Update original data to reflect saved state
+      console.log('✅ Profile update API call successful:', result);
+      
+      // Update local state with the response data
+      const updatedUser = result.user;
+      
+      // Extract phone number without country code for display
+      let displayPhone = '';
+      if (updatedUser.phone) {
+        if (updatedUser.phone.startsWith('+91')) {
+          displayPhone = updatedUser.phone.substring(3);
+        } else if (updatedUser.phone.startsWith('+')) {
+          const match = updatedUser.phone.match(/^\+(\d+)/);
+          if (match) {
+            displayPhone = updatedUser.phone.substring(match[0].length);
+          }
+        } else {
+          displayPhone = updatedUser.phone;
+        }
+      }
+      
+      // Update both profile data and original data to prevent "unsaved changes" indicator
+      setProfileData(prev => ({
+        ...prev,
+        full_name: updatedUser.full_name || '',
+        phone: displayPhone
+      }));
+      
       setOriginalData({
-        full_name: profileData.full_name.trim(),
-        phone: profileData.phone
+        full_name: updatedUser.full_name || '',
+        phone: displayPhone
       });
       
-      toast.success("Profile updated successfully!");
+      // Sync user data in context to update global state
+      await syncUser();
+      
+      toast.success('Profile updated successfully!');
+      
     } catch (error) {
       console.error('Profile update error:', error);
-      if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response data:', error.response.data);
-      }
-      toast.error("Failed to update profile");
+      toast.error(error instanceof Error ? error.message : 'Update failed');
     } finally {
       setIsSaving(false);
     }

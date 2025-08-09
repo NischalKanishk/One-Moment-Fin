@@ -63,7 +63,15 @@ export const authAPI = {
   },
 
   updateProfile: async (data: { full_name?: string; phone?: string; settings?: any }) => {
+    // This function needs to be called with a token, so we'll use the base api
+    // The frontend should pass the token in the Authorization header
     const response = await api.put('/api/auth/profile', data);
+    return response.data;
+  },
+
+  updateProfileWithToken: async (token: string, data: { full_name?: string; phone?: string; settings?: any }) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.put('/api/auth/profile', data);
     return response.data;
   },
 };

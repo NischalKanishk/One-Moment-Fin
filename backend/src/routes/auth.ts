@@ -28,11 +28,11 @@ router.post('/logout', authenticateUser, async (req: express.Request, res: expre
   }
 });
 
-// GET /api/auth/me
+// GET /api/auth/me - Get current user profile
 router.get('/me', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
     const clerkId = req.user!.id;
-    
+
     // Try to get user data from database
     let { data: userData, error } = await supabase
       .from('users')
@@ -42,7 +42,6 @@ router.get('/me', authenticateUser, async (req: express.Request, res: express.Re
 
     if (error && error.code === 'PGRST116') {
       // User doesn't exist, create them with basic info
-      console.log(`Creating new user for Clerk ID: ${clerkId}`);
       
       const { data: newUser, error: createError } = await supabase
         .from('users')
@@ -65,7 +64,6 @@ router.get('/me', authenticateUser, async (req: express.Request, res: express.Re
       }
 
       userData = newUser;
-      console.log('New user created:', newUser.id);
     } else if (error) {
       console.error('Database error:', error);
       return res.status(500).json({ error: 'Failed to fetch user data from database' });
@@ -89,30 +87,38 @@ router.post('/refresh', async (req: express.Request, res: express.Response) => {
   return res.status(501).json({ error: 'Not implemented with Clerk' });
 });
 
-// PUT /api/auth/profile
+// PUT /api/auth/profile - Update user profile
 router.put('/profile', authenticateUser, [
-  body('full_name')
-    .optional()
-    .notEmpty().withMessage('Full name cannot be empty')
-    .isLength({ max: 200 }).withMessage('Full name cannot exceed 200 characters'),
-  body('phone')
-    .optional()
-    .isString().withMessage('Phone must be a string')
-    .custom((value) => {
-      if (value && !value.match(/^\+[0-9]{10,15}$/)) {
-        throw new Error('Phone number must be in format +[country code][number] (10-15 digits total)');
-      }
-      return true;
-    })
+  body('full_name').optional().isString().trim().isLength({ min: 1, max: 200 }),
+  body('phone').optional().isString().trim().custom((value) => {
+    // If phone is provided, it must be between 10-15 characters
+    // If phone is empty string or undefined, it's valid (will be treated as null)
+    if (value === '' || value === undefined || value === null) {
+      return true; // Valid - will be converted to null
+    }
+    if (value.length < 10 || value.length > 15) {
+      throw new Error('Phone number must be between 10-15 characters');
+    }
+    return true;
+  }),
+  body('settings').optional().isObject()
 ], async (req: express.Request, res: express.Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        details: errors.array()
+      });
     }
 
     const { full_name, phone, settings } = req.body;
+    
+    // Get the actual Clerk ID from the authenticated user
     const clerkId = req.user!.id;
+
+    // Handle phone field - convert empty string to null
+    const phoneValue = phone === '' ? null : phone;
 
     // First, check if user exists in database
     let { data: existingUser, error: fetchError } = await supabase
@@ -123,15 +129,14 @@ router.put('/profile', authenticateUser, [
 
     if (fetchError && fetchError.code === 'PGRST116') {
       // User doesn't exist, create them
-      console.log(`Creating new user for Clerk ID: ${clerkId}`);
       
       const { data: newUser, error: createError } = await supabase
         .from('users')
         .insert({
           clerk_id: clerkId,
-          full_name: full_name || 'New User',
+          full_name: full_name || req.user!.email?.split('@')[0] || 'New User',
           email: req.user!.email || null,
-          phone: phone || req.user!.phone || null,
+          phone: phoneValue || req.user!.phone || null,
           auth_provider: 'clerk',
           role: 'mfd',
           referral_link: `ref_${clerkId.slice(-8)}`,
@@ -146,27 +151,31 @@ router.put('/profile', authenticateUser, [
       }
 
       existingUser = newUser;
-      console.log('New user created:', newUser.id);
     } else if (fetchError) {
       console.error('Error fetching user:', fetchError);
       return res.status(500).json({ error: 'Failed to fetch user profile' });
     }
 
+    // Prepare update data - only update fields that are provided
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    };
+    
+    if (full_name !== undefined) updateData.full_name = full_name;
+    if (phoneValue !== undefined) updateData.phone = phoneValue;
+    if (settings !== undefined) updateData.settings = settings;
+
     // Now update the user profile
     const { data, error } = await supabase
       .from('users')
-      .update({
-        full_name: full_name || existingUser.full_name,
-        phone: phone || existingUser.phone,
-        settings: settings || existingUser.settings
-      })
+      .update(updateData)
       .eq('clerk_id', clerkId)
       .select()
       .single();
 
     if (error) {
       console.error('Profile update error:', error);
-      return res.status(500).json({ error: error?.message || 'Unknown error' });
+      return res.status(500).json({ error: 'Profile update failed' });
     }
 
     return res.json({ user: data });
