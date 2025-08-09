@@ -1,11 +1,9 @@
-import { supabase } from './supabase'
-import { User } from './supabase'
-import { createAuthenticatedSupabaseClient } from './clerk-jwt-config'
+import { SupabaseClient } from '@supabase/supabase-js'
 
 export interface ClerkUserData {
   id: string
-  emailAddresses: Array<{ emailAddress: string }>
-  phoneNumbers: Array<{ phoneNumber: string }>
+  emailAddresses: any[]
+  phoneNumbers: any[]
   firstName?: string
   lastName?: string
   imageUrl?: string
@@ -14,105 +12,153 @@ export interface ClerkUserData {
 
 export class ClerkSupabaseSync {
   /**
-   * Sync user data from Clerk to Supabase
+   * Sync Clerk user data to Supabase
+   * This method will either create a new user or update existing one
    */
-  public static async syncUserToSupabase(clerkUser: ClerkUserData, jwtToken?: string): Promise<User | null> {
-    // Use authenticated client if JWT token is provided, otherwise fall back to anonymous client
-    const client = jwtToken ? createAuthenticatedSupabaseClient(jwtToken) : supabase
-    
-    if (!client) {
-      console.error('ClerkSupabaseSync: Supabase client not initialized')
-      return null
-    }
-
+  static async syncUserToSupabase(clerkUserData: ClerkUserData, supabaseClient: SupabaseClient) {
     try {
-      const email = clerkUser.emailAddresses[0]?.emailAddress || null
-      const phone = clerkUser.phoneNumbers[0]?.phoneNumber || null
-      const fullName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ')
-
-      console.log('ClerkSupabaseSync: Attempting to sync user:', {
-        clerkId: clerkUser.id,
-        email,
-        phone,
-        fullName
+      console.log('🔄 Starting Clerk user sync to Supabase...')
+      console.log('📋 Clerk user data:', {
+        id: clerkUserData.id,
+        email: clerkUserData.emailAddresses?.[0]?.emailAddress,
+        name: `${clerkUserData.firstName} ${clerkUserData.lastName}`,
+        phone: clerkUserData.phoneNumbers?.[0]?.phoneNumber
       })
 
       // Test Supabase connection first
-      console.log('ClerkSupabaseSync: Testing Supabase connection...')
-      const { data: testData, error: testError } = await client
+      console.log('🔌 Testing Supabase connection...')
+      const { data: testData, error: testError } = await supabaseClient
         .from('users')
         .select('count')
         .limit(1)
       
       if (testError) {
-        console.error('ClerkSupabaseSync: Supabase connection test failed:', testError)
+        console.error('❌ Supabase connection test failed:', testError)
         return null
       }
-      
-      console.log('ClerkSupabaseSync: Supabase connection test successful')
+      console.log('✅ Supabase connection successful')
 
-      // Check if user already exists in Supabase
-      const { data: existingUser, error: fetchError } = await client
+      // First, check if user already exists
+      console.log('🔍 Checking if user exists in Supabase...')
+      const { data: existingUser, error: fetchError } = await supabaseClient
         .from('users')
         .select('*')
-        .eq('clerk_id', clerkUser.id)
+        .eq('clerk_id', clerkUserData.id)
         .single()
 
-      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 means no rows found
-        console.error('Error fetching existing user:', fetchError)
-        // Continue with creation attempt even if fetch fails
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('❌ Error fetching existing user:', fetchError)
       }
 
       if (existingUser) {
-        console.log('ClerkSupabaseSync: Updating existing user:', existingUser.id)
-        // Update existing user
-        const { data: updatedUser, error: updateError } = await client
-          .from('users')
-          .update({
-            full_name: fullName,
-            email: email,
-            phone: phone,
-            profile_image_url: clerkUser.imageUrl,
-            updated_at: new Date().toISOString()
-          })
-          .eq('clerk_id', clerkUser.id)
-          .select()
-          .single()
-
-        if (updateError) {
-          console.error('Error updating user:', updateError)
-          // Return existing user if update fails
-          return existingUser
-        }
-
-        return updatedUser
+        console.log('✅ User already exists in Supabase, updating...')
+        return await this.updateUserInSupabase(clerkUserData, existingUser.id, supabaseClient)
       } else {
-        console.log('ClerkSupabaseSync: Creating new user')
-        // Create new user
-        const { data: newUser, error: insertError } = await client
-          .from('users')
-          .insert({
-            clerk_id: clerkUser.id,
-            full_name: fullName,
-            email: email,
-            phone: phone,
-            auth_provider: email ? 'email' : 'phone', // Basic logic, can be refined
-            profile_image_url: clerkUser.imageUrl,
-            referral_link: this.generateReferralLink(clerkUser.id),
-            role: 'mfd' // Default role
-          })
-          .select()
-          .single()
-
-        if (insertError) {
-          console.error('Error creating user:', insertError)
-          return null
-        }
-
-        return newUser
+        console.log('🆕 Creating new user in Supabase...')
+        return await this.createUserInSupabase(clerkUserData, supabaseClient)
       }
     } catch (error) {
-      console.error('Error syncing user to Supabase:', error)
+      console.error('❌ Error syncing user to Supabase:', error)
+      return null
+    }
+  }
+
+  /**
+   * Create a new user in Supabase
+   */
+  private static async createUserInSupabase(clerkUserData: ClerkUserData, supabaseClient: SupabaseClient) {
+    try {
+      const email = clerkUserData.emailAddresses?.[0]?.emailAddress || ''
+      const phone = clerkUserData.phoneNumbers?.[0]?.phoneNumber || ''
+      const fullName = [clerkUserData.firstName, clerkUserData.lastName]
+        .filter(Boolean)
+        .join(' ') || 'User'
+
+      console.log('📝 Preparing user data for Supabase:', {
+        clerk_id: clerkUserData.id,
+        full_name: fullName,
+        email: email,
+        phone: phone,
+        auth_provider: 'clerk',
+        role: 'mfd'
+      })
+
+      const newUserData = {
+        clerk_id: clerkUserData.id,
+        full_name: fullName,
+        email: email,
+        phone: phone,
+        auth_provider: 'clerk',
+        profile_image_url: clerkUserData.imageUrl || '',
+        referral_link: this.generateReferralLink(clerkUserData.id),
+        role: 'mfd' as const
+      }
+
+      console.log('🚀 Inserting user into Supabase...')
+      const { data: newUser, error } = await supabaseClient
+        .from('users')
+        .insert(newUserData)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('❌ Error creating user in Supabase:', error)
+        console.error('❌ Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        })
+        return null
+      }
+
+      console.log('✅ User created successfully in Supabase:', {
+        supabaseId: newUser.id,
+        clerkId: clerkUserData.id,
+        email: newUser.email
+      })
+      return newUser
+    } catch (error) {
+      console.error('❌ Error in createUserInSupabase:', error)
+      return null
+    }
+  }
+
+  /**
+   * Update existing user in Supabase
+   */
+  private static async updateUserInSupabase(clerkUserData: ClerkUserData, supabaseUserId: string, supabaseClient: SupabaseClient) {
+    try {
+      const email = clerkUserData.emailAddresses?.[0]?.emailAddress || ''
+      const phone = clerkUserData.phoneNumbers?.[0]?.phoneNumber || ''
+      const fullName = [clerkUserData.firstName, clerkUserData.lastName]
+        .filter(Boolean)
+        .join(' ') || 'User'
+
+      const updateData = {
+        full_name: fullName,
+        email: email,
+        phone: phone,
+        profile_image_url: clerkUserData.imageUrl || '',
+        updated_at: new Date().toISOString()
+      }
+
+      const { data: updatedUser, error } = await supabaseClient
+        .from('users')
+        .update(updateData)
+        .eq('id', supabaseUserId)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('❌ Error updating user in Supabase:', error)
+        return null
+      }
+
+      console.log('✅ User updated successfully in Supabase:', updatedUser.id)
+      return updatedUser
+    } catch (error) {
+      console.error('❌ Error in updateUserInSupabase:', error)
       return null
     }
   }
@@ -120,67 +166,53 @@ export class ClerkSupabaseSync {
   /**
    * Get user from Supabase by Clerk ID
    */
-  static async getUserByClerkId(clerkId: string, jwtToken?: string): Promise<User | null> {
-    const client = jwtToken ? createAuthenticatedSupabaseClient(jwtToken) : supabase
-    
-    if (!client) {
-      console.error('Supabase client not initialized')
-      return null
-    }
-
+  static async getUserByClerkId(clerkId: string, supabaseClient: SupabaseClient) {
     try {
-      const { data: user, error } = await client
+      const { data: user, error } = await supabaseClient
         .from('users')
         .select('*')
         .eq('clerk_id', clerkId)
         .single()
 
       if (error) {
-        console.error('Error fetching user:', error)
+        console.error('❌ Error fetching user from Supabase:', error)
         return null
       }
 
       return user
     } catch (error) {
-      console.error('Error getting user by Clerk ID:', error)
+      console.error('❌ Error in getUserByClerkId:', error)
       return null
     }
   }
 
   /**
-   * Delete user from Supabase when deleted from Clerk
+   * Delete user from Supabase
    */
-  static async deleteUserFromSupabase(clerkId: string, jwtToken?: string): Promise<boolean> {
-    const client = jwtToken ? createAuthenticatedSupabaseClient(jwtToken) : supabase
-    
-    if (!client) {
-      console.error('Supabase client not initialized')
-      return false
-    }
-
+  static async deleteUserFromSupabase(clerkId: string, supabaseClient: SupabaseClient) {
     try {
-      const { error } = await client
+      const { error } = await supabaseClient
         .from('users')
         .delete()
         .eq('clerk_id', clerkId)
 
       if (error) {
-        console.error('Error deleting user:', error)
+        console.error('❌ Error deleting user from Supabase:', error)
         return false
       }
 
+      console.log('✅ User deleted successfully from Supabase')
       return true
     } catch (error) {
-      console.error('Error deleting user from Supabase:', error)
+      console.error('❌ Error in deleteUserFromSupabase:', error)
       return false
     }
   }
 
   /**
-   * Generate a unique referral link for the user
+   * Generate referral link for user
    */
   private static generateReferralLink(clerkId: string): string {
-    // Create a short, readable referral code
     const shortId = clerkId.substring(0, 8)
     const randomSuffix = Math.random().toString(36).substring(2, 6)
     return `${shortId}${randomSuffix}`

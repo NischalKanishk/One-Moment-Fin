@@ -1,35 +1,57 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
+import { useAuth } from '@/contexts/AuthContext'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!
 
-function createSafeClient(): SupabaseClient | null {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return null;
-  }
-  try {
-    return createClient(supabaseUrl, supabaseAnonKey)
-  } catch (e) {
-    return null
-  }
+// Log environment variables (remove in production)
+console.log('🔧 Supabase Configuration:', {
+  url: supabaseUrl ? '✅ Set' : '❌ Missing',
+  anonKey: supabaseAnonKey ? '✅ Set' : '❌ Missing'
+})
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('❌ Missing Supabase environment variables!')
+  console.error('Please check your .env.local file')
 }
 
-export const supabase = createSafeClient() as unknown as SupabaseClient
+// Create the base Supabase client
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+// Create a Supabase client that uses Clerk session tokens
+export const createSupabaseClient = (accessToken: string | null) => {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        Authorization: accessToken ? `Bearer ${accessToken}` : '',
+      },
+    },
+  })
+}
+
+// Hook to get Supabase client with Clerk token
+export const useSupabase = () => {
+  const { user } = useAuth()
+  
+  // For now, return the base client
+  // In the future, we can enhance this to use Clerk tokens
+  return supabase
+}
 
 // Database types based on our schema
 export interface User {
   id: string
   clerk_id: string
   full_name: string
-  email?: string
+  email: string
   phone?: string
-  auth_provider: string
-  created_at: string
-  updated_at?: string
-  referral_link?: string
   profile_image_url?: string
-  settings: Record<string, any>
+  auth_provider: string
   role: 'mfd' | 'admin'
+  created_at: string
+  updated_at: string
+  settings: Record<string, any>
+  referral_link?: string
 }
 
 export interface Lead {
