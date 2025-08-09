@@ -25,10 +25,12 @@ export const authenticateUser = async (
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ Auth: No valid authorization header');
       return res.status(401).json({ error: 'No valid authorization header' });
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    console.log('🔍 Auth: Token received, length:', token.length);
     
     // For development, allow any token that looks like a JWT
     if (process.env.NODE_ENV === 'development') {
@@ -37,10 +39,15 @@ export const authenticateUser = async (
         try {
           // Try to decode the JWT payload
           const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+          console.log('🔍 Auth: JWT payload decoded (dev mode):', payload);
           
           // Extract Clerk user ID from the token
           // Clerk JWT tokens have 'sub' field with the user ID
-          const clerkUserId = payload.sub || payload.user_id || 'dev-user-id';
+          const clerkUserId = payload.sub || payload.user_id || payload.clerk_id || 'dev-user-id';
+          
+          if (!payload.sub) {
+            console.warn('⚠️ Auth: JWT token missing "sub" field, using fallback ID');
+          }
           
           req.user = {
             id: clerkUserId,
@@ -49,8 +56,10 @@ export const authenticateUser = async (
             role: 'mfd'
           };
           
+          console.log('✅ Auth: User authenticated (dev mode):', req.user);
           return next();
         } catch (decodeError) {
+          console.warn('⚠️ Auth: JWT decode failed in dev mode, using default user');
           // In development, allow the request to continue with a default user
           req.user = {
             id: 'dev-user-id',
@@ -62,17 +71,21 @@ export const authenticateUser = async (
         }
       } else {
         // Token doesn't look like a JWT
+        console.log('❌ Auth: Token format invalid (not JWT)');
         return res.status(401).json({ error: 'Invalid token format' });
       }
     }
     
-    // Production token verification (original logic)
+    // Production token verification (Clerk JWT handling)
     try {
-      // Decode JWT token (this is a simplified approach)
+      // Decode JWT token
       const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
       
+      console.log('🔍 Auth: JWT payload received:', payload);
+      
       if (!payload.sub) {
-        return res.status(401).json({ error: 'Invalid token' });
+        console.error('❌ Auth: JWT missing "sub" field');
+        return res.status(401).json({ error: 'Invalid token - missing sub field' });
       }
 
       // Set user information from token
@@ -83,13 +96,14 @@ export const authenticateUser = async (
         role: 'mfd' // Default role, can be updated based on user data
       };
 
+      console.log('✅ Auth: User authenticated:', req.user);
       return next();
     } catch (tokenError) {
-      console.error('Token verification error:', tokenError);
-      return res.status(401).json({ error: 'Invalid token' });
+      console.error('❌ Auth: Token verification error:', tokenError);
+      return res.status(401).json({ error: 'Invalid token format' });
     }
   } catch (error) {
-    console.error('Authentication error:', error);
+    console.error('❌ Auth: Authentication error:', error);
     return res.status(500).json({ error: 'Authentication failed' });
   }
 };

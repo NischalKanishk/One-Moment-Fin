@@ -15,19 +15,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Please check your .env.local file')
 }
 
-// Create the base Supabase client
+// Create the base Supabase client (single instance)
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-// Create a Supabase client that uses Clerk session tokens
-export const createSupabaseClient = (accessToken: string | null) => {
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: {
-        Authorization: accessToken ? `Bearer ${accessToken}` : '',
-      },
-    },
-  })
-}
 
 // Hook to get Supabase client with Clerk token
 export const useSupabase = () => {

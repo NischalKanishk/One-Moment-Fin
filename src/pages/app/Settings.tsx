@@ -214,124 +214,31 @@ export default function Settings(){
         <link rel="canonical" href="/app/settings" />
       </Helmet>
 
-      <Tabs defaultValue="profile">
+      <Tabs defaultValue="preferences">
         <TabsList className="w-full md:w-auto overflow-auto">
-          <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
           <TabsTrigger value="subscription">Subscription</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile" className="space-y-4">
-          {hasChanges() && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-700">You have unsaved changes</p>
-            </div>
-          )}
-          
+        <TabsContent value="preferences" className="space-y-4">
           <div className="space-y-4">
-            {/* Full Name */}
-            <div className="space-y-2">
-              <Label htmlFor="full_name">Full Name</Label>
-              <Input 
-                id="full_name"
-                placeholder="Enter your full name" 
-                value={profileData.full_name}
-                onChange={(e) => setProfileData(prev => ({ ...prev, full_name: e.target.value }))}
-                maxLength={200}
-              />
-              <div className="flex justify-between items-center">
-                {errors.full_name && <p className="text-xs text-red-500">{errors.full_name}</p>}
-                <p className="text-xs text-muted-foreground ml-auto">
-                  {profileData.full_name.length}/200
-                </p>
-              </div>
+            <div className="flex items-center gap-3">
+              <Switch id="ai-score" defaultChecked />
+              <Label htmlFor="ai-score">AI scoring</Label>
             </div>
-
-            {/* Email */}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Input 
-                      id="email"
-                      placeholder="Email address" 
-                      value={profileData.email}
-                      readOnly
-                      className="bg-muted cursor-not-allowed opacity-75 hover:opacity-100 transition-opacity"
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs">
-                    <p className="text-center">Cannot change email. To use different mail, sign up with different mail</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <p className="text-xs text-muted-foreground">Email address cannot be modified</p>
+            <div className="flex items-center gap-3">
+              <Switch id="notif-email" defaultChecked />
+              <Label htmlFor="notif-email">Email notifications</Label>
             </div>
-
-            {/* Phone */}
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <div className="flex gap-2">
-                <div className="w-20">
-                  <Input 
-                    value={countryCode}
-                    readOnly
-                    className="bg-muted text-center font-medium"
-                  />
-                </div>
-                <Input 
-                  id="phone"
-                  placeholder="Enter phone number" 
-                  value={profileData.phone}
-                  onChange={(e) => {
-                    // Only allow numbers
-                    const value = e.target.value.replace(/\D/g, '');
-                    // Limit to 10 digits (typical for Indian phone numbers)
-                    if (value.length <= 10) {
-                      setProfileData(prev => ({ ...prev, phone: value }));
-                    }
-                  }}
-                  className="flex-1"
-                  maxLength={10}
-                />
-              </div>
-              <div className="flex justify-between items-center">
-                {errors.phone && <p className="text-xs text-red-500">{errors.phone}</p>}
-                <p className="text-xs text-muted-foreground ml-auto">
-                  {profileData.phone.length}/10 digits
-                </p>
-              </div>
-              <p className="text-xs text-muted-foreground">Enter 10-digit phone number without country code</p>
+            <div className="flex items-center gap-3">
+              <Switch id="notif-wa" />
+              <Label htmlFor="notif-wa">WhatsApp notifications</Label>
             </div>
-
-            {/* Referral Link */}
-            <div className="space-y-2">
-              <Label htmlFor="referral_link">Referral Link</Label>
-              <div className="flex gap-2">
-                <Input 
-                  id="referral_link"
-                  placeholder="Referral Link" 
-                  value={profileData.referral_link} 
-                  readOnly 
-                  className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 font-mono text-sm shadow-sm hover:shadow-md transition-shadow duration-200"
-                />
-                <Button variant="outline" onClick={copyReferralLink} className="hover:bg-blue-50 hover:border-blue-300 transition-colors">Copy</Button>
-              </div>
-              <p className="text-xs text-muted-foreground">Share this link to refer new users to the platform</p>
-            </div>
+            <Input placeholder="Default Risk Form" />
+            <Button variant="cta">Save Preferences</Button>
           </div>
-          
-          <Button 
-            variant="cta" 
-            onClick={handleProfileSave}
-            disabled={isSaving || !hasChanges()}
-            className={!hasChanges() ? 'opacity-50 cursor-not-allowed' : ''}
-          >
-            {isSaving ? 'Saving...' : 'Save'}
-          </Button>
         </TabsContent>
 
         <TabsContent value="preferences" className="space-y-4">

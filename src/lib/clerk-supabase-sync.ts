@@ -11,11 +11,29 @@ export interface ClerkUserData {
 }
 
 export class ClerkSupabaseSync {
+  // Global flag to disable sync operations
+  private static syncDisabled = false;
+
+  static disableSync() {
+    console.log('🔍 ClerkSupabaseSync: Sync disabled globally');
+    this.syncDisabled = true;
+  }
+
+  static enableSync() {
+    console.log('🔍 ClerkSupabaseSync: Sync enabled globally');
+    this.syncDisabled = false;
+  }
+
   /**
    * Sync Clerk user data to Supabase
    * This method will either create a new user or update existing one
    */
   static async syncUserToSupabase(clerkUserData: ClerkUserData, supabaseClient: SupabaseClient) {
+    // Check if sync is disabled
+    if (this.syncDisabled) {
+      console.log('🔍 ClerkSupabaseSync: Sync is disabled, returning null');
+      return null;
+    }
     try {
       // Test Supabase connection first
       const { data: testData, error: testError } = await supabaseClient
@@ -95,22 +113,73 @@ export class ClerkSupabaseSync {
 
   /**
    * Update existing user in Supabase
+   * COMPLETELY NON-DESTRUCTIVE - Only updates missing fields, never overwrites existing data
    */
   private static async updateUserInSupabase(clerkUserData: ClerkUserData, supabaseUserId: string, supabaseClient: SupabaseClient) {
     try {
-      const email = clerkUserData.emailAddresses?.[0]?.emailAddress || ''
-      const phone = clerkUserData.phoneNumbers?.[0]?.phoneNumber || ''
-      const fullName = [clerkUserData.firstName, clerkUserData.lastName]
-        .filter(Boolean)
-        .join(' ') || 'User'
+      // Get the existing user data first
+      const { data: existingUser, error: fetchError } = await supabaseClient
+        .from('users')
+        .select('*')
+        .eq('id', supabaseUserId)
+        .single()
 
-      const updateData = {
-        full_name: fullName,
-        email: email,
-        phone: phone,
-        profile_image_url: clerkUserData.imageUrl || '',
+      if (fetchError) {
+        console.error('Error fetching existing user:', fetchError)
+        return null
+      }
+
+      console.log('🔍 ClerkSupabaseSync: Existing user data:', existingUser);
+
+      // Build update data - ONLY update fields that are completely missing (null/undefined/empty)
+      const updateData: any = {
         updated_at: new Date().toISOString()
       }
+
+      // Only update full_name if it's completely missing
+      if (!existingUser.full_name || existingUser.full_name.trim() === '') {
+        const fullName = [clerkUserData.firstName, clerkUserData.lastName]
+          .filter(Boolean)
+          .join(' ') || 'User'
+        if (fullName && fullName !== 'User') {
+          updateData.full_name = fullName
+          console.log('🔍 ClerkSupabaseSync: Updating missing full_name:', fullName)
+        }
+      }
+
+      // Only update email if it's completely missing
+      if (!existingUser.email || existingUser.email.trim() === '') {
+        const email = clerkUserData.emailAddresses?.[0]?.emailAddress || ''
+        if (email) {
+          updateData.email = email
+          console.log('🔍 ClerkSupabaseSync: Updating missing email:', email)
+        }
+      }
+
+      // Only update phone if it's completely missing
+      if (!existingUser.phone || existingUser.phone.trim() === '') {
+        const phone = clerkUserData.phoneNumbers?.[0]?.phoneNumber || ''
+        if (phone) {
+          updateData.phone = phone
+          console.log('🔍 ClerkSupabaseSync: Updating missing phone:', phone)
+        }
+      }
+
+      // Only update profile_image_url if it's completely missing
+      if (!existingUser.profile_image_url || existingUser.profile_image_url.trim() === '') {
+        if (clerkUserData.imageUrl) {
+          updateData.profile_image_url = clerkUserData.imageUrl
+          console.log('🔍 ClerkSupabaseSync: Updating missing profile_image_url:', clerkUserData.imageUrl)
+        }
+      }
+
+      // If no fields to update, just return the existing user
+      if (Object.keys(updateData).length === 1) { // Only has updated_at
+        console.log('🔍 ClerkSupabaseSync: No fields to update, returning existing user unchanged')
+        return existingUser
+      }
+
+      console.log('🔍 ClerkSupabaseSync: Updating fields:', updateData);
 
       const { data: updatedUser, error } = await supabaseClient
         .from('users')
@@ -124,6 +193,7 @@ export class ClerkSupabaseSync {
         return null
       }
 
+      console.log('🔍 ClerkSupabaseSync: Update successful, returning updated user');
       return updatedUser
     } catch (error) {
       console.error('Error in updateUserInSupabase:', error)

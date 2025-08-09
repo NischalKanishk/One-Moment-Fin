@@ -1,12 +1,13 @@
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarSeparator } from "@/components/ui/sidebar";
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Users, ClipboardList, Boxes, Calendar, Settings } from "lucide-react";
+import { Home, Users, ClipboardList, Boxes, Calendar, Settings, User } from "lucide-react";
 
 const nav = [
   { title: "Home", url: "/app/dashboard", icon: Home },
   { title: "Leads", url: "/app/leads", icon: Users },
   { title: "Assessments", url: "/app/assessments", icon: ClipboardList },
   { title: "Meetings", url: "/app/meetings", icon: Calendar },
+  { title: "Profile", url: "/app/profile", icon: User },
   { title: "Settings", url: "/app/settings", icon: Settings },
   { title: "Products", url: "/app/products", icon: Boxes, disabled: true, comingSoon: true },
 ];

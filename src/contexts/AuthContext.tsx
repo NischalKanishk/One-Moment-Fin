@@ -9,6 +9,8 @@ interface AuthContextType {
   isLoading: boolean
   isAuthenticated: boolean
   syncUser: () => Promise<void>
+  disableSync: () => void
+  enableSync: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -30,6 +32,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const { isSignedIn, getToken } = useClerkAuth()
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [syncDisabled, setSyncDisabled] = useState(false)
 
   const syncUser = async () => {
     if (!clerkUser || !isSignedIn) {
@@ -71,12 +74,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       // Sync user with Supabase using our ClerkSupabaseSync class
+      console.log('🔍 AuthContext: Starting user sync with Supabase...')
       const supabaseUser = await ClerkSupabaseSync.syncUserToSupabase(clerkUserData, authenticatedSupabase)
 
       if (supabaseUser) {
+        console.log('🔍 AuthContext: Sync successful, setting user from Supabase:', supabaseUser)
         setUser(supabaseUser)
       } else {
         // Fallback to Clerk data if sync fails
+        console.log('🔍 AuthContext: Sync failed, using fallback Clerk data')
         const fallbackUser: User = {
           id: clerkUser.id,
           clerk_id: clerkUser.id,
@@ -113,7 +119,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Sync user when Clerk user changes
   useEffect(() => {
-    if (clerkLoaded) {
+    if (clerkLoaded && !syncDisabled) {
       if (clerkUser && isSignedIn) {
         syncUser()
       } else {
@@ -121,7 +127,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setIsLoading(false)
       }
     }
-  }, [clerkLoaded, clerkUser, isSignedIn])
+  }, [clerkLoaded, clerkUser, isSignedIn, syncDisabled])
+
+  const disableSync = () => {
+    console.log('🔍 AuthContext: Sync disabled');
+    setSyncDisabled(true);
+  }
+
+  const enableSync = () => {
+    console.log('🔍 AuthContext: Sync enabled');
+    setSyncDisabled(false);
+  }
 
   const value: AuthContextType = {
     user,

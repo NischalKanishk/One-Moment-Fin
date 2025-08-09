@@ -28,6 +28,23 @@ router.post('/logout', authenticateUser, async (req: express.Request, res: expre
   }
 });
 
+// GET /api/auth/test - Test authentication endpoint
+router.get('/test', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    console.log('🔍 Test endpoint called');
+    console.log('Authenticated user:', req.user);
+    
+    return res.json({ 
+      message: 'Authentication working',
+      user: req.user,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Test endpoint error:', error);
+    return res.status(500).json({ error: 'Test failed' });
+  }
+});
+
 // GET /api/auth/me - Get current user profile
 router.get('/me', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
@@ -104,8 +121,14 @@ router.put('/profile', authenticateUser, [
   body('settings').optional().isObject()
 ], async (req: express.Request, res: express.Response) => {
   try {
+    console.log('🔍 Profile update request received');
+    console.log('Request body:', req.body);
+    console.log('Authenticated user:', req.user);
+    console.log('User ID from auth middleware:', req.user?.id);
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Validation errors:', errors.array());
       return res.status(400).json({ 
         error: 'Validation failed',
         details: errors.array()
@@ -113,14 +136,18 @@ router.put('/profile', authenticateUser, [
     }
 
     const { full_name, phone, settings } = req.body;
+    console.log('🔍 Extracted data:', { full_name, phone, settings });
     
     // Get the actual Clerk ID from the authenticated user
     const clerkId = req.user!.id;
+    console.log('🔍 Clerk ID from request:', clerkId);
 
     // Handle phone field - convert empty string to null
     const phoneValue = phone === '' ? null : phone;
+    console.log('🔍 Phone value after processing:', phoneValue);
 
     // First, check if user exists in database
+    console.log('🔍 Checking if user exists in database with clerk_id:', clerkId);
     let { data: existingUser, error: fetchError } = await supabase
       .from('users')
       .select('*')
@@ -128,6 +155,7 @@ router.put('/profile', authenticateUser, [
       .single();
 
     if (fetchError && fetchError.code === 'PGRST116') {
+      console.log('📝 User does not exist, creating new user...');
       // User doesn't exist, create them
       
       const { data: newUser, error: createError } = await supabase
@@ -146,14 +174,17 @@ router.put('/profile', authenticateUser, [
         .single();
 
       if (createError) {
-        console.error('Error creating user:', createError);
+        console.error('❌ Error creating user:', createError);
         return res.status(500).json({ error: 'Failed to create user profile' });
       }
 
+      console.log('✅ New user created successfully:', newUser);
       existingUser = newUser;
     } else if (fetchError) {
-      console.error('Error fetching user:', fetchError);
+      console.error('❌ Error fetching user:', fetchError);
       return res.status(500).json({ error: 'Failed to fetch user profile' });
+    } else {
+      console.log('✅ Existing user found:', existingUser);
     }
 
     // Prepare update data - only update fields that are provided
@@ -165,7 +196,10 @@ router.put('/profile', authenticateUser, [
     if (phoneValue !== undefined) updateData.phone = phoneValue;
     if (settings !== undefined) updateData.settings = settings;
 
+    console.log('🔍 Update data prepared:', updateData);
+
     // Now update the user profile
+    console.log('🚀 Updating user profile in database...');
     const { data, error } = await supabase
       .from('users')
       .update(updateData)
@@ -174,13 +208,20 @@ router.put('/profile', authenticateUser, [
       .single();
 
     if (error) {
-      console.error('Profile update error:', error);
+      console.error('❌ Profile update error:', error);
+      console.error('❌ Error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
       return res.status(500).json({ error: 'Profile update failed' });
     }
 
+    console.log('✅ Profile updated successfully:', data);
     return res.json({ user: data });
   } catch (error) {
-    console.error('Profile update error:', error);
+    console.error('❌ Profile update error:', error);
     return res.status(500).json({ error: 'Profile update failed' });
   }
 });

@@ -18,6 +18,7 @@ import FormBuilder from "./pages/app/FormBuilder";
 import Assessments from "./pages/app/Assessments";
 import Products from "./pages/app/Products";
 import Meetings from "./pages/app/Meetings";
+import Profile from "./pages/app/Profile";
 import Settings from "./pages/app/Settings";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const App = () => (
               <Route path="assessments" element={<Assessments />} />
               <Route path="products" element={<Products />} />
               <Route path="meetings" element={<Meetings />} />
+              <Route path="profile" element={<Profile />} />
               <Route path="settings" element={<Settings />} />
             </Route>
 

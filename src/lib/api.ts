@@ -12,13 +12,15 @@ const api = axios.create({
 
 // Function to create authenticated API instance
 export const createAuthenticatedApi = (token: string) => {
-  return axios.create({
-    baseURL: API_BASE_URL,
+  const api = axios.create({
+    baseURL: import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
-    },
+    }
   });
+  
+  return api;
 };
 
 // Response interceptor to handle auth errors
@@ -62,6 +64,42 @@ export const authAPI = {
     return response.data;
   },
 
+  getProfileWithToken: async (token: string) => {
+    console.log('🔍 API: getProfileWithToken called with token length:', token.length);
+    
+    // Validate token format
+    if (!token || token.split('.').length !== 3) {
+      throw new Error('Invalid JWT token format');
+    }
+    
+    const authApi = createAuthenticatedApi(token);
+    
+    try {
+      const response = await authApi.get('/api/auth/me');
+      console.log('✅ API: Profile fetch successful');
+      return response.data;
+    } catch (error) {
+      console.error('❌ API: Profile fetch failed:', error);
+      
+      // Provide more specific error information
+      if (error.response) {
+        const { status, data: errorData } = error.response;
+        
+        if (status === 401) {
+          throw new Error('Authentication failed. Please try signing out and signing back in.');
+        } else if (status === 500) {
+          throw new Error('Server error. Please try again later.');
+        } else {
+          throw new Error(`Request failed with status ${status}`);
+        }
+      } else if (error.request) {
+        throw new Error('Network error. Please check your connection and try again.');
+      } else {
+        throw new Error('Request failed. Please try again.');
+      }
+    }
+  },
+
   updateProfile: async (data: { full_name?: string; phone?: string; settings?: any }) => {
     // This function needs to be called with a token, so we'll use the base api
     // The frontend should pass the token in the Authorization header
@@ -70,9 +108,52 @@ export const authAPI = {
   },
 
   updateProfileWithToken: async (token: string, data: { full_name?: string; phone?: string; settings?: any }) => {
+    console.log('🔍 API: updateProfileWithToken called with:', { tokenLength: token.length, data });
+    
+    // Validate token format
+    if (!token || token.split('.').length !== 3) {
+      throw new Error('Invalid JWT token format');
+    }
+    
+    // Decode and validate JWT payload (browser-compatible)
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (!payload.sub) {
+        console.warn('⚠️ API: JWT token missing "sub" field - this may cause authentication issues');
+      }
+    } catch (decodeError) {
+      console.warn('⚠️ API: Could not decode JWT payload:', decodeError);
+    }
+    
     const authApi = createAuthenticatedApi(token);
-    const response = await authApi.put('/api/auth/profile', data);
-    return response.data;
+    
+    try {
+      const response = await authApi.put('/api/auth/profile', data);
+      console.log('✅ API: Profile update successful');
+      return response.data;
+    } catch (error) {
+      console.error('❌ API: Profile update failed:', error);
+      
+      // Provide more specific error information
+      if (error.response) {
+        const { status, data: errorData } = error.response;
+        
+        if (status === 401) {
+          throw new Error('Authentication failed. Please try signing out and signing back in.');
+        } else if (status === 400) {
+          const errorMessage = errorData?.error || 'Invalid data provided';
+          throw new Error(errorMessage);
+        } else if (status === 500) {
+          throw new Error('Server error. Please try again later.');
+        } else {
+          throw new Error(`Request failed with status ${status}`);
+        }
+      } else if (error.request) {
+        throw new Error('Network error. Please check your connection and try again.');
+      } else {
+        throw new Error('Request failed. Please try again.');
+      }
+    }
   },
 };
 
