@@ -10,6 +10,7 @@ import { Plus, Calendar, Clock, User, ExternalLink, Video } from "lucide-react";
 import { LeadAutocomplete } from "@/components/LeadAutocomplete";
 import { CalendlyEmbed } from "@/components/CalendlyEmbed";
 import { toast } from "@/hooks/use-toast";
+import { useSettings } from "@/hooks/use-settings";
 
 interface Lead {
   id: string;
@@ -36,6 +37,7 @@ interface Meeting {
 export default function Meetings() {
   const { user } = useUser();
   const { getToken } = useAuth();
+  const { hasCalendlyConfig } = useSettings();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -238,6 +240,44 @@ export default function Meetings() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Calendly Configuration Warning */}
+      {!hasCalendlyConfig && (
+        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+          <div className="flex items-start space-x-4">
+            <div className="flex-shrink-0">
+              <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                Calendly Integration Required
+              </h3>
+              <p className="text-blue-800 dark:text-blue-200 mb-4">
+                To schedule meetings with your leads, you need to configure your Calendly integration. 
+                This will allow you to embed your scheduling calendar and automatically create meetings.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <a 
+                  href="/app/settings?tab=calendly" 
+                  className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Configure Calendly
+                </a>
+                <a 
+                  href="https://help.calendly.com/hc/en-us/articles/360019511834-API-keys" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center px-4 py-2 bg-white text-blue-600 text-sm font-medium rounded-md border border-blue-200 hover:bg-blue-50 transition-colors"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  How to get API key
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Meetings List */}
       <Card>

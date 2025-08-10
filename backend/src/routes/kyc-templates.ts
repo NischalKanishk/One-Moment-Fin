@@ -12,7 +12,7 @@ router.get('/', authenticateUser, async (req: express.Request, res: express.Resp
     const { data: templates, error } = await supabase
       .from('kyc_templates')
       .select('*')
-      .eq('user_id', req.user!.id)
+      .eq('user_id', req.user!.supabase_user_id)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -36,7 +36,7 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
       .from('kyc_templates')
       .select('*')
       .eq('id', id)
-      .eq('user_id', req.user!.id)
+      .eq('user_id', req.user!.supabase_user_id)
       .single();
 
     if (error) {
@@ -72,7 +72,7 @@ router.post('/', authenticateUser, [
     const { data, error } = await supabase
       .from('kyc_templates')
       .insert({
-        user_id: req.user!.id,
+        user_id: req.user!.supabase_user_id,
         name,
         description,
         fields,
@@ -116,7 +116,7 @@ router.put('/:id', authenticateUser, [
       .from('kyc_templates')
       .update(updateData)
       .eq('id', id)
-      .eq('user_id', req.user!.id)
+      .eq('user_id', req.user!.supabase_user_id)
       .select()
       .single();
 
@@ -144,7 +144,7 @@ router.delete('/:id', authenticateUser, async (req: express.Request, res: expres
       .from('kyc_templates')
       .delete()
       .eq('id', id)
-      .eq('user_id', req.user!.id)
+      .eq('user_id', req.user!.supabase_user_id)
       .select()
       .single();
 
@@ -166,44 +166,44 @@ router.delete('/:id', authenticateUser, async (req: express.Request, res: expres
 // POST /api/kyc-templates/seed - Seed dummy KYC templates
 router.post('/seed', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
-    const result = await seedKYCTemplates(req.user!.id);
+    if (!req.user?.supabase_user_id) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
+    const result = await seedKYCTemplates(req.user.supabase_user_id);
     
     if (result.success) {
-      return res.json({
-        message: 'KYC templates seeded successfully',
-        ...result
+      return res.json({ 
+        message: 'KYC templates seeded successfully', 
+        results: result.results,
+        summary: result.summary
       });
     } else {
-      return res.status(500).json({
-        error: 'Failed to seed KYC templates',
-        details: result.error
-      });
+      return res.status(500).json({ error: 'Failed to seed KYC templates', details: result.error });
     }
   } catch (error) {
     console.error('KYC templates seeding error:', error);
-    return res.status(500).json({ error: 'Failed to seed KYC templates' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // DELETE /api/kyc-templates/seed - Clear all KYC templates for the user
 router.delete('/seed', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
-    const result = await clearKYCTemplates(req.user!.id);
+    if (!req.user?.supabase_user_id) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
+    const result = await clearKYCTemplates(req.user.supabase_user_id);
     
     if (result.success) {
-      return res.json({
-        message: 'KYC templates cleared successfully',
-        count: result.count
-      });
+      return res.json({ message: 'KYC templates cleared successfully' });
     } else {
-      return res.status(500).json({
-        error: 'Failed to clear KYC templates',
-        details: result.error
-      });
+      return res.status(500).json({ error: 'Failed to clear KYC templates', details: result.error });
     }
   } catch (error) {
     console.error('KYC templates clearing error:', error);
-    return res.status(500).json({ error: 'Failed to clear KYC templates' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 

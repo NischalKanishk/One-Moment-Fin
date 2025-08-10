@@ -40,7 +40,7 @@ router.post('/', authenticateUser, [
 
     // Only allow whitelisted fields
     const { full_name, email, phone, age } = req.body;
-    const clerkUserId = req.user!.id;
+    const clerkUserId = req.user!.clerk_id;
 
     // Get the actual user UUID from the users table using the Clerk ID
     let user_id;
@@ -194,7 +194,7 @@ router.get('/', authenticateUser, [
       });
     }
 
-    const clerkUserId = req.user!.id;
+    const clerkUserId = req.user!.clerk_id;
 
     // Get the actual user UUID from the users table using the Clerk ID
     let user_id;
@@ -323,7 +323,7 @@ router.get('/', authenticateUser, [
 // GET /api/leads/stats (Get lead statistics)
 router.get('/stats', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
-    const clerkUserId = req.user!.id;
+    const clerkUserId = req.user!.clerk_id;
 
     // Get the actual user UUID from the users table using the Clerk ID
     let user_id;
@@ -412,7 +412,7 @@ router.get('/search', authenticateUser, [
 
     const searchTerm = req.query.search as string;
     const limit = parseInt(req.query.limit as string) || 20;
-    const clerkUserId = req.user!.id;
+    const clerkUserId = req.user!.clerk_id;
 
     // Get the actual user UUID from the users table using the Clerk ID
     let user_id;
@@ -458,7 +458,7 @@ router.get('/search', authenticateUser, [
 router.get('/:id', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
     const { id } = req.params;
-    const clerkUserId = req.user!.id;
+    const clerkUserId = req.user!.clerk_id;
 
     // Get the actual user UUID from the users table using the Clerk ID
     let user_id;
@@ -561,7 +561,7 @@ router.patch('/:id/status', authenticateUser, [
 
     const { id } = req.params;
     const { status } = req.body;
-    const clerkUserId = req.user!.id;
+    const clerkUserId = req.user!.clerk_id;
 
     // Get the actual user UUID from the users table using the Clerk ID
     let user_id;
@@ -623,7 +623,7 @@ router.put('/:id', authenticateUser, [
 
     const { id } = req.params;
     const { full_name, email, phone, age } = req.body;
-    const clerkUserId = req.user!.id;
+    const clerkUserId = req.user!.clerk_id;
 
     // Get the actual user UUID from the users table using the Clerk ID
     let user_id;
@@ -667,7 +667,7 @@ router.put('/:id', authenticateUser, [
 router.delete('/:id', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
     const { id } = req.params;
-    const clerkUserId = req.user!.id;
+    const clerkUserId = req.user!.clerk_id;
 
     // Get the actual user UUID from the users table using the Clerk ID
     let user_id;

@@ -48,7 +48,7 @@ router.get('/test', authenticateUser, async (req: express.Request, res: express.
 // GET /api/auth/me - Get current user profile
 router.get('/me', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
-    const clerkId = req.user!.id;
+    const clerkId = req.user!.clerk_id;
 
     // Try to get user data from database
     let { data: userData, error } = await supabase
@@ -127,7 +127,7 @@ router.put('/profile', authenticateUser, [
     console.log('🔍 Profile update request received');
     console.log('Request body:', req.body);
     console.log('Authenticated user:', req.user);
-    console.log('User ID from auth middleware:', req.user?.id);
+    console.log('User ID from auth middleware:', req.user?.clerk_id);
     
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -142,7 +142,7 @@ router.put('/profile', authenticateUser, [
     console.log('🔍 Extracted data:', { full_name, phone, settings });
     
     // Get the actual Clerk ID from the authenticated user
-    const clerkId = req.user!.id;
+    const clerkId = req.user!.clerk_id;
     console.log('🔍 Clerk ID from request:', clerkId);
 
     // Handle phone field - convert empty string to null

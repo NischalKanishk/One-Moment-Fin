@@ -42,7 +42,7 @@ router.get('/current', authenticateUser, async (req: express.Request, res: expre
           meeting_limit
         )
       `)
-      .eq('user_id', req.user!.id)
+      .eq('user_id', req.user!.supabase_user_id)
       .eq('is_active', true)
       .single();
 
@@ -82,14 +82,14 @@ router.post('/start', authenticateUser, async (req: express.Request, res: expres
     await supabase
       .from('user_subscriptions')
       .update({ is_active: false })
-      .eq('user_id', req.user!.id)
+      .eq('user_id', req.user!.supabase_user_id)
       .eq('is_active', true);
 
     // Create new subscription
     const { data: subscription, error } = await supabase
       .from('user_subscriptions')
       .insert({
-        user_id: req.user!.id,
+        user_id: req.user!.supabase_user_id,
         subscription_plan_id: plan_id,
         start_date: new Date().toISOString().split('T')[0],
         is_active: true,

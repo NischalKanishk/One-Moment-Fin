@@ -143,7 +143,7 @@ router.get('/:lead_id', authenticateUser, async (req: express.Request, res: expr
         )
       `)
       .eq('lead_id', lead_id)
-      .eq('user_id', req.user!.id)
+      .eq('user_id', req.user!.supabase_user_id)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -200,7 +200,7 @@ router.get('/forms', authenticateUser, async (req: express.Request, res: express
           weight
         )
       `)
-      .eq('user_id', req.user!.id)
+      .eq('user_id', req.user!.supabase_user_id)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -238,14 +238,14 @@ router.post('/forms', authenticateUser, [
       await supabase
         .from('assessments')
         .update({ is_active: false })
-        .eq('user_id', req.user!.id);
+        .eq('user_id', req.user!.supabase_user_id);
     }
 
     // Create assessment form
     const { data: form, error: formError } = await supabase
       .from('assessments')
       .insert({
-        user_id: req.user!.id,
+        user_id: req.user!.supabase_user_id,
         name,
         description,
         is_active: is_active || false

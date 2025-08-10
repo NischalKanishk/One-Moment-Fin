@@ -14,7 +14,7 @@ router.get('/:lead_id', authenticateUser, async (req: express.Request, res: expr
       .from('kyc_status')
       .select('*')
       .eq('lead_id', lead_id)
-      .eq('user_id', req.user!.id)
+      .eq('user_id', req.user!.supabase_user_id)
       .single();
 
     if (error && error.code !== 'PGRST116') {
@@ -48,7 +48,7 @@ router.post('/upload', authenticateUser, [
       .from('kyc_status')
       .upsert({
         lead_id,
-        user_id: req.user!.id,
+        user_id: req.user!.supabase_user_id,
         kyc_method,
         form_data,
         kyc_file_url,
@@ -87,7 +87,7 @@ router.patch('/:lead_id/status', authenticateUser, [
       .from('kyc_status')
       .update({ status, verified_by })
       .eq('lead_id', lead_id)
-      .eq('user_id', req.user!.id)
+      .eq('user_id', req.user!.supabase_user_id)
       .select()
       .single();
 

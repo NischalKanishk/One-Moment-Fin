@@ -11,7 +11,7 @@ router.get('/', authenticateUser, async (req: express.Request, res: express.Resp
     const { data: products, error } = await supabase
       .from('product_recommendations')
       .select('*')
-      .or(`user_id.eq.${req.user!.id},visibility.eq.public`)
+      .or(`user_id.eq.${req.user!.supabase_user_id},visibility.eq.public`)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -46,7 +46,7 @@ router.post('/', authenticateUser, [
     const { data, error } = await supabase
       .from('product_recommendations')
       .insert({
-        user_id: req.user!.id,
+        user_id: req.user!.supabase_user_id,
         title,
         risk_category,
         description,
@@ -79,7 +79,7 @@ router.delete('/:id', authenticateUser, async (req: express.Request, res: expres
       .from('product_recommendations')
       .delete()
       .eq('id', id)
-      .eq('user_id', req.user!.id);
+      .eq('user_id', req.user!.supabase_user_id);
 
     if (error) {
       console.error('Product deletion error:', error);
@@ -103,7 +103,7 @@ router.get('/recommended/:lead_id', authenticateUser, async (req: express.Reques
       .from('risk_assessments')
       .select('risk_category')
       .eq('lead_id', lead_id)
-      .eq('user_id', req.user!.id)
+      .eq('user_id', req.user!.supabase_user_id)
       .single();
 
     if (riskError || !riskAssessment) {
@@ -115,7 +115,7 @@ router.get('/recommended/:lead_id', authenticateUser, async (req: express.Reques
       .from('product_recommendations')
       .select('*')
       .eq('risk_category', riskAssessment.risk_category)
-      .or(`user_id.eq.${req.user!.id},visibility.eq.public`)
+      .or(`user_id.eq.${req.user!.supabase_user_id},visibility.eq.public`)
       .order('created_at', { ascending: false });
 
     if (error) {

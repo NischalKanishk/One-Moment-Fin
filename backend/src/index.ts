@@ -27,6 +27,7 @@ import kycRoutes from './routes/kyc';
 import kycTemplatesRoutes from './routes/kyc-templates';
 import subscriptionRoutes from './routes/subscriptions';
 import webhookRoutes from './routes/webhooks';
+import settingsRoutes from './routes/settings';
 
 
 
@@ -91,6 +92,7 @@ app.use('/api/meetings', meetingsRoutes);
 app.use('/api/kyc', kycRoutes);
 app.use('/api/kyc-templates', kycTemplatesRoutes);
 app.use('/api/subscription', subscriptionRoutes);
+app.use('/api/settings', settingsRoutes);
 app.use('/webhooks', webhookRoutes);
 
 // 404 handler

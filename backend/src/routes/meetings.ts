@@ -9,7 +9,7 @@ const router = express.Router();
 // GET /api/meetings
 router.get('/', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
-    const clerkUserId = req.user!.id;
+    const clerkUserId = req.user!.clerk_id;
 
     // Get the actual user UUID from the users table using the Clerk ID
     let user_id;
@@ -92,7 +92,7 @@ router.post('/manual', authenticateUser, [
     }
 
     const { lead_id, title, start_time, end_time, description, meeting_link } = req.body;
-    const clerkUserId = req.user!.id;
+    const clerkUserId = req.user!.clerk_id;
 
     // Get the actual user UUID from the users table using the Clerk ID
     let user_id;
@@ -160,7 +160,7 @@ router.patch('/:id/status', authenticateUser, [
 
     const { id } = req.params;
     const { status } = req.body;
-    const clerkUserId = req.user!.id;
+    const clerkUserId = req.user!.clerk_id;
 
     // Get the actual user UUID from the users table using the Clerk ID
     let user_id;
@@ -213,7 +213,7 @@ router.post('/calendly-scheduled', authenticateUser, [
     }
 
     const { eventUri, inviteeUri, leadId } = req.body;
-    const clerkUserId = req.user!.id;
+    const clerkUserId = req.user!.clerk_id;
 
     // Get the actual user UUID from the users table using the Clerk ID
     let user_id;
@@ -246,12 +246,21 @@ router.post('/calendly-scheduled', authenticateUser, [
       return res.status(404).json({ error: 'Lead not found or access denied' });
     }
 
-    // Fetch Calendly event and invitee details
-    const calendlyToken = process.env.CALENDLY_API_KEY;
-    if (!calendlyToken) {
-      console.error('CALENDLY_API_KEY not configured');
-      return res.status(500).json({ error: 'Calendly integration not configured' });
+    // Fetch user's Calendly settings
+    const { data: userSettings, error: settingsError } = await supabase
+      .from('user_settings')
+      .select('calendly_api_key')
+      .eq('user_id', user_id)
+      .single();
+
+    if (settingsError || !userSettings?.calendly_api_key) {
+      console.error('User Calendly API key not configured');
+      return res.status(400).json({ 
+        error: 'Calendly integration not configured. Please configure your Calendly settings first.' 
+      });
     }
+
+    const calendlyToken = userSettings.calendly_api_key;
 
     try {
       // Fetch event details
