@@ -11,6 +11,7 @@ interface AuthContextType {
   syncUser: () => Promise<void>
   disableSync: () => void
   enableSync: () => void
+  getToken: () => Promise<string | null>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -143,7 +144,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     user,
     isLoading,
     isAuthenticated: !!user && isSignedIn,
-    syncUser
+    syncUser,
+    getToken: async () => {
+      try {
+        if (!isSignedIn) return null;
+        return await getToken({ template: 'supabase' });
+      } catch (error) {
+        console.error('Error getting token:', error);
+        return null;
+      }
+    }
   }
 
   return (

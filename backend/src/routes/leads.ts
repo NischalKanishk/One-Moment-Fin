@@ -399,6 +399,61 @@ router.get('/stats', authenticateUser, async (req: express.Request, res: express
   }
 });
 
+// GET /api/leads/search (Search leads for autocomplete)
+router.get('/search', authenticateUser, [
+  query('search').notEmpty().withMessage('Search term is required'),
+  query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const searchTerm = req.query.search as string;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const clerkUserId = req.user!.id;
+
+    // Get the actual user UUID from the users table using the Clerk ID
+    let user_id;
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('clerk_id', clerkUserId)
+        .single();
+
+      if (userError || !userData) {
+        throw new Error('User not found. Please complete your profile first.');
+      }
+      
+      user_id = userData.id;
+    } catch (error) {
+      console.error('User lookup error:', error);
+      return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
+    }
+
+    // Search leads by name, email, or phone
+    const { data: leads, error } = await supabase
+      .from('leads')
+      .select('id, full_name, email, phone')
+      .eq('user_id', user_id)
+      .or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
+      .limit(limit)
+      .order('full_name', { ascending: true });
+
+    if (error) {
+      console.error('Lead search error:', error);
+      return res.status(500).json({ error: 'Failed to search leads' });
+    }
+
+    return res.json({ leads: leads || [] });
+  } catch (error) {
+    console.error('Lead search error:', error);
+    return res.status(500).json({ error: 'Failed to search leads' });
+  }
+});
+
 // GET /api/leads/:id (Get single lead with details)
 router.get('/:id', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
@@ -650,7 +705,5 @@ router.delete('/:id', authenticateUser, async (req: express.Request, res: expres
     return res.status(500).json({ error: 'Failed to delete lead' });
   }
 });
-
-
 
 export default router;

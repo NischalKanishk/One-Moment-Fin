@@ -1,4 +1,5 @@
-import { useUser, useAuth } from "@clerk/clerk-react";
+import { useUser } from "@clerk/clerk-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +55,7 @@ interface PaginationInfo {
 
 export default function Leads(){
   const { user } = useUser();
-  const { getToken } = useAuth();
+  const { getToken, isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -93,6 +94,29 @@ export default function Leads(){
       age: '',
     });
   }, []);
+
+  // Authentication guard
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="text-lg font-medium">Loading...</div>
+          <div className="text-sm text-muted-foreground">Please wait while we authenticate you.</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="text-lg font-medium">Authentication Required</div>
+          <div className="text-sm text-muted-foreground">Please sign in to access leads.</div>
+        </div>
+      </div>
+    );
+  }
 
   // Reset form when dialog opens/closes
   useEffect(() => {

@@ -458,7 +458,7 @@ export default function LeadDetail() {
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="risk">Risk</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="meetings">Meetings ({lead?.meetings?.length || 0})</TabsTrigger>
           <TabsTrigger value="kyc">KYC</TabsTrigger>
           <TabsTrigger value="suggestions">Suggestions</TabsTrigger>
         </TabsList>
@@ -553,12 +553,12 @@ export default function LeadDetail() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="timeline" className="space-y-4">
+        <TabsContent value="meetings" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
-                Timeline
+                Meetings
               </CardTitle>
             </CardHeader>
             <CardContent>
