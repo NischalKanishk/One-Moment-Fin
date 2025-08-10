@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   MessageSquare, 
   Calendar, 
@@ -14,28 +17,241 @@ import {
   TrendingUp,
   FileText,
   Lightbulb,
-  StickyNote
+  StickyNote,
+  Edit,
+  Trash2,
+  ArrowLeft
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@clerk/clerk-react";
+import { leadsAPI } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 import KYCStatus from "@/components/KYCStatus";
+import { 
+  Dialog, 
+  DialogTrigger, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter, 
+  DialogClose 
+} from '@/components/ui/dialog';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
 
-export default function LeadDetail(){
-  // Mock lead data - in real app this would come from API
-  const lead = {
-    id: "mock-lead-id",
-    full_name: "Rohit Sharma",
-    email: "rohit.sharma@email.com",
-    phone: "+91 90000 11111",
-    source_link: "website",
-    status: "assessment_done",
-    kyc_status: "pending",
-    age: 35,
-    notes: "Interested in mutual funds for child education. Has stable government job."
+interface Lead {
+  id: string;
+  full_name: string;
+  email?: string;
+  phone?: string;
+  age?: number;
+  source_link?: string;
+  status: string;
+  created_at: string;
+  notes?: string;
+  kyc_status?: any[];
+  risk_assessments?: any[];
+  meetings?: any[];
+}
+
+interface EditFormData {
+  full_name: string;
+  email: string;
+  phone: string;
+  age: string;
+  notes: string;
+}
+
+// Common lead sources for MFDs
+const LEAD_SOURCES = [
+  { value: 'sms', label: 'SMS' },
+  { value: 'in_person', label: 'In-Person Meeting' },
+  { value: 'phone_call', label: 'Phone Call' },
+  { value: 'referral', label: 'Referral' },
+  { value: 'social_media', label: 'Social Media' },
+  { value: 'website', label: 'Website' },
+  { value: 'email', label: 'Email' },
+  { value: 'walk_in', label: 'Walk-in' },
+  { value: 'seminar', label: 'Seminar/Event' },
+  { value: 'advertisement', label: 'Advertisement' },
+  { value: 'cold_call', label: 'Cold Call' },
+  { value: 'other', label: 'Other' },
+] as const;
+
+export default function LeadDetail() {
+  const { id } = useParams<{ id: string }>();
+  const { getToken } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  
+  const [lead, setLead] = useState<Lead | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [canDelete, setCanDelete] = useState(false);
+
+  const form = useForm<EditFormData>({
+    defaultValues: {
+      full_name: '',
+      email: '',
+      phone: '',
+      age: '',
+      notes: ''
+    },
+    mode: 'onBlur',
+  });
+
+  useEffect(() => {
+    if (id) {
+      loadLead();
+    }
+  }, [id]);
+
+  const loadLead = async () => {
+    try {
+      setLoading(true);
+      const token = await getToken();
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+      
+      const response = await leadsAPI.getById(token, id!);
+      setLead(response.lead);
+      
+      // Initialize form with current values
+      form.reset({
+        full_name: response.lead.full_name || '',
+        email: response.lead.email || '',
+        phone: response.lead.phone || '',
+        age: response.lead.age?.toString() || '',
+        notes: response.lead.notes || ''
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to load lead: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = () => {
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async (values: EditFormData) => {
+    try {
+      const token = await getToken();
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      const updateData = {
+        full_name: values.full_name,
+        email: values.email || undefined,
+        phone: values.phone || undefined,
+        age: values.age ? parseInt(values.age) : undefined,
+        notes: values.notes || undefined
+      };
+
+      await leadsAPI.update(token, id!, updateData);
+      
+      // Refresh lead data
+      await loadLead();
+      setEditDialogOpen(false);
+      
+      toast({
+        title: "Success",
+        description: "Lead updated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to update lead: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (deleteConfirmation !== 'Delete lead') {
+      toast({
+        title: "Error",
+        description: "Please type 'Delete lead' exactly to confirm deletion",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const token = await getToken();
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      await leadsAPI.delete(token, id!);
+      
+      toast({
+        title: "Success",
+        description: "Lead deleted successfully",
+      });
+      
+      // Navigate back to leads list
+      navigate('/app/leads');
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to delete lead: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeleteConfirmation('');
+      setCanDelete(false);
+    }
   };
 
   const handleKYCStatusChange = () => {
-    // Refresh lead data or update UI as needed
-    console.log("KYC status changed");
+    // Refresh lead data
+    loadLead();
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading lead details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!lead) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground">Lead not found</p>
+        <Button onClick={() => navigate('/app/leads')} className="mt-4">
+          Back to Leads
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -43,6 +259,18 @@ export default function LeadDetail(){
         <title>{lead.full_name} – OneMFin</title>
         <meta name="description" content="Lead summary, risk assessment, meetings, KYC, portfolio and AI suggestions." />
       </Helmet>
+
+      {/* Back Button */}
+      <div className="flex items-center gap-4">
+        <Button 
+          variant="outline" 
+          onClick={() => navigate('/app/leads')}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Leads
+        </Button>
+      </div>
 
       {/* Lead Header */}
       <Card>
@@ -56,28 +284,216 @@ export default function LeadDetail(){
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Phone className="h-4 w-4" />
-                      {lead.phone}
+                      {lead.phone || 'N/A'}
                     </span>
                     <span className="flex items-center gap-1">
                       <Mail className="h-4 w-4" />
-                      {lead.email}
+                      {lead.email || 'N/A'}
                     </span>
                     <span className="flex items-center gap-1">
                       <ExternalLink className="h-4 w-4" />
-                      Source: {lead.source_link}
+                      Source: {lead.source_link || 'N/A'}
                     </span>
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline">Age: {lead.age}</Badge>
+                <Badge variant="outline">
+                  Age: {lead.age || 'N/A'}
+                </Badge>
                 <Badge variant="secondary">Status: {lead.status.replace('_', ' ')}</Badge>
-                <Badge variant={lead.kyc_status === 'completed' ? 'default' : 'secondary'}>
-                  KYC: {lead.kyc_status}
+                <Badge variant={lead.kyc_status?.[0]?.status === 'completed' ? 'default' : 'secondary'}>
+                  KYC: {lead.kyc_status?.[0]?.status || 'Not started'}
                 </Badge>
               </div>
             </div>
             <div className="flex gap-2">
+              <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <Edit className="h-4 w-4" />
+                    Edit
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-visible">
+                  <DialogHeader className="pb-4">
+                    <DialogTitle className="text-xl font-semibold">Edit Lead</DialogTitle>
+                  </DialogHeader>
+                  <div 
+                    className="max-h-[calc(90vh-120px)] overflow-y-auto scroll-smooth"
+                    style={{ 
+                      scrollBehavior: 'smooth',
+                      scrollbarWidth: 'thin',
+                      scrollbarColor: 'hsl(var(--border)) hsl(var(--background))'
+                    }}
+                  >
+                    <Form {...form}>
+                      <form onSubmit={form.handleSubmit(handleSaveEdit)} className="space-y-4">
+                        <div className="grid grid-cols-1 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="full_name"
+                            rules={{ required: 'Full name is required' }}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Full Name *</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Enter full name" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="email"
+                              rules={{ 
+                                pattern: { 
+                                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i, 
+                                  message: 'Invalid email address' 
+                                } 
+                              }}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Email</FormLabel>
+                                  <FormControl>
+                                    <Input type="email" placeholder="Enter email address" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="phone"
+                              rules={{ 
+                                pattern: { 
+                                  value: /^[0-9]{10}$/, 
+                                  message: 'Phone number must be 10 digits' 
+                                } 
+                              }}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Phone</FormLabel>
+                                  <FormControl>
+                                    <Input type="tel" placeholder="Enter phone number" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="age"
+                              rules={{ 
+                                min: { value: 18, message: 'Minimum age is 18' },
+                                max: { value: 100, message: 'Maximum age is 100' }
+                              }}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Age</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="Enter age" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div className="flex items-end">
+                              <div className="w-full">
+                                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                  Source
+                                </label>
+                                <div className="mt-2 text-sm text-muted-foreground">
+                                  {LEAD_SOURCES.find(s => s.value === lead.source_link)?.label || lead.source_link || 'N/A'}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <FormField
+                            control={form.control}
+                            name="notes"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Notes</FormLabel>
+                                <FormControl>
+                                  <Textarea placeholder="Add notes (optional)" className="min-h-[80px]" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <DialogFooter className="pt-6">
+                          <Button type="submit" variant="cta">Update Lead</Button>
+                          <DialogClose asChild>
+                            <Button type="button" variant="outline">Cancel</Button>
+                          </DialogClose>
+                        </DialogFooter>
+                      </form>
+                    </Form>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              
+              <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" className="flex items-center gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Lead</AlertDialogTitle>
+                    <AlertDialogDescription className="space-y-4">
+                      <p>
+                        This action cannot be undone. This will permanently delete the lead "{lead.full_name}" and all associated data.
+                      </p>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">
+                          To confirm deletion, please type "Delete lead" below:
+                        </label>
+                        <Input
+                          type="text"
+                          placeholder="Type 'Delete lead' to confirm"
+                          value={deleteConfirmation}
+                          onChange={(e) => {
+                            setDeleteConfirmation(e.target.value);
+                            setCanDelete(e.target.value === 'Delete lead');
+                          }}
+                          className="w-full"
+                        />
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel 
+                      onClick={() => {
+                        setDeleteConfirmation('');
+                        setCanDelete(false);
+                      }}
+                    >
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={handleDelete} 
+                      disabled={!canDelete}
+                      className={`${
+                        canDelete 
+                          ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' 
+                          : 'bg-muted text-muted-foreground cursor-not-allowed'
+                      }`}
+                    >
+                      Delete Lead
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              
               <Button variant="outline" className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4" />
                 Message
@@ -133,23 +549,31 @@ export default function LeadDetail(){
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground">Age:</span>
-                  <p className="font-medium">{lead.age} years</p>
+                  <p className="font-medium">{lead.age ? `${lead.age} years` : 'N/A'}</p>
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground">Email:</span>
-                  <p className="font-medium">{lead.email}</p>
+                  <p className="font-medium">{lead.email || 'N/A'}</p>
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground">Phone:</span>
-                  <p className="font-medium">{lead.phone}</p>
+                  <p className="font-medium">{lead.phone || 'N/A'}</p>
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground">Source:</span>
-                  <p className="font-medium capitalize">{lead.source_link}</p>
+                  <p className="font-medium capitalize">{lead.source_link || 'N/A'}</p>
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground">Current Status:</span>
                   <p className="font-medium capitalize">{lead.status.replace('_', ' ')}</p>
+                </div>
+                <div>
+                  <span className="text-sm text-muted-foreground">Created:</span>
+                  <p className="font-medium">{new Date(lead.created_at).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <span className="text-sm text-muted-foreground">KYC Status:</span>
+                  <p className="font-medium capitalize">{lead.kyc_status?.[0]?.status || 'Not started'}</p>
                 </div>
               </div>
             </CardContent>
@@ -165,18 +589,36 @@ export default function LeadDetail(){
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="font-medium">AI analysis • Confidence 78%</div>
-                <Button size="sm" variant="outline">Re-run AI</Button>
-              </div>
-              <Separator />
-              <ul className="text-sm text-muted-foreground list-disc ml-5 space-y-1">
-                <li>Stable income, medium horizon</li>
-                <li>Comfortable with moderate volatility</li>
-                <li>Goal: child education</li>
-                <li>Risk tolerance: Moderate</li>
-                <li>Investment horizon: 10-15 years</li>
-              </ul>
+              {lead.risk_assessments && lead.risk_assessments.length > 0 ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium">
+                      AI analysis • Confidence {lead.risk_assessments[0].risk_score || 'N/A'}%
+                    </div>
+                    <Button size="sm" variant="outline">Re-run AI</Button>
+                  </div>
+                  <Separator />
+                  <div className="space-y-2">
+                    <p><strong>Risk Category:</strong> {lead.risk_assessments[0].risk_category || 'N/A'}</p>
+                    <p><strong>Assessment Date:</strong> {new Date(lead.risk_assessments[0].created_at).toLocaleDateString()}</p>
+                    {lead.risk_assessments[0].risk_assessment_answers && (
+                      <div>
+                        <p className="font-medium mb-2">Assessment Answers:</p>
+                        <ul className="text-sm text-muted-foreground list-disc ml-5 space-y-1">
+                          {lead.risk_assessments[0].risk_assessment_answers.map((answer: any, index: number) => (
+                            <li key={answer.id}>
+                              <strong>Q{index + 1}:</strong> {answer.assessment_questions?.question_text || 'N/A'} - 
+                              <strong>Answer:</strong> {answer.answer_value || 'N/A'}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-muted-foreground">No risk assessment completed yet.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -190,7 +632,24 @@ export default function LeadDetail(){
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Meetings & updates timeline will be displayed here.</p>
+              {lead.meetings && lead.meetings.length > 0 ? (
+                <div className="space-y-4">
+                  {lead.meetings.map((meeting: any) => (
+                    <div key={meeting.id} className="border-l-2 border-primary pl-4 py-2">
+                      <div className="font-medium">{meeting.title}</div>
+                      <div className="text-sm text-muted-foreground">{meeting.description}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(meeting.start_time).toLocaleString()} - {new Date(meeting.end_time).toLocaleString()}
+                      </div>
+                      <Badge variant={meeting.status === 'completed' ? 'default' : 'secondary'}>
+                        {meeting.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No meetings scheduled yet.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -208,7 +667,7 @@ export default function LeadDetail(){
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Holdings & allocation will be displayed here.</p>
+              <p className="text-muted-foreground">Portfolio holdings and allocation will be displayed here.</p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -222,7 +681,7 @@ export default function LeadDetail(){
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Suggested products with actions will be displayed here.</p>
+              <p className="text-muted-foreground">AI-powered product suggestions will be displayed here.</p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -242,5 +701,5 @@ export default function LeadDetail(){
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }
