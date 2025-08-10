@@ -24,7 +24,7 @@ router.get('/', authenticateUser, async (req: express.Request, res: express.Resp
         throw new Error('User not found. Please complete your profile first.');
       }
       
-      user_id = userData.id;
+      user_id = (userData as { id: string }).id;
     } catch (error) {
       console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
@@ -107,7 +107,7 @@ router.post('/manual', authenticateUser, [
         throw new Error('User not found. Please complete your profile first.');
       }
       
-      user_id = userData.id;
+      user_id = (userData as { id: string }).id;
     } catch (error) {
       console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
@@ -175,7 +175,7 @@ router.patch('/:id/status', authenticateUser, [
         throw new Error('User not found. Please complete your profile first.');
       }
       
-      user_id = userData.id;
+      user_id = (userData as { id: string }).id;
     } catch (error) {
       console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
@@ -228,7 +228,7 @@ router.post('/calendly-scheduled', authenticateUser, [
         throw new Error('User not found. Please complete your profile first.');
       }
       
-      user_id = userData.id;
+      user_id = (userData as { id: string }).id;
     } catch (error) {
       console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });

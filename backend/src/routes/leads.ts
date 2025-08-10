@@ -55,7 +55,7 @@ router.post('/', authenticateUser, [
         throw new Error('User not found. Please complete your profile first.');
       }
       
-      user_id = userData.id;
+      user_id = (userData as { id: string }).id;
     } catch (error) {
       console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
@@ -209,7 +209,7 @@ router.get('/', authenticateUser, [
         throw new Error('User not found. Please complete your profile first.');
       }
       
-      user_id = userData.id;
+      user_id = (userData as { id: string }).id;
     } catch (error) {
       console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
@@ -338,7 +338,7 @@ router.get('/stats', authenticateUser, async (req: express.Request, res: express
         throw new Error('User not found. Please complete your profile first.');
       }
       
-      user_id = userData.id;
+      user_id = (userData as { id: string }).id;
     } catch (error) {
       console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
@@ -427,7 +427,7 @@ router.get('/search', authenticateUser, [
         throw new Error('User not found. Please complete your profile first.');
       }
       
-      user_id = userData.id;
+      user_id = (userData as { id: string }).id;
     } catch (error) {
       console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
@@ -473,7 +473,7 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
         throw new Error('User not found. Please complete your profile first.');
       }
       
-      user_id = userData.id;
+      user_id = (userData as { id: string }).id;
     } catch (error) {
       console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
@@ -576,7 +576,7 @@ router.patch('/:id/status', authenticateUser, [
         throw new Error('User not found. Please complete your profile first.');
       }
       
-      user_id = userData.id;
+      user_id = (userData as { id: string }).id;
     } catch (error) {
       console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
@@ -638,7 +638,7 @@ router.put('/:id', authenticateUser, [
         throw new Error('User not found. Please complete your profile first.');
       }
       
-      user_id = userData.id;
+      user_id = (userData as { id: string }).id;
     } catch (error) {
       console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
@@ -682,7 +682,7 @@ router.delete('/:id', authenticateUser, async (req: express.Request, res: expres
         throw new Error('User not found. Please complete your profile first.');
       }
       
-      user_id = userData.id;
+      user_id = (userData as { id: string }).id;
     } catch (error) {
       console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
