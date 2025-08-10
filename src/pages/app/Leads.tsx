@@ -10,8 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { Textarea } from '@/components/ui/textarea';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller as HookFormController } from 'react-hook-form';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -27,14 +26,11 @@ interface Lead {
   email?: string;
   phone?: string;
   age?: number;
-  source_link?: string;
   status: string;
   created_at: string;
-  notes?: string;
   risk_assessments?: any[];
   meetings?: any[];
   kyc_status?: any[];
-  portfolio_value?: number;
 }
 
 interface LeadFormData {
@@ -42,27 +38,11 @@ interface LeadFormData {
   email: string;
   phone: string;
   age: string;
-  source_link: string;
-  notes: string;
   status: string;
   kyc_status: string;
 }
 
-// Common lead sources for MFDs
-const LEAD_SOURCES = [
-  { value: 'sms', label: 'SMS' },
-  { value: 'in_person', label: 'In-Person Meeting' },
-  { value: 'phone_call', label: 'Phone Call' },
-  { value: 'referral', label: 'Referral' },
-  { value: 'social_media', label: 'Social Media' },
-  { value: 'website', label: 'Website' },
-  { value: 'email', label: 'Email' },
-  { value: 'walk_in', label: 'Walk-in' },
-  { value: 'seminar', label: 'Seminar/Event' },
-  { value: 'advertisement', label: 'Advertisement' },
-  { value: 'cold_call', label: 'Cold Call' },
-  { value: 'other', label: 'Other' },
-] as const;
+
 
 interface PaginationInfo {
   page: number;
@@ -100,13 +80,37 @@ export default function Leads(){
       email: '',
       phone: '',
       age: '',
-      source_link: 'website',
-      notes: '',
       status: 'lead',
       kyc_status: 'pending',
     },
     mode: 'onBlur',
   });
+
+  // Ensure form is properly initialized
+  useEffect(() => {
+    form.reset({
+      full_name: '',
+      email: '',
+      phone: '',
+      age: '',
+      status: 'lead',
+      kyc_status: 'pending',
+    });
+  }, []);
+
+  // Reset form when dialog opens/closes
+  useEffect(() => {
+    if (addOpen) {
+      form.reset({
+        full_name: '',
+        email: '',
+        phone: '',
+        age: '',
+        status: 'lead',
+        kyc_status: 'pending',
+      });
+    }
+  }, [addOpen, form]);
 
   useEffect(() => {
     loadLeads();
@@ -170,27 +174,83 @@ export default function Leads(){
 
   const handleAddLead = async (values: LeadFormData) => {
     try {
+      console.log('Form values received:', values);
       const token = await getToken();
       if (!token) throw new Error('No authentication token available');
       
-      // Convert age to number if provided
+      // Convert age to number if provided and validate
       const leadData = {
         ...values,
-        age: values.age ? parseInt(values.age) : undefined,
+        age: values.age && values.age.trim() !== '' ? parseInt(values.age) : undefined,
       };
+      
+      // Validate required fields
+      if (!values.full_name.trim()) {
+        throw new Error('Full name is required');
+      }
+      
+      // Validate age if provided
+      if (values.age && values.age.trim() !== '') {
+        const ageNum = parseInt(values.age);
+        if (isNaN(ageNum) || ageNum < 18 || ageNum > 100) {
+          throw new Error('Age must be between 18 and 100');
+        }
+      }
+      
+      console.log('Submitting lead data:', leadData);
+      
+      // Debug: Log the exact data being sent
+      console.log('Data being sent to API:', {
+        full_name: leadData.full_name,
+        email: leadData.email,
+        phone: leadData.phone,
+        age: leadData.age,
+        status: leadData.status,
+        kyc_status: leadData.kyc_status,
+        ageType: typeof leadData.age,
+        phoneType: typeof leadData.phone
+      });
+      
+      // Ensure all required fields are present
+      if (!leadData.full_name || leadData.full_name.trim() === '') {
+        throw new Error('Full name is required');
+      }
       
       await leadsAPI.createLead(token, leadData);
       setAddOpen(false);
-      form.reset();
+      form.reset({
+        full_name: '',
+        email: '',
+        phone: '',
+        age: '',
+        status: 'lead',
+        kyc_status: 'pending',
+      });
       loadLeads();
       toast({ 
         title: 'Success', 
         description: 'Lead created successfully.' 
       });
     } catch (err: any) {
+      console.error('Lead creation error:', err);
+      
+      // Handle validation errors from backend
+      let errorMessage = 'Failed to create lead';
+      
+      if (err.response?.data) {
+        const { error, details } = err.response.data;
+        if (error === 'Validation failed' && details && Array.isArray(details)) {
+          errorMessage = `Validation failed: ${details.map(d => `${d.field}: ${d.message}`).join(', ')}`;
+        } else if (err.response.data.error) {
+          errorMessage = err.response.data.error;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
       toast({ 
         title: 'Error', 
-        description: err.message || 'Failed to create lead', 
+        description: errorMessage, 
         variant: 'destructive' 
       });
     }
@@ -264,7 +324,7 @@ export default function Leads(){
             <SelectItem value="high">Aggressive</SelectItem>
           </SelectContent>
         </Select>
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <Dialog key="add-lead-dialog" open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
             <Button variant="cta">Add Lead</Button>
           </DialogTrigger>
@@ -322,8 +382,8 @@ export default function Leads(){
                           name="phone"
                           rules={{ 
                             pattern: { 
-                              value: /^[0-9]{10}$/, 
-                              message: 'Phone number must be 10 digits' 
+                              value: /^(\+91|91|0)?[6-9]\d{9}$/, 
+                              message: 'Phone number must be a valid Indian mobile number (e.g., 9876543210, +919876543210, 09876543210)' 
                             } 
                           }}
                           render={({ field }) => (
@@ -342,8 +402,10 @@ export default function Leads(){
                           control={form.control}
                           name="age"
                           rules={{ 
-                            min: { value: 18, message: 'Minimum age is 18' },
-                            max: { value: 100, message: 'Maximum age is 100' }
+                            pattern: { 
+                              value: /^(1[8-9]|[2-9]\d|100)$/, 
+                              message: 'Age must be between 18 and 100' 
+                            }
                           }}
                           render={({ field }) => (
                             <FormItem>
@@ -355,107 +417,45 @@ export default function Leads(){
                             </FormItem>
                           )}
                         />
-                        <FormField
-                          control={form.control}
-                          name="source_link"
-                          rules={{ required: 'Source is required' }}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Source *</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select source" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent 
-                                  position="popper" 
-                                  side="bottom" 
-                                  align="start"
-                                  sideOffset={4}
-                                  className="max-h-[200px] overflow-y-auto"
-                                >
-                                  {LEAD_SOURCES.map((source) => (
-                                    <SelectItem key={source.value} value={source.value}>
-                                      {source.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
+                        <HookFormController
                           control={form.control}
                           name="status"
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Status</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
+                                <Select onValueChange={field.onChange} value={field.value || 'lead'}>
                                   <SelectTrigger>
                                     <SelectValue placeholder="Select status" />
                                   </SelectTrigger>
-                                </FormControl>
-                                <SelectContent 
-                                  position="popper" 
-                                  side="bottom" 
-                                  align="start"
-                                  sideOffset={4}
-                                  className="max-h-[200px] overflow-y-auto"
-                                >
-                                  <SelectItem value="lead">Lead</SelectItem>
-                                  <SelectItem value="assessment_done">Assessment Done</SelectItem>
-                                  <SelectItem value="meeting_scheduled">Meeting Scheduled</SelectItem>
-                                  <SelectItem value="converted">Converted</SelectItem>
-                                  <SelectItem value="dropped">Dropped</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="kyc_status"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>KYC Status</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select KYC status" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent 
-                                  position="popper" 
-                                  side="bottom" 
-                                  align="start"
-                                  sideOffset={4}
-                                  className="max-h-[200px] overflow-y-auto"
-                                >
-                                  <SelectItem value="pending">Pending</SelectItem>
-                                  <SelectItem value="incomplete">Incomplete</SelectItem>
-                                  <SelectItem value="completed">Completed</SelectItem>
-                                </SelectContent>
-                              </Select>
+                                  <SelectContent>
+                                    <SelectItem value="lead">Lead</SelectItem>
+                                    <SelectItem value="assessment_done">Assessment Done</SelectItem>
+                                    <SelectItem value="meeting_scheduled">Meeting Scheduled</SelectItem>
+                                    <SelectItem value="converted">Converted</SelectItem>
+                                    <SelectItem value="dropped">Dropped</SelectItem>
+                                  </SelectContent>
+                                </Select>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
                       </div>
-                      <FormField
+                      <HookFormController
                         control={form.control}
-                        name="notes"
+                        name="kyc_status"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Notes</FormLabel>
-                            <FormControl>
-                              <Textarea placeholder="Add notes (optional)" className="min-h-[80px]" {...field} />
-                            </FormControl>
+                            <FormLabel>KYC Status</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || 'pending'}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select KYC status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="incomplete">Incomplete</SelectItem>
+                                  <SelectItem value="completed">Completed</SelectItem>
+                                </SelectContent>
+                              </Select>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -478,7 +478,7 @@ export default function Leads(){
         <Table>
           <TableHeader>
             <TableRow>
-              {['Name','Contact','Age','Source','Risk','Meeting','KYC','Portfolio','Notes','Actions'].map(h => (
+              {['Name','Contact','Age','Risk','Meeting','KYC','Actions'].map(h => (
                 <TableHead key={h}>{h}</TableHead>
               ))}
             </TableRow>
@@ -486,11 +486,11 @@ export default function Leads(){
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8">Loading leads...</TableCell>
+                <TableCell colSpan={7} className="text-center py-8">Loading leads...</TableCell>
               </TableRow>
             ) : filteredLeads.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8">
+                <TableCell colSpan={7} className="text-center py-8">
                   <div className="text-muted-foreground">No leads found</div>
                 </TableCell>
               </TableRow>
@@ -504,7 +504,6 @@ export default function Leads(){
                   </TableCell>
                   <TableCell>{lead.phone || lead.email || 'N/A'}</TableCell>
                   <TableCell>{lead.age || 'N/A'}</TableCell>
-                  <TableCell>{lead.source_link ? 'Link' : 'Manual'}</TableCell>
                   <TableCell>
                     <span className="px-2 py-0.5 text-xs rounded bg-secondary">
                       {lead.risk_assessments?.[0]?.risk_category || 'Not assessed'}
@@ -516,10 +515,6 @@ export default function Leads(){
                   <TableCell>
                     {lead.kyc_status?.[0]?.status || 'Not started'}
                   </TableCell>
-                  <TableCell>
-                    {lead.portfolio_value ? `₹${lead.portfolio_value}` : 'N/A'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{lead.notes || '-'}</TableCell>
                   <TableCell className="space-x-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

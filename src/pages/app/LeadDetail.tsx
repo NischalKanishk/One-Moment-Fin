@@ -5,7 +5,6 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   MessageSquare, 
@@ -16,8 +15,6 @@ import {
   User,
   TrendingUp,
   FileText,
-  Lightbulb,
-  StickyNote,
   Edit,
   Trash2,
   ArrowLeft
@@ -57,10 +54,8 @@ interface Lead {
   email?: string;
   phone?: string;
   age?: number;
-  source_link?: string;
   status: string;
   created_at: string;
-  notes?: string;
   kyc_status?: any[];
   risk_assessments?: any[];
   meetings?: any[];
@@ -71,24 +66,7 @@ interface EditFormData {
   email: string;
   phone: string;
   age: string;
-  notes: string;
 }
-
-// Common lead sources for MFDs
-const LEAD_SOURCES = [
-  { value: 'sms', label: 'SMS' },
-  { value: 'in_person', label: 'In-Person Meeting' },
-  { value: 'phone_call', label: 'Phone Call' },
-  { value: 'referral', label: 'Referral' },
-  { value: 'social_media', label: 'Social Media' },
-  { value: 'website', label: 'Website' },
-  { value: 'email', label: 'Email' },
-  { value: 'walk_in', label: 'Walk-in' },
-  { value: 'seminar', label: 'Seminar/Event' },
-  { value: 'advertisement', label: 'Advertisement' },
-  { value: 'cold_call', label: 'Cold Call' },
-  { value: 'other', label: 'Other' },
-] as const;
 
 export default function LeadDetail() {
   const { id } = useParams<{ id: string }>();
@@ -109,7 +87,6 @@ export default function LeadDetail() {
       email: '',
       phone: '',
       age: '',
-      notes: ''
     },
     mode: 'onBlur',
   });
@@ -137,7 +114,6 @@ export default function LeadDetail() {
         email: response.lead.email || '',
         phone: response.lead.phone || '',
         age: response.lead.age?.toString() || '',
-        notes: response.lead.notes || ''
       });
     } catch (error: any) {
       toast({
@@ -166,7 +142,6 @@ export default function LeadDetail() {
         email: values.email || undefined,
         phone: values.phone || undefined,
         age: values.age ? parseInt(values.age) : undefined,
-        notes: values.notes || undefined
       };
 
       await leadsAPI.update(token, id!, updateData);
@@ -257,7 +232,7 @@ export default function LeadDetail() {
     <div className="space-y-6">
       <Helmet>
         <title>{lead.full_name} – OneMFin</title>
-        <meta name="description" content="Lead summary, risk assessment, meetings, KYC, portfolio and AI suggestions." />
+        <meta name="description" content="Lead summary, risk assessment, meetings, KYC and AI suggestions." />
       </Helmet>
 
       {/* Back Button */}
@@ -289,10 +264,6 @@ export default function LeadDetail() {
                     <span className="flex items-center gap-1">
                       <Mail className="h-4 w-4" />
                       {lead.email || 'N/A'}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <ExternalLink className="h-4 w-4" />
-                      Source: {lead.source_link || 'N/A'}
                     </span>
                   </div>
                 </div>
@@ -402,30 +373,7 @@ export default function LeadDetail() {
                                 </FormItem>
                               )}
                             />
-                            <div className="flex items-end">
-                              <div className="w-full">
-                                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                  Source
-                                </label>
-                                <div className="mt-2 text-sm text-muted-foreground">
-                                  {LEAD_SOURCES.find(s => s.value === lead.source_link)?.label || lead.source_link || 'N/A'}
-                                </div>
-                              </div>
-                            </div>
                           </div>
-                          <FormField
-                            control={form.control}
-                            name="notes"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Notes</FormLabel>
-                                <FormControl>
-                                  <Textarea placeholder="Add notes (optional)" className="min-h-[80px]" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
                         </div>
                         <DialogFooter className="pt-6">
                           <Button type="submit" variant="cta">Update Lead</Button>
@@ -507,30 +455,15 @@ export default function LeadDetail() {
         </CardHeader>
       </Card>
 
-      {/* Lead Notes */}
-      {lead.notes && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <StickyNote className="h-5 w-5" />
-              Notes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">{lead.notes}</p>
-          </CardContent>
-        </Card>
-      )}
+
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="risk">Risk</TabsTrigger>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="kyc">KYC</TabsTrigger>
-          <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
           <TabsTrigger value="suggestions">Suggestions</TabsTrigger>
-          <TabsTrigger value="notes">Notes</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview" className="space-y-4">
@@ -558,10 +491,6 @@ export default function LeadDetail() {
                 <div>
                   <span className="text-sm text-muted-foreground">Phone:</span>
                   <p className="font-medium">{lead.phone || 'N/A'}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">Source:</span>
-                  <p className="font-medium capitalize">{lead.source_link || 'N/A'}</p>
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground">Current Status:</span>
@@ -658,44 +587,16 @@ export default function LeadDetail() {
           <KYCStatus leadId={lead.id} onStatusChange={handleKYCStatusChange} />
         </TabsContent>
         
-        <TabsContent value="portfolio" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Portfolio
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Portfolio holdings and allocation will be displayed here.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
         <TabsContent value="suggestions" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Lightbulb className="h-5 w-5" />
+                <FileText className="h-5 w-5" />
                 AI Suggestions
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground">AI-powered product suggestions will be displayed here.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="notes" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <StickyNote className="h-5 w-5" />
-                Internal Notes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Internal notes and comments will be displayed here.</p>
             </CardContent>
           </Card>
         </TabsContent>

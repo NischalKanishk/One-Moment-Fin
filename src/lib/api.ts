@@ -165,7 +165,7 @@ export const leadsAPI = {
     return response.data;
   },
 
-  createLead: async (token: string, data: { full_name: string; email?: string; phone?: string; age?: number; source_link: string; notes?: string; status?: string; kyc_status?: string }) => {
+  createLead: async (token: string, data: { full_name: string; email?: string; phone?: string; age?: number; status?: string; kyc_status?: string }) => {
     const authApi = createAuthenticatedApi(token);
     const response = await authApi.post('/api/leads', data);
     return response.data;

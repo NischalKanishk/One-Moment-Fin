@@ -9,22 +9,39 @@ const router = express.Router();
 // POST /api/leads (Authenticated endpoint for logged-in MFD to create a lead)
 router.post('/', authenticateUser, [
   body('full_name').notEmpty().withMessage('Full name is required'),
-  body('email').optional().isEmail().withMessage('Valid email required'),
-  body('phone').optional().isMobilePhone('en-IN').withMessage('Valid phone number required'),
-  body('age').optional().isInt({ min: 18, max: 100 }).withMessage('Valid age required'),
-  body('source_link').notEmpty().withMessage('Source link is required'),
-  body('notes').optional().isString().isLength({ max: 1000 }).withMessage('Notes must be a string (max 1000 chars)'),
+  body('email').optional().custom((value) => {
+    if (value === undefined || value === null || value === '') return true;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  }).withMessage('Valid email required'),
+  body('phone').optional().custom((value) => {
+    if (value === undefined || value === null || value === '') return true;
+    // More flexible phone validation for Indian numbers
+    const phoneRegex = /^(\+91|91|0)?[6-9]\d{9}$/;
+    return phoneRegex.test(value.replace(/\s+/g, ''));
+  }).withMessage('Valid phone number required'),
+  body('age').optional().custom((value) => {
+    if (value === undefined || value === null || value === '') return true;
+    const age = parseInt(value);
+    return !isNaN(age) && age >= 18 && age <= 100;
+  }).withMessage('Age must be between 18 and 100'),
   body('status').optional().isIn(['lead', 'assessment_done', 'meeting_scheduled', 'converted', 'dropped']).withMessage('Invalid status'),
   body('kyc_status').optional().isIn(['pending', 'incomplete', 'completed']).withMessage('Invalid KYC status'),
 ], async (req: express.Request, res: express.Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      console.error('Validation errors:', errors.array());
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        details: errors.array().map(err => ({
+          field: err.type,
+          message: err.msg
+        }))
+      });
     }
 
     // Only allow whitelisted fields
-    const { full_name, email, phone, age, source_link, notes, status, kyc_status } = req.body;
+    const { full_name, email, phone, age, status, kyc_status } = req.body;
     const clerkUserId = req.user!.id;
 
     // Get the actual user UUID from the users table using the Clerk ID
@@ -55,8 +72,6 @@ router.post('/', authenticateUser, [
         email,
         phone,
         age,
-        source_link,
-        notes,
         status: status || 'lead',
         kyc_status: kyc_status || 'pending',
       })
@@ -89,7 +104,14 @@ router.get('/', authenticateUser, [
     // Validate query parameters
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      console.error('Validation errors:', errors.array());
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        details: errors.array().map(err => ({
+          field: err.type,
+          message: err.msg
+        }))
+      });
     }
 
     const clerkUserId = req.user!.id;
@@ -134,10 +156,8 @@ router.get('/', authenticateUser, [
           email,
           phone,
           age,
-          source_link,
           status,
           created_at,
-          notes,
           kyc_status,
           risk_assessments!risk_assessments_lead_id_fkey (
             id,
@@ -321,10 +341,8 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
         email,
         phone,
         age,
-        source_link,
         status,
         created_at,
-        notes,
         kyc_status,
         risk_assessments!risk_assessments_lead_id_fkey (
           id,
@@ -379,17 +397,23 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
 // PATCH /api/leads/:id/status (Update lead status)
 router.patch('/:id/status', authenticateUser, [
   body('status').isIn(['lead', 'assessment_done', 'meeting_scheduled', 'converted', 'dropped'])
-    .withMessage('Valid status required'),
-  body('notes').optional().isString().withMessage('Notes must be a string')
+    .withMessage('Valid status required')
 ], async (req: express.Request, res: express.Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      console.error('Validation errors:', errors.array());
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        details: errors.array().map(err => ({
+          field: err.type,
+          message: err.msg
+        }))
+      });
     }
 
     const { id } = req.params;
-    const { status, notes } = req.body;
+    const { status } = req.body;
     const clerkUserId = req.user!.id;
 
     // Get the actual user UUID from the users table using the Clerk ID
@@ -413,7 +437,7 @@ router.patch('/:id/status', authenticateUser, [
 
     const { data, error } = await supabase
       .from('leads')
-      .update({ status, notes })
+      .update({ status })
       .eq('id', id)
       .eq('user_id', user_id)
       .select()
@@ -435,17 +459,23 @@ router.put('/:id', authenticateUser, [
   body('full_name').optional().notEmpty().withMessage('Full name cannot be empty'),
   body('email').optional().isEmail().withMessage('Valid email required'),
   body('phone').optional().isMobilePhone('en-IN').withMessage('Valid phone number required'),
-  body('age').optional().isInt({ min: 18, max: 100 }).withMessage('Valid age required'),
-  body('notes').optional().isString().withMessage('Notes must be a string')
+  body('age').optional().isInt({ min: 18, max: 100 }).withMessage('Valid age required')
 ], async (req: express.Request, res: express.Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      console.error('Validation errors:', errors.array());
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        details: errors.array().map(err => ({
+          field: err.type,
+          message: err.msg
+        }))
+      });
     }
 
     const { id } = req.params;
-    const { full_name, email, phone, age, notes } = req.body;
+    const { full_name, email, phone, age } = req.body;
     const clerkUserId = req.user!.id;
 
     // Get the actual user UUID from the users table using the Clerk ID
@@ -469,7 +499,7 @@ router.put('/:id', authenticateUser, [
 
     const { data, error } = await supabase
       .from('leads')
-      .update({ full_name, email, phone, age, notes })
+      .update({ full_name, email, phone, age })
       .eq('id', id)
       .eq('user_id', user_id)
       .select()
