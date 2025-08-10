@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { supabase } from '../config/supabase';
 import { authenticateUser } from '../middleware/auth';
 import { AIService } from '../services/ai';
+import { LeadStatusService } from '../services/leadStatusService';
 
 const router = express.Router();
 
@@ -102,11 +103,8 @@ router.post('/submit', [
       console.error('Risk assessment update error:', updateError);
     }
 
-    // Update lead status
-    await supabase
-      .from('leads')
-      .update({ status: 'assessment_done' })
-      .eq('id', lead_id);
+    // Update lead status to "Risk analyzed" when assessment form is submitted
+    await LeadStatusService.updateStatusToRiskAnalyzed(lead_id);
 
     return res.json({
       message: 'Assessment submitted successfully',

@@ -2,6 +2,7 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { supabase } from '../config/supabase';
 import { authenticateUser } from '../middleware/auth';
+import { LeadStatusService } from '../services/leadStatusService';
 
 const router = express.Router();
 
@@ -69,6 +70,14 @@ router.post('/manual', authenticateUser, [
     if (error) {
       console.error('Meeting creation error:', error);
       return res.status(500).json({ error: 'Failed to create meeting' });
+    }
+
+    // Update lead status to "Meeting scheduled" when at least 1 meeting is created
+    try {
+      await LeadStatusService.checkAndUpdateMeetingStatus(lead_id);
+    } catch (statusError) {
+      console.error('Failed to update lead status after meeting creation:', statusError);
+      // Don't fail the meeting creation if status update fails
     }
 
     return res.json({ meeting: data });

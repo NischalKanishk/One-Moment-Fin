@@ -176,7 +176,7 @@ router.get('/', authenticateUser, [
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('sort_by').optional().isIn(['created_at', 'full_name', 'status', 'kyc_status', 'source_link']).withMessage('Invalid sort field'),
   query('sort_order').optional().isIn(['asc', 'desc']).withMessage('Sort order must be asc or desc'),
-  query('status').optional().isIn(['lead', 'assessment_done', 'meeting_scheduled', 'converted', 'dropped']).withMessage('Invalid status filter'),
+  query('status').optional().isIn(['lead', 'assessment_done', 'meeting_scheduled', 'converted', 'dropped', 'halted', 'rejected']).withMessage('Invalid status filter'),
   query('search').optional().isString().isLength({ max: 100 }).withMessage('Search term too long'),
   query('source_link').optional().isString().isLength({ max: 100 }).withMessage('Source filter too long')
 ], async (req: express.Request, res: express.Response) => {
@@ -359,7 +359,9 @@ router.get('/stats', authenticateUser, async (req: express.Request, res: express
             assessment_done: leads.filter(l => l.status === 'assessment_done').length,
             meeting_scheduled: leads.filter(l => l.status === 'meeting_scheduled').length,
             converted: leads.filter(l => l.status === 'converted').length,
-            dropped: leads.filter(l => l.status === 'dropped').length
+            dropped: leads.filter(l => l.status === 'dropped').length,
+            halted: leads.filter(l => l.status === 'halted').length,
+            rejected: leads.filter(l => l.status === 'rejected').length
           },
           thisMonth: leads.filter(l => {
             const created = new Date(l.created_at);
@@ -383,7 +385,9 @@ router.get('/stats', authenticateUser, async (req: express.Request, res: express
         assessment_done: 0,
         meeting_scheduled: 0,
         converted: 0,
-        dropped: 0
+        dropped: 0,
+        halted: 0,
+        rejected: 0
       },
       thisMonth: 0
     };
@@ -484,7 +488,7 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
 
 // PATCH /api/leads/:id/status (Update lead status)
 router.patch('/:id/status', authenticateUser, [
-  body('status').isIn(['lead', 'assessment_done', 'meeting_scheduled', 'converted', 'dropped'])
+  body('status').isIn(['lead', 'assessment_done', 'meeting_scheduled', 'converted', 'dropped', 'halted', 'rejected'])
     .withMessage('Valid status required')
 ], async (req: express.Request, res: express.Response) => {
   try {
