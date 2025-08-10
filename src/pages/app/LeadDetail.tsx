@@ -7,7 +7,6 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
-  MessageSquare, 
   Calendar, 
   Phone, 
   Mail, 
@@ -443,10 +442,7 @@ export default function LeadDetail() {
                 </AlertDialogContent>
               </AlertDialog>
               
-              <Button variant="outline" className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" />
-                Message
-              </Button>
+
               <Button variant="default" className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
                 Schedule

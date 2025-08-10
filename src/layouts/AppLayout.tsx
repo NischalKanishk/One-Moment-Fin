@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { UserButton } from "@clerk/clerk-react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -65,10 +65,20 @@ const mockNotifications = [
 ];
 
 export default function AppLayout() {
+  const location = useLocation();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState(mockNotifications);
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  // Check if current page should show the Trial plan bar
+  const shouldShowTrialBar = () => {
+    const currentPath = location.pathname;
+    return currentPath === '/app/profile' || 
+           currentPath === '/app/dashboard' || 
+           currentPath === '/app/leads' ||
+           currentPath.startsWith('/app/leads/'); // Include lead detail pages
+  };
 
   const markAsRead = (id: number) => {
     setNotifications(prev => 
@@ -129,13 +139,15 @@ export default function AppLayout() {
             </div>
           </header>
           
-          <div className="border-b bg-muted/50 p-3 text-sm flex items-center justify-between">
-            <div><strong>Trial plan</strong> — 8 days left</div>
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="cta">Upgrade Plan</Button>
-              <Button size="sm" variant="outline">View Usage</Button>
+          {shouldShowTrialBar() && (
+            <div className="border-b bg-muted/50 p-3 text-sm flex items-center justify-between">
+              <div><strong>Trial plan</strong> — 8 days left</div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="cta">Upgrade Plan</Button>
+                <Button size="sm" variant="outline">View Usage</Button>
+              </div>
             </div>
-          </div>
+          )}
           
           <main className="p-4">
             <Outlet />
