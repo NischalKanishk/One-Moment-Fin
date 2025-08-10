@@ -16,7 +16,8 @@ import {
   FileText,
   Edit,
   Trash2,
-  ArrowLeft
+  ArrowLeft,
+  Plus
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -24,6 +25,8 @@ import { useAuth } from "@clerk/clerk-react";
 import { leadsAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import KYCStatus from "@/components/KYCStatus";
+import { LeadAutocomplete } from "@/components/LeadAutocomplete";
+import { CalendlyEmbed } from "@/components/CalendlyEmbed";
 import { 
   Dialog, 
   DialogTrigger, 
@@ -50,8 +53,8 @@ import { useForm } from 'react-hook-form';
 interface Lead {
   id: string;
   full_name: string;
-  email?: string;
-  phone?: string;
+  email: string | null;
+  phone: string | null;
   age?: number;
   status: string;
   source_link?: string;
@@ -80,6 +83,8 @@ export default function LeadDetail() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [canDelete, setCanDelete] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
 
   const form = useForm<EditFormData>({
     defaultValues: {
@@ -206,6 +211,64 @@ export default function LeadDetail() {
     loadLead();
   };
 
+  const handleEventScheduled = async (eventData: any) => {
+    try {
+      setIsCreatingMeeting(true);
+      
+      const token = await getToken();
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      const payload = {
+        eventUri: eventData.event.uri,
+        eventName: eventData.event.name,
+        startTime: eventData.event.start_time,
+        endTime: eventData.event.end_time,
+        meetingLink: eventData.event.location,
+        leadId: lead?.id,
+        leadName: lead?.full_name,
+        leadEmail: lead?.email,
+        platform: 'calendly'
+      };
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create meeting');
+      }
+
+      toast({
+        title: "Success",
+        description: "Meeting scheduled successfully!",
+      });
+
+      // Close modal and refresh lead data
+      setIsScheduleModalOpen(false);
+      loadLead();
+    } catch (error) {
+      console.error('Failed to schedule meeting:', error);
+      toast({
+        title: "Error",
+        description: "Failed to schedule meeting. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingMeeting(false);
+    }
+  };
+
+  const resetScheduleModal = () => {
+    setIsScheduleModalOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -279,6 +342,13 @@ export default function LeadDetail() {
               </div>
             </div>
             <div className="flex gap-2">
+              <Button 
+                onClick={() => setIsScheduleModalOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <Calendar className="h-4 w-4" />
+                Schedule
+              </Button>
               <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="flex items-center gap-2">
@@ -443,10 +513,6 @@ export default function LeadDetail() {
               </AlertDialog>
               
 
-              <Button variant="default" className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Schedule
-              </Button>
             </div>
           </div>
         </CardHeader>
@@ -602,6 +668,47 @@ export default function LeadDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Schedule Meeting Modal */}
+      <Dialog open={isScheduleModalOpen} onOpenChange={setIsScheduleModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Schedule New Meeting</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Step 1: Lead Selection (Pre-filled) */}
+            <div>
+              <h3 className="text-lg font-medium mb-4">1. Lead Information</h3>
+              <div className="p-4 border rounded-lg bg-muted/50">
+                <div className="flex items-center gap-3">
+                  <User className="h-5 w-5 text-primary" />
+                  <div>
+                    <div className="font-medium">{lead.full_name}</div>
+                    <div className="text-sm text-muted-foreground">{lead.email || 'No email'}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 2: Calendly Integration */}
+            <div>
+              <h3 className="text-lg font-medium mb-4">2. Schedule Meeting</h3>
+              <CalendlyEmbed
+                lead={lead}
+                onEventScheduled={handleEventScheduled}
+              />
+            </div>
+          </div>
+
+          {/* Modal Footer */}
+          <div className="flex justify-end space-x-2 pt-4 border-t">
+            <Button variant="outline" onClick={resetScheduleModal}>
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
