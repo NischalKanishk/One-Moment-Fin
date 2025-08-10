@@ -55,6 +55,7 @@ interface Lead {
   phone?: string;
   age?: number;
   status: string;
+  source_link?: string;
   created_at: string;
   kyc_status?: any[];
   risk_assessments?: any[];
@@ -499,6 +500,10 @@ export default function LeadDetail() {
                 <div>
                   <span className="text-sm text-muted-foreground">Created:</span>
                   <p className="font-medium">{new Date(lead.created_at).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <span className="text-sm text-muted-foreground">Source:</span>
+                  <p className="font-medium capitalize">{lead.source_link || 'N/A'}</p>
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground">KYC Status:</span>

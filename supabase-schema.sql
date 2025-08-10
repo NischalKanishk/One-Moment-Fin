@@ -55,7 +55,7 @@ CREATE TABLE leads (
     email TEXT,
     phone TEXT,
     age INTEGER,
-    source_link TEXT,
+    source_link TEXT DEFAULT 'Manually Added',
     status TEXT DEFAULT 'lead' CHECK (status IN ('lead', 'assessment_done', 'meeting_scheduled', 'converted', 'dropped')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     notes TEXT,
