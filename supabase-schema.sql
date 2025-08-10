@@ -11,7 +11,7 @@ CREATE TABLE users (
     clerk_id TEXT UNIQUE, -- Stores Clerk user ID (e.g., 'user_...')
     full_name TEXT NOT NULL,
     email TEXT UNIQUE,
-    phone TEXT UNIQUE,
+    phone TEXT, -- Unique constraint handled via partial index to allow NULL values
     auth_provider TEXT NOT NULL DEFAULT 'clerk',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -488,3 +488,10 @@ ALTER TABLE leads
 
 -- Helpful indexes
 CREATE INDEX IF NOT EXISTS idx_users_clerk_id ON users(clerk_id);
+
+-- ------------------------------------------------------------------
+-- Phone constraint handling
+-- ------------------------------------------------------------------
+-- Note: Phone uniqueness is handled via a partial unique index that only applies to non-NULL values
+-- This allows multiple users to have NULL phone values while maintaining uniqueness for actual phone numbers
+-- The constraint is created in the migration script: fix-phone-constraint.sql

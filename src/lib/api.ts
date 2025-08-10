@@ -171,9 +171,16 @@ export const leadsAPI = {
     return response.data;
   },
 
-  getAll: async (token: string) => {
+  getAll: async (token: string, params?: { 
+    page?: number; 
+    limit?: number; 
+    sort_by?: string; 
+    sort_order?: 'asc' | 'desc'; 
+    status?: string; 
+    search?: string; 
+  }) => {
     const authApi = createAuthenticatedApi(token);
-    const response = await authApi.get('/api/leads');
+    const response = await authApi.get('/api/leads', { params });
     return response.data;
   },
 
@@ -204,6 +211,20 @@ export const leadsAPI = {
   getStats: async (token: string) => {
     const authApi = createAuthenticatedApi(token);
     const response = await authApi.get('/api/leads/stats');
+    return response.data;
+  },
+
+  // Admin function to get leads for any user by UUID (requires admin token)
+  getLeadsByUserUUID: async (token: string, userUUID: string, params?: { 
+    page?: number; 
+    limit?: number; 
+    sort_by?: string; 
+    sort_order?: 'asc' | 'desc'; 
+    status?: string; 
+    search?: string; 
+  }) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.get(`/api/admin/users/${userUUID}/leads`, { params });
     return response.data;
   },
 };

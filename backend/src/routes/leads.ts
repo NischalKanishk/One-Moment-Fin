@@ -1,5 +1,5 @@
 import express from 'express';
-import { body, validationResult } from 'express-validator';
+import { body, query, validationResult } from 'express-validator';
 import { supabase } from '../config/supabase';
 import { authenticateUser, optionalAuth } from '../middleware/auth';
 import { AIService } from '../services/ai';
@@ -14,7 +14,7 @@ router.post('/', authenticateUser, [
   body('age').optional().isInt({ min: 18, max: 100 }).withMessage('Valid age required'),
   body('source_link').notEmpty().withMessage('Source link is required'),
   body('notes').optional().isString().isLength({ max: 1000 }).withMessage('Notes must be a string (max 1000 chars)'),
-  body('status').optional().isIn(['lead', 'assessment done', 'meeting_scheduled', 'converted', 'dropped']).withMessage('Invalid status'),
+  body('status').optional().isIn(['lead', 'assessment_done', 'meeting_scheduled', 'converted', 'dropped']).withMessage('Invalid status'),
   body('kyc_status').optional().isIn(['pending', 'incomplete', 'completed']).withMessage('Invalid KYC status'),
 ], async (req: express.Request, res: express.Response) => {
   try {
@@ -25,7 +25,26 @@ router.post('/', authenticateUser, [
 
     // Only allow whitelisted fields
     const { full_name, email, phone, age, source_link, notes, status, kyc_status } = req.body;
-    const user_id = req.user!.id;
+    const clerkUserId = req.user!.id;
+
+    // Get the actual user UUID from the users table using the Clerk ID
+    let user_id;
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('clerk_id', clerkUserId)
+        .single();
+
+      if (userError || !userData) {
+        throw new Error('User not found. Please complete your profile first.');
+      }
+      
+      user_id = userData.id;
+    } catch (error) {
+      console.error('User lookup error:', error);
+      return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
+    }
 
     // Insert lead, enforce tenant isolation
     const { data: leadData, error: leadError } = await supabase
@@ -56,46 +75,138 @@ router.post('/', authenticateUser, [
   }
 });
 
-// GET /api/leads (Get all leads for logged-in MFD)
-router.get('/', authenticateUser, async (req: express.Request, res: express.Response) => {
+// GET /api/leads (Get all leads for logged-in MFD with pagination and sorting)
+router.get('/', authenticateUser, [
+  // Server-side validation for query parameters
+  query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+  query('sort_by').optional().isIn(['created_at', 'full_name', 'status', 'kyc_status']).withMessage('Invalid sort field'),
+  query('sort_order').optional().isIn(['asc', 'desc']).withMessage('Sort order must be asc or desc'),
+  query('status').optional().isIn(['lead', 'assessment_done', 'meeting_scheduled', 'converted', 'dropped']).withMessage('Invalid status filter'),
+  query('search').optional().isString().isLength({ max: 100 }).withMessage('Search term too long')
+], async (req: express.Request, res: express.Response) => {
   try {
+    // Validate query parameters
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const clerkUserId = req.user!.id;
+
+    // Get the actual user UUID from the users table using the Clerk ID
+    let user_id;
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('clerk_id', clerkUserId)
+        .single();
+
+      if (userError || !userData) {
+        throw new Error('User not found. Please complete your profile first.');
+      }
+      
+      user_id = userData.id;
+    } catch (error) {
+      console.error('User lookup error:', error);
+      return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
+    }
+
+    // Parse and validate pagination parameters
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = (page - 1) * limit;
+
+    // Parse and validate sorting parameters
+    const sortBy = (req.query.sort_by as string) || 'created_at';
+    const sortOrder = (req.query.sort_order as string) || 'desc';
+    const statusFilter = req.query.status as string;
+    const searchTerm = req.query.search as string;
+
     // Try to get leads from database (may fail due to API key issues)
     try {
-      const { data: leads, error } = await supabase
+      let query = supabase
         .from('leads')
         .select(`
-          *,
-          risk_assessments (
+          id,
+          full_name,
+          email,
+          phone,
+          age,
+          source_link,
+          status,
+          created_at,
+          notes,
+          kyc_status,
+          risk_assessments!risk_assessments_lead_id_fkey (
             id,
             risk_score,
             risk_category,
             ai_used,
             created_at
           ),
-          meetings (
+          meetings!meetings_lead_id_fkey (
             id,
             title,
             start_time,
             status
           ),
-          kyc_status (
+          kyc_status!kyc_status_lead_id_fkey (
             id,
             status,
             updated_at
           )
-        `)
-        .eq('user_id', req.user!.id)
-        .order('created_at', { ascending: false });
+        `, { count: 'exact' })
+        .eq('user_id', user_id);
+
+      // Apply filters
+      if (statusFilter) {
+        query = query.eq('status', statusFilter);
+      }
+
+      if (searchTerm) {
+        query = query.or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
+      }
+
+      // Apply sorting and pagination
+      query = query
+        .order(sortBy, { ascending: sortOrder === 'asc' })
+        .range(offset, offset + limit - 1);
+
+      const { data: leads, error, count } = await query;
 
       if (!error && leads) {
-        return res.json({ leads });
+        const totalPages = Math.ceil((count || 0) / limit);
+        
+        return res.json({ 
+          leads,
+          pagination: {
+            page,
+            limit,
+            total: count || 0,
+            totalPages,
+            hasNext: page < totalPages,
+            hasPrev: page > 1
+          }
+        });
       }
     } catch (dbError) {
       console.error('Database error (returning empty leads):', dbError);
     }
 
     // Return empty leads when database fails
-    return res.json({ leads: [] });
+    return res.json({ 
+      leads: [], 
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0,
+        hasNext: false,
+        hasPrev: false
+      }
+    });
   } catch (error) {
     console.error('Leads fetch error:', error);
     return res.status(500).json({ error: 'Failed to fetch leads' });
@@ -105,12 +216,33 @@ router.get('/', authenticateUser, async (req: express.Request, res: express.Resp
 // GET /api/leads/stats (Get lead statistics)
 router.get('/stats', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
+    const clerkUserId = req.user!.id;
+
+    // Get the actual user UUID from the users table using the Clerk ID
+    let user_id;
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('clerk_id', clerkUserId)
+        .single();
+
+      if (userError || !userData) {
+        throw new Error('User not found. Please complete your profile first.');
+      }
+      
+      user_id = userData.id;
+    } catch (error) {
+      console.error('User lookup error:', error);
+      return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
+    }
+
     // Try to get stats from database (may fail due to API key issues)
     try {
       const { data: leads, error } = await supabase
         .from('leads')
         .select('status, created_at')
-        .eq('user_id', req.user!.id);
+        .eq('user_id', user_id);
 
       if (!error && leads) {
         const stats = {
@@ -160,12 +292,41 @@ router.get('/stats', authenticateUser, async (req: express.Request, res: express
 router.get('/:id', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
     const { id } = req.params;
+    const clerkUserId = req.user!.id;
+
+    // Get the actual user UUID from the users table using the Clerk ID
+    let user_id;
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('clerk_id', clerkUserId)
+        .single();
+
+      if (userError || !userData) {
+        throw new Error('User not found. Please complete your profile first.');
+      }
+      
+      user_id = userData.id;
+    } catch (error) {
+      console.error('User lookup error:', error);
+      return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
+    }
 
     const { data: lead, error } = await supabase
       .from('leads')
       .select(`
-        *,
-        risk_assessments (
+        id,
+        full_name,
+        email,
+        phone,
+        age,
+        source_link,
+        status,
+        created_at,
+        notes,
+        kyc_status,
+        risk_assessments!risk_assessments_lead_id_fkey (
           id,
           risk_score,
           risk_category,
@@ -182,7 +343,7 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
             )
           )
         ),
-        meetings (
+        meetings!meetings_lead_id_fkey (
           id,
           title,
           description,
@@ -192,7 +353,7 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
           meeting_link,
           platform
         ),
-        kyc_status (
+        kyc_status!kyc_status_lead_id_fkey (
           id,
           status,
           kyc_method,
@@ -201,7 +362,7 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
         )
       `)
       .eq('id', id)
-      .eq('user_id', req.user!.id)
+      .eq('user_id', user_id)
       .single();
 
     if (error || !lead) {
@@ -229,12 +390,32 @@ router.patch('/:id/status', authenticateUser, [
 
     const { id } = req.params;
     const { status, notes } = req.body;
+    const clerkUserId = req.user!.id;
+
+    // Get the actual user UUID from the users table using the Clerk ID
+    let user_id;
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('clerk_id', clerkUserId)
+        .single();
+
+      if (userError || !userData) {
+        throw new Error('User not found. Please complete your profile first.');
+      }
+      
+      user_id = userData.id;
+    } catch (error) {
+      console.error('User lookup error:', error);
+      return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
+    }
 
     const { data, error } = await supabase
       .from('leads')
       .update({ status, notes })
       .eq('id', id)
-      .eq('user_id', req.user!.id)
+      .eq('user_id', user_id)
       .select()
       .single();
 
@@ -265,12 +446,32 @@ router.put('/:id', authenticateUser, [
 
     const { id } = req.params;
     const { full_name, email, phone, age, notes } = req.body;
+    const clerkUserId = req.user!.id;
+
+    // Get the actual user UUID from the users table using the Clerk ID
+    let user_id;
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('clerk_id', clerkUserId)
+        .single();
+
+      if (userError || !userData) {
+        throw new Error('User not found. Please complete your profile first.');
+      }
+      
+      user_id = userData.id;
+    } catch (error) {
+      console.error('User lookup error:', error);
+      return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
+    }
 
     const { data, error } = await supabase
       .from('leads')
       .update({ full_name, email, phone, age, notes })
       .eq('id', id)
-      .eq('user_id', req.user!.id)
+      .eq('user_id', user_id)
       .select()
       .single();
 
@@ -289,12 +490,32 @@ router.put('/:id', authenticateUser, [
 router.delete('/:id', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
     const { id } = req.params;
+    const clerkUserId = req.user!.id;
+
+    // Get the actual user UUID from the users table using the Clerk ID
+    let user_id;
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('clerk_id', clerkUserId)
+        .single();
+
+      if (userError || !userData) {
+        throw new Error('User not found. Please complete your profile first.');
+      }
+      
+      user_id = userData.id;
+    } catch (error) {
+      console.error('User lookup error:', error);
+      return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
+    }
 
     const { error } = await supabase
       .from('leads')
       .delete()
       .eq('id', id)
-      .eq('user_id', req.user!.id);
+      .eq('user_id', user_id);
 
     if (error) {
       console.error('Lead deletion error:', error);

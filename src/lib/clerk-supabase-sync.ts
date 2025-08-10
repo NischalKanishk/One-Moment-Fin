@@ -74,7 +74,7 @@ export class ClerkSupabaseSync {
   private static async createUserInSupabase(clerkUserData: ClerkUserData, supabaseClient: SupabaseClient) {
     try {
       const email = clerkUserData.emailAddresses?.[0]?.emailAddress || ''
-      const phone = clerkUserData.phoneNumbers?.[0]?.phoneNumber || ''
+      const phone = clerkUserData.phoneNumbers?.[0]?.phoneNumber || null // Use null instead of empty string
       const fullName = [clerkUserData.firstName, clerkUserData.lastName]
         .filter(Boolean)
         .join(' ') || 'User'
@@ -101,6 +101,8 @@ export class ClerkSupabaseSync {
 
       if (error) {
         console.error('Error creating user in Supabase:', error)
+        console.error('Error details:', error)
+        console.error('User data being inserted:', newUserData)
         return null
       }
 
@@ -158,7 +160,7 @@ export class ClerkSupabaseSync {
 
       // Only update phone if it's completely missing
       if (!existingUser.phone || existingUser.phone.trim() === '') {
-        const phone = clerkUserData.phoneNumbers?.[0]?.phoneNumber || ''
+        const phone = clerkUserData.phoneNumbers?.[0]?.phoneNumber || null
         if (phone) {
           updateData.phone = phone
           console.log('🔍 ClerkSupabaseSync: Updating missing phone:', phone)

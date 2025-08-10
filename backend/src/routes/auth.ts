@@ -60,13 +60,16 @@ router.get('/me', authenticateUser, async (req: express.Request, res: express.Re
     if (error && error.code === 'PGRST116') {
       // User doesn't exist, create them with basic info
       
+      // Handle phone field - convert empty string to null
+      const phoneValue = req.user!.phone === '' ? null : req.user!.phone;
+      
       const { data: newUser, error: createError } = await supabase
         .from('users')
         .insert({
           clerk_id: clerkId,
           full_name: req.user!.email?.split('@')[0] || 'New User',
           email: req.user!.email || null,
-          phone: req.user!.phone || null,
+          phone: phoneValue,
           auth_provider: 'clerk',
           role: 'mfd',
           referral_link: `ref_${clerkId.slice(-8)}`,

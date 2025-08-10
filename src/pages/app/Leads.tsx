@@ -56,14 +56,32 @@ const LEAD_SOURCES = [
   { value: 'other', label: 'Other' },
 ] as const;
 
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
 export default function Leads(){
   const { user } = useUser();
   const { getToken } = useAuth();
   const { toast } = useToast();
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false
+  });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [riskFilter, setRiskFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
   
   const form = useForm<LeadFormData>({
@@ -82,23 +100,57 @@ export default function Leads(){
 
   useEffect(() => {
     loadLeads();
-  }, []);
+  }, [pagination.page, statusFilter, searchTerm]);
+
+  // Debounce search term changes
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      if (pagination.page !== 1) {
+        setPagination(prev => ({ ...prev, page: 1 }));
+      } else {
+        loadLeads();
+      }
+    }, 500);
+
+    return () => clearTimeout(delayedSearch);
+  }, [searchTerm]);
 
   const loadLeads = async () => {
     try {
+      setLoading(true);
+      
       const token = await getToken();
       
       if (!token) {
         throw new Error('No authentication token available');
       }
       
-      const { leads: leadsData } = await leadsAPI.getAll(token);
-      setLeads(leadsData);
-    } catch (error) {
+      const params = {
+        page: pagination.page,
+        limit: pagination.limit,
+        sort_by: 'created_at',
+        sort_order: 'desc' as const,
+        ...(statusFilter !== 'all' && { status: statusFilter }),
+        ...(searchTerm.trim() && { search: searchTerm.trim() })
+      };
+
+      const response = await leadsAPI.getAll(token, params);
+      
+      // Handle both old and new response formats for backward compatibility
+      if (response.leads && response.pagination) {
+        setLeads(response.leads);
+        setPagination(response.pagination);
+      } else {
+        // Fallback for old response format
+        setLeads(response.leads || []);
+        setPagination(prev => ({ ...prev, total: response.leads?.length || 0 }));
+      }
+    } catch (error: any) {
       setLeads([]);
+      setPagination(prev => ({ ...prev, total: 0 }));
       toast({
         title: "Error",
-        description: "Failed to load leads. Please try again later.",
+        description: `Failed to load leads: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
     } finally {
@@ -134,15 +186,13 @@ export default function Leads(){
     }
   };
 
+  // Server-side filtering handles search and status filters
+  // Client-side filtering only for risk (since it's a related table field)
   const filteredLeads = leads.filter(lead => {
-    const matchesSearch = lead.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lead.phone?.includes(searchTerm);
-    
     const matchesRisk = riskFilter === 'all' || 
                        lead.risk_assessments?.[0]?.risk_category === riskFilter;
     
-    return matchesSearch && matchesRisk;
+    return matchesRisk;
   });
 
   return (
@@ -155,11 +205,30 @@ export default function Leads(){
       <div className="flex flex-col md:flex-row gap-3 items-center md:items-end">
         <div className="flex-1">
           <Input 
-            placeholder="Search leads…" 
+            placeholder="Search leads by name, email, or phone…" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent 
+            position="popper" 
+            side="bottom" 
+            align="start"
+            sideOffset={4}
+            className="max-h-[200px] overflow-y-auto"
+          >
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="lead">Lead</SelectItem>
+            <SelectItem value="assessment_done">Assessment Done</SelectItem>
+            <SelectItem value="meeting_scheduled">Meeting Scheduled</SelectItem>
+            <SelectItem value="converted">Converted</SelectItem>
+            <SelectItem value="dropped">Dropped</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={riskFilter} onValueChange={setRiskFilter}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Risk" />
@@ -171,7 +240,7 @@ export default function Leads(){
             sideOffset={4}
             className="max-h-[200px] overflow-y-auto"
           >
-            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="all">All Risk</SelectItem>
             <SelectItem value="low">Conservative</SelectItem>
             <SelectItem value="medium">Balanced</SelectItem>
             <SelectItem value="high">Aggressive</SelectItem>
@@ -321,7 +390,7 @@ export default function Leads(){
                                   className="max-h-[200px] overflow-y-auto"
                                 >
                                   <SelectItem value="lead">Lead</SelectItem>
-                                  <SelectItem value="assessment done">Assessment Done</SelectItem>
+                                  <SelectItem value="assessment_done">Assessment Done</SelectItem>
                                   <SelectItem value="meeting_scheduled">Meeting Scheduled</SelectItem>
                                   <SelectItem value="converted">Converted</SelectItem>
                                   <SelectItem value="dropped">Dropped</SelectItem>
@@ -443,6 +512,52 @@ export default function Leads(){
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination Controls */}
+      {pagination.totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} leads
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+              disabled={!pagination.hasPrev || loading}
+            >
+              Previous
+            </Button>
+            <div className="flex items-center space-x-1">
+              {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                const startPage = Math.max(1, pagination.page - 2);
+                const pageNumber = startPage + i;
+                if (pageNumber > pagination.totalPages) return null;
+                
+                return (
+                  <Button
+                    key={pageNumber}
+                    variant={pageNumber === pagination.page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setPagination(prev => ({ ...prev, page: pageNumber }))}
+                    disabled={loading}
+                  >
+                    {pageNumber}
+                  </Button>
+                );
+              })}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+              disabled={!pagination.hasNext || loading}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
