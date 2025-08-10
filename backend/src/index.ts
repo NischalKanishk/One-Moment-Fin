@@ -24,6 +24,7 @@ import aiRoutes from './routes/ai';
 import productsRoutes from './routes/products';
 import meetingsRoutes from './routes/meetings';
 import kycRoutes from './routes/kyc';
+import kycTemplatesRoutes from './routes/kyc-templates';
 import subscriptionRoutes from './routes/subscriptions';
 import webhookRoutes from './routes/webhooks';
 
@@ -88,6 +89,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/meetings', meetingsRoutes);
 app.use('/api/kyc', kycRoutes);
+app.use('/api/kyc-templates', kycTemplatesRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/webhooks', webhookRoutes);
 

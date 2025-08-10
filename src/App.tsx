@@ -16,6 +16,8 @@ import Signup from "./pages/Signup";
 import Onboarding from "./pages/Onboarding";
 import FormBuilder from "./pages/app/FormBuilder";
 import Assessments from "./pages/app/Assessments";
+import KYC from "./pages/app/KYC";
+import KYCTemplateForm from "./pages/app/KYCTemplateForm";
 import Products from "./pages/app/Products";
 import Meetings from "./pages/app/Meetings";
 import Profile from "./pages/app/Profile";
@@ -53,6 +55,9 @@ const App = () => (
               <Route path="leads/:id" element={<LeadDetail />} />
               <Route path="form-builder" element={<FormBuilder />} />
               <Route path="assessments" element={<Assessments />} />
+              <Route path="kyc" element={<KYC />} />
+              <Route path="kyc/templates/new" element={<KYCTemplateForm />} />
+              <Route path="kyc/templates/:id/edit" element={<KYCTemplateForm />} />
               <Route path="products" element={<Products />} />
               <Route path="meetings" element={<Meetings />} />
               <Route path="profile" element={<Profile />} />

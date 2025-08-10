@@ -332,8 +332,23 @@ CREATE TABLE kyc_status (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 9.1. KYC Templates table
+CREATE TABLE kyc_templates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT,
+    fields JSONB NOT NULL, -- Array of field definitions based on KYC schema
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Enable RLS for kyc_status
 ALTER TABLE kyc_status ENABLE ROW LEVEL SECURITY;
+
+-- Enable RLS for kyc_templates
+ALTER TABLE kyc_templates ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for kyc_status table
 CREATE POLICY "Users can view own kyc" ON kyc_status
@@ -346,6 +361,22 @@ CREATE POLICY "Users can update own kyc" ON kyc_status
     FOR UPDATE USING (auth.uid() = user_id);
 
 CREATE POLICY "Service role can manage all kyc" ON kyc_status
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- RLS Policies for kyc_templates table
+CREATE POLICY "Users can view own kyc templates" ON kyc_templates
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own kyc templates" ON kyc_templates
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own kyc templates" ON kyc_templates
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own kyc templates" ON kyc_templates
+    FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can manage all kyc templates" ON kyc_templates
     FOR ALL USING (auth.role() = 'service_role');
 
 -- 10. Subscription Plans table
@@ -414,6 +445,10 @@ CREATE TABLE ai_feedback (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Create triggers for updated_at columns
+CREATE TRIGGER update_kyc_templates_updated_at BEFORE UPDATE ON kyc_templates
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Enable RLS for ai_feedback
 ALTER TABLE ai_feedback ENABLE ROW LEVEL SECURITY;
 
@@ -442,6 +477,7 @@ CREATE INDEX idx_product_recommendations_risk_category ON product_recommendation
 CREATE INDEX idx_meetings_user_id ON meetings(user_id);
 CREATE INDEX idx_meetings_lead_id ON meetings(lead_id);
 CREATE INDEX idx_kyc_status_lead_id ON kyc_status(lead_id);
+CREATE INDEX idx_kyc_templates_user_id ON kyc_templates(user_id);
 CREATE INDEX idx_user_subscriptions_user_id ON user_subscriptions(user_id);
 CREATE INDEX idx_ai_feedback_user_id ON ai_feedback(user_id);
 

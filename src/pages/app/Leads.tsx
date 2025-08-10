@@ -12,6 +12,14 @@ import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, Dialog
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { useForm } from 'react-hook-form';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
+import { ChevronDown } from 'lucide-react';
+import KYCPopup from '@/components/KYCPopup';
 
 interface Lead {
   id: string;
@@ -83,6 +91,8 @@ export default function Leads(){
   const [riskFilter, setRiskFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
+  const [kycPopupOpen, setKycPopupOpen] = useState(false);
+  const [selectedLeadForKyc, setSelectedLeadForKyc] = useState<Lead | null>(null);
   
   const form = useForm<LeadFormData>({
     defaultValues: {
@@ -183,6 +193,14 @@ export default function Leads(){
         description: err.message || 'Failed to create lead', 
         variant: 'destructive' 
       });
+    }
+  };
+
+  const onKyc = async (leadId: string) => {
+    const lead = leads.find(l => l.id === leadId);
+    if (lead) {
+      setSelectedLeadForKyc(lead);
+      setKycPopupOpen(true);
     }
   };
 
@@ -503,8 +521,18 @@ export default function Leads(){
                   </TableCell>
                   <TableCell className="text-muted-foreground">{lead.notes || '-'}</TableCell>
                   <TableCell className="space-x-2">
-                    <Button size="sm" variant="outline">Call</Button>
-                    <Button size="sm" variant="outline">Meet</Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 px-3">
+                          Actions <ChevronDown className="ml-1 h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onKyc(lead.id)}>
+                          KYC
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
@@ -557,6 +585,20 @@ export default function Leads(){
             </Button>
           </div>
         </div>
+      )}
+
+      {/* KYC Popup */}
+      {selectedLeadForKyc && (
+        <KYCPopup
+          isOpen={kycPopupOpen}
+          onClose={() => {
+            setKycPopupOpen(false);
+            setSelectedLeadForKyc(null);
+          }}
+          leadId={selectedLeadForKyc.id}
+          leadName={selectedLeadForKyc.full_name}
+          getToken={getToken}
+        />
       )}
     </div>
   )

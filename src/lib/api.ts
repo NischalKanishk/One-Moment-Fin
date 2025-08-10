@@ -324,6 +324,53 @@ export const kycAPI = {
   },
 };
 
+// KYC Templates API
+export const kycTemplatesAPI = {
+  getAll: async (token: string) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.get('/api/kyc-templates');
+    return response.data;
+  },
+
+  getById: async (token: string, id: string) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.get(`/api/kyc-templates/${id}`);
+    return response.data;
+  },
+
+  create: async (token: string, data: { name: string; description?: string; fields: any[]; is_active?: boolean }) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.post('/api/kyc-templates', data);
+    return response.data;
+  },
+
+  update: async (token: string, id: string, data: { name?: string; description?: string; fields?: any[]; is_active?: boolean }) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.put(`/api/kyc-templates/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (token: string, id: string) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.delete(`/api/kyc-templates/${id}`);
+    return response.data;
+  },
+
+  // Seed dummy templates for demonstration
+  seed: async (token: string) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.post('/api/kyc-templates/seed');
+    return response.data;
+  },
+
+  // Clear all templates for the user
+  clearAll: async (token: string) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.delete('/api/kyc-templates/seed');
+    return response.data;
+  },
+};
+
 // Subscriptions API
 export const subscriptionsAPI = {
   getPlans: async () => {
