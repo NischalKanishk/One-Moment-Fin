@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AppLayout from "./layouts/AppLayout";
 import Dashboard from "./pages/app/Dashboard";
+import ActionDashboard from "./pages/app/ActionDashboard";
 import Leads from "./pages/app/Leads";
 import LeadDetail from "./pages/app/LeadDetail";
 import Auth from "./pages/Auth";
@@ -54,8 +55,9 @@ const App = () => (
                 <AppLayout />
               </ProtectedRoute>
             }>
-              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route index element={<Navigate to="action-dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
+              <Route path="action-dashboard" element={<ActionDashboard />} />
               <Route path="leads" element={<Leads />} />
               <Route path="leads/:id" element={<LeadDetail />} />
               <Route path="form-builder" element={<FormBuilder />} />
