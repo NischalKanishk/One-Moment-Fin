@@ -241,13 +241,32 @@ export const assessmentsAPI = {
     return response.data;
   },
 
-  getForms: async () => {
-    const response = await api.get('/api/assessments/forms');
+  getForms: async (token: string) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.get('/api/assessments/forms');
     return response.data;
   },
 
-  createForm: async (data: { name: string; description?: string; questions: any[]; is_active?: boolean }) => {
-    const response = await api.post('/api/assessments/forms', data);
+  createForm: async (token: string, data: { name: string; description?: string; questions: any[]; is_active?: boolean }) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.post('/api/assessments/forms', data);
+    return response.data;
+  },
+
+  updateForm: async (token: string, id: string, data: { name: string; description?: string; questions: any[]; is_active?: boolean }) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.put(`/api/assessments/forms/${id}`, data);
+    return response.data;
+  },
+
+  deleteForm: async (token: string, id: string) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.delete(`/api/assessments/forms/${id}`);
+    return response.data;
+  },
+
+  getPublicAssessment: async (referralCode: string) => {
+    const response = await api.get(`/api/assessments/public/${referralCode}`);
     return response.data;
   },
 };

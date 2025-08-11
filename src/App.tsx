@@ -22,6 +22,9 @@ import Products from "./pages/app/Products";
 import Meetings from "./pages/app/Meetings";
 import Profile from "./pages/app/Profile";
 import Settings from "./pages/app/Settings";
+import PublicAssessment from "./pages/PublicAssessment";
+import AssessmentComplete from "./pages/AssessmentComplete";
+import AssessmentForms from "./pages/app/AssessmentForms";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +46,10 @@ const App = () => (
                    <Route path="/signup" element={<Signup />} />
                    <Route path="/onboarding" element={<Onboarding />} />
 
+                   {/* Public assessment route */}
+                   <Route path="/r/:referralCode" element={<PublicAssessment />} />
+                   <Route path="/assessment-complete" element={<AssessmentComplete />} />
+
             {/* Protected app routes */}
             <Route path="/app" element={
               <ProtectedRoute>
@@ -55,6 +62,7 @@ const App = () => (
               <Route path="leads/:id" element={<LeadDetail />} />
               <Route path="form-builder" element={<FormBuilder />} />
               <Route path="assessments" element={<Assessments />} />
+              <Route path="assessment/forms" element={<AssessmentForms />} />
               <Route path="kyc" element={<KYC />} />
               <Route path="kyc/templates/new" element={<KYCTemplateForm />} />
               <Route path="kyc/templates/:id/edit" element={<KYCTemplateForm />} />

@@ -73,7 +73,8 @@ export const authenticateUser = async (
                 email: payload.email || payload.email_address || 'dev@example.com',
                 phone: payload.phone_number || payload.phone || '+91 99999 99999',
                 auth_provider: 'clerk',
-                role: 'mfd'
+                role: 'mfd',
+                referral_link: `/r/${clerkUserId.slice(-8)}` // Generate referral link
               })
               .select('id, email, phone, role')
               .single();

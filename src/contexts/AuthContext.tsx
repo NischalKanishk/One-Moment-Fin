@@ -148,7 +148,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     getToken: async () => {
       try {
         if (!isSignedIn) return null;
-        return await getToken({ template: 'supabase' });
+        // Get a regular Clerk JWT token (not Supabase-specific)
+        return await getToken();
       } catch (error) {
         console.error('Error getting token:', error);
         return null;

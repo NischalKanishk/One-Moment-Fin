@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { supabase } from '../config/supabase';
 import { authenticateUser } from '../middleware/auth';
 import { UserMigrationService } from '../services/userMigration';
+import { DefaultAssessmentService } from '../services/defaultAssessmentService';
 
 const router = express.Router();
 
@@ -81,6 +82,16 @@ router.get('/me', authenticateUser, async (req: express.Request, res: express.Re
       if (createError) {
         console.error('Error creating user:', createError);
         return res.status(500).json({ error: 'Failed to create user profile' });
+      }
+
+      // Automatically create default assessment for new user
+      try {
+        await DefaultAssessmentService.createDefaultAssessment(newUser.id);
+        console.log(`Created default assessment for new user ${newUser.id}`);
+      } catch (assessmentError) {
+        console.error('Warning: Failed to create default assessment:', assessmentError);
+        // Don't fail the user creation if assessment creation fails
+        // The user can still use the system and create assessments manually
       }
 
       userData = newUser;

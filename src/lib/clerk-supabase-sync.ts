@@ -221,7 +221,7 @@ export class ClerkSupabaseSync {
     // Use last 6 characters of userId for uniqueness
     const uniqueId = userId.slice(-6);
     
-    return `/${cleanName}${uniqueId}`;
+    return `/r/${cleanName}${uniqueId}`;
   }
 
   /**
