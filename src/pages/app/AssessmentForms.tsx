@@ -6,73 +6,98 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Plus, Save, Eye, Trash2, Copy, CheckCircle, ArrowLeft, Settings } from "lucide-react";
+import { Plus, Save, Eye, Trash2, Copy, CheckCircle, ArrowLeft, Settings, FileText, Code } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { createAuthenticatedApi } from "@/lib/api";
 
-interface Question {
-  id: string;
-  question_text: string;
-  type: "text" | "number" | "mcq" | "dropdown" | "scale";
-  options?: string[];
-  weight?: number;
-}
-
-interface Assessment {
+interface AssessmentForm {
   id: string;
   name: string;
   description?: string;
   is_active: boolean;
-  assessment_questions: Question[];
+  created_at: string;
+  versions?: AssessmentFormVersion[];
 }
 
-const defaultQuestions: Question[] = [
-  { 
-    id: "q1", 
-    question_text: "Investment horizon", 
-    type: "dropdown", 
-    options: ["< 1 year", "1–3 years", "> 3 years"],
-    weight: 1
+interface AssessmentFormVersion {
+  id: string;
+  version: number;
+  schema: any;
+  ui?: any;
+  scoring?: any;
+  created_at: string;
+}
+
+const defaultSchema = {
+  type: "object",
+  properties: {
+    investment_experience: {
+      type: "string",
+      title: "What is your investment experience?",
+      enum: ["None", "Beginner", "Intermediate", "Advanced"],
+      default: "None"
+    },
+    risk_tolerance: {
+      type: "string",
+      title: "How would you describe your risk tolerance?",
+      enum: ["Conservative", "Moderate", "Aggressive"],
+      default: "Moderate"
+    },
+    investment_horizon: {
+      type: "string",
+      title: "What is your investment time horizon?",
+      enum: ["Less than 3 years", "3-5 years", "5-10 years", "More than 10 years"],
+      default: "5-10 years"
+    },
+    financial_goals: {
+      type: "string",
+      title: "What is your primary financial goal?",
+      enum: ["Capital preservation", "Income generation", "Growth", "Tax efficiency"],
+      default: "Growth"
+    },
+    emergency_fund: {
+      type: "string",
+      title: "Do you have an emergency fund?",
+      enum: ["Yes, 6+ months", "Yes, 3-6 months", "Yes, less than 3 months", "No"],
+      default: "Yes, 3-6 months"
+    }
   },
-  { 
-    id: "q2", 
-    question_text: "Risk appetite", 
-    type: "mcq", 
-    options: ["Low", "Medium", "High"],
-    weight: 2
+  required: ["investment_experience", "risk_tolerance", "investment_horizon", "financial_goals", "emergency_fund"]
+};
+
+const defaultScoring = {
+  weights: {
+    investment_experience: 0.2,
+    risk_tolerance: 0.3,
+    investment_horizon: 0.25,
+    financial_goals: 0.15,
+    emergency_fund: 0.1
   },
-  { 
-    id: "q3", 
-    question_text: "Monthly investable amount (₹)", 
-    type: "number",
-    weight: 1
+  scoring: {
+    investment_experience: { "None": 1, "Beginner": 2, "Intermediate": 3, "Advanced": 4 },
+    risk_tolerance: { "Conservative": 1, "Moderate": 2, "Aggressive": 3 },
+    investment_horizon: { "Less than 3 years": 1, "3-5 years": 2, "5-10 years": 3, "More than 10 years": 4 },
+    financial_goals: { "Capital preservation": 1, "Income generation": 2, "Growth": 3, "Tax efficiency": 2 },
+    emergency_fund: { "Yes, 6+ months": 3, "Yes, 3-6 months": 2, "Yes, less than 3 months": 1, "No": 0 }
   },
-  { 
-    id: "q4", 
-    question_text: "Experience with equities", 
-    type: "mcq", 
-    options: ["New", "Some", "Experienced"],
-    weight: 1
-  },
-  { 
-    id: "q5", 
-    question_text: "Comfort with short-term volatility", 
-    type: "scale", 
-    options: ["1","2","3","4","5"],
-    weight: 2
-  },
-];
+  thresholds: {
+    low: { min: 0, max: 8 },
+    medium: { min: 9, max: 12 },
+    high: { min: 13, max: 16 }
+  }
+};
 
 export default function AssessmentForms() {
   const { toast } = useToast();
   const { user, getToken } = useAuth();
   const navigate = useNavigate();
   
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [currentAssessment, setCurrentAssessment] = useState<Assessment | null>(null);
-  const [questions, setQuestions] = useState<Question[]>(defaultQuestions);
+  const [assessments, setAssessments] = useState<AssessmentForm[]>([]);
+  const [currentAssessment, setCurrentAssessment] = useState<AssessmentForm | null>(null);
+  const [schema, setSchema] = useState(defaultSchema);
+  const [scoring, setScoring] = useState(defaultScoring);
   const [assessmentName, setAssessmentName] = useState("Default Risk Assessment");
   const [assessmentDescription, setAssessmentDescription] = useState("Comprehensive risk assessment for mutual fund investments");
   const [isActive, setIsActive] = useState(true);
@@ -81,18 +106,17 @@ export default function AssessmentForms() {
   const [showPreview, setShowPreview] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState<'form' | 'schema' | 'scoring'>('form');
 
   useEffect(() => {
     loadAssessments();
   }, []);
 
-  // Debug: Check if user has referral_link
   useEffect(() => {
     if (user) {
       console.log('🔍 AssessmentForms: User data:', user);
       console.log('🔍 AssessmentForms: User referral_link:', user.referral_link);
       
-      // If user doesn't have a referral_link, we need to generate one
       if (!user.referral_link) {
         console.warn('⚠️ AssessmentForms: User missing referral_link');
         toast({
@@ -102,17 +126,14 @@ export default function AssessmentForms() {
         });
       }
     }
-  }, [user]);
+  }, [user, toast]);
 
   const loadAssessments = async () => {
     try {
-      console.log('🔍 AssessmentForms: Loading assessments...');
       setIsLoading(true);
       const token = await getToken();
-      console.log('🔍 AssessmentForms: Token received, length:', token?.length);
       
       if (!token) {
-        console.error('❌ AssessmentForms: No token received');
         toast({
           title: "Authentication Error",
           description: "Please sign in again to access assessments",
@@ -121,46 +142,31 @@ export default function AssessmentForms() {
         return;
       }
 
-      // Use the real API to get assessment forms
       const api = createAuthenticatedApi(token);
-      console.log('🔍 AssessmentForms: API instance created for GET request');
-      
-      console.log('🔍 AssessmentForms: Making API request to /api/assessments/forms');
       const response = await api.get('/api/assessments/forms');
-      console.log('🔍 AssessmentForms: API response received:', response);
       
       if (response.data.forms && response.data.forms.length > 0) {
-        console.log('🔍 AssessmentForms: Found existing assessments:', response.data.forms);
         setAssessments(response.data.forms);
         
-        // Set current assessment to the active one or first one
-        const activeAssessment = response.data.forms.find((a: Assessment) => a.is_active);
-        if (activeAssessment) {
-          console.log('🔍 AssessmentForms: Setting active assessment:', activeAssessment);
-          setCurrentAssessment(activeAssessment);
-          setQuestions(activeAssessment.assessment_questions);
-          setAssessmentName(activeAssessment.name);
-          setAssessmentDescription(activeAssessment.description || "");
-          setIsActive(activeAssessment.is_active);
+        // Set the first assessment as current
+        const firstAssessment = response.data.forms[0];
+        setCurrentAssessment(firstAssessment);
+        setAssessmentName(firstAssessment.name);
+        setAssessmentDescription(firstAssessment.description || '');
+        setIsActive(firstAssessment.is_active);
+        
+        // Load the latest version's schema and scoring
+        if (firstAssessment.versions && firstAssessment.versions.length > 0) {
+          const latestVersion = firstAssessment.versions[0]; // Assuming sorted by version desc
+          setSchema(latestVersion.schema);
+          setScoring(latestVersion.scoring || defaultScoring);
         }
       } else {
-        console.log('🔍 AssessmentForms: No assessments found, creating default...');
-        // No assessments exist yet, create a default one
+        // Create default assessment if none exists
         await createDefaultAssessment(token);
       }
-    } catch (error) {
-      console.error('❌ AssessmentForms: Failed to load assessments:', error);
-      
-      // Log more details about the error
-      if (error.response) {
-        console.error('❌ AssessmentForms: Error response status:', error.response.status);
-        console.error('❌ AssessmentForms: Error response data:', error.response.data);
-      } else if (error.request) {
-        console.error('❌ AssessmentForms: No response received:', error.request);
-      } else {
-        console.error('❌ AssessmentForms: Error message:', error.message);
-      }
-      
+    } catch (error: any) {
+      console.error("Failed to load assessments:", error);
       toast({
         title: "Error",
         description: "Failed to load assessments. Please try again.",
@@ -173,52 +179,50 @@ export default function AssessmentForms() {
 
   const createDefaultAssessment = async (token: string) => {
     try {
-      console.log('🔍 AssessmentForms: Creating default assessment...');
-      console.log('🔍 AssessmentForms: Token length:', token?.length);
-      console.log('🔍 AssessmentForms: User data:', user);
-      
       const api = createAuthenticatedApi(token);
-      console.log('🔍 AssessmentForms: API instance created');
       
-      const assessmentData = {
-        name: "Default Risk Assessment",
-        description: "Comprehensive risk assessment for mutual fund investments",
-        questions: defaultQuestions,
-        is_active: true
+      // Create the form
+      const formResponse = await api.post('/api/assessments/forms', {
+        name: assessmentName,
+        description: assessmentDescription,
+        is_active: isActive
+      });
+
+      const newForm = formResponse.data.form;
+      
+      // Create the first version
+      const versionResponse = await api.post(`/api/assessments/forms/${newForm.id}/versions`, {
+        schema,
+        scoring
+      });
+
+      const newVersion = versionResponse.data.version;
+      
+      // Set as default
+      await api.post('/api/assessments/users/default', {
+        formId: newForm.id
+      });
+
+      // Update state
+      const assessmentWithVersion = {
+        ...newForm,
+        versions: [newVersion]
       };
       
-      console.log('🔍 AssessmentForms: Sending assessment data:', assessmentData);
-      
-      const response = await api.post('/api/assessments/forms', assessmentData);
-      console.log('🔍 AssessmentForms: API response received:', response);
-      
-      const newAssessment = response.data.form;
-      console.log('🔍 AssessmentForms: New assessment created:', newAssessment);
-      
-      setAssessments([newAssessment]);
-      setCurrentAssessment(newAssessment);
-      setQuestions(newAssessment.assessment_questions);
-      setAssessmentName(newAssessment.name);
-      setAssessmentDescription(newAssessment.description || "");
-      setIsActive(newAssessment.is_active);
+      setAssessments([assessmentWithVersion]);
+      setCurrentAssessment(assessmentWithVersion);
       
       toast({
         title: "Success",
-        description: "Default assessment created successfully",
+        description: "Default assessment created successfully!",
       });
-    } catch (error) {
-      console.error('❌ AssessmentForms: Failed to create default assessment:', error);
-      
-      // Log more details about the error
-      if (error.response) {
-        console.error('❌ AssessmentForms: Error response status:', error.response.status);
-        console.error('❌ AssessmentForms: Error response data:', error.response.data);
-      } else if (error.request) {
-        console.error('❌ AssessmentForms: No response received:', error.request);
-      } else {
-        console.error('❌ AssessmentForms: Error message:', error.message);
+
+      // Generate referral link
+      if (user?.referral_link) {
+        setPreviewUrl(`${window.location.origin}${user.referral_link}`);
       }
-      
+    } catch (error: any) {
+      console.error("Failed to create default assessment:", error);
       toast({
         title: "Error",
         description: "Failed to create default assessment. Please try again.",
@@ -227,85 +231,58 @@ export default function AssessmentForms() {
     }
   };
 
-  const updateQuestion = (id: string, patch: Partial<Question>) => {
-    setQuestions((qs) => qs.map((q) => (q.id === id ? { ...q, ...patch } : q)));
-  };
-
-  const addQuestion = () => {
-    const newQuestion = { 
-      id: `q${Date.now()}`, 
-      question_text: "New question", 
-      type: "text" as const,
-      weight: 1
-    };
-    setQuestions((qs) => [...qs, newQuestion]);
-  };
-
-  const removeQuestion = (id: string) => {
-    setQuestions((qs) => qs.filter((q) => q.id !== id));
-  };
-
   const saveAssessment = async () => {
-    if (!assessmentName.trim()) {
-      toast({
-        title: "Error",
-        description: "Assessment name is required",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    if (!currentAssessment) return;
+    
     try {
       setIsSaving(true);
       const token = await getToken();
+      
       if (!token) {
         toast({
           title: "Authentication Error",
-          description: "Please sign in again to access assessments",
+          description: "Please sign in again",
           variant: "destructive",
         });
         return;
       }
-      
+
       const api = createAuthenticatedApi(token);
       
-      if (currentAssessment) {
-        // Update existing assessment
-        const response = await api.put(`/api/assessments/forms/${currentAssessment.id}`, {
-          name: assessmentName,
-          description: assessmentDescription,
-          questions: questions,
-          is_active: isActive
-        });
-        
-        const updatedAssessment = response.data.form;
-        setCurrentAssessment(updatedAssessment);
-        setAssessments(prev => prev.map(a => a.id === updatedAssessment.id ? updatedAssessment : a));
-        
-        toast({
-          title: "Success",
-          description: "Assessment updated successfully",
-        });
-      } else {
-        // Create new assessment
-        const response = await api.post('/api/assessments/forms', {
-          name: assessmentName,
-          description: assessmentDescription,
-          questions: questions,
-          is_active: isActive
-        });
-        
-        const newAssessment = response.data.form;
-        setCurrentAssessment(newAssessment);
-        setAssessments(prev => [...prev, newAssessment]);
-        
-        toast({
-          title: "Success",
-          description: "Assessment created successfully",
-        });
-      }
+      // Update form details
+      await api.put(`/api/assessments/forms/${currentAssessment.id}`, {
+        name: assessmentName,
+        description: assessmentDescription,
+        is_active: isActive
+      });
+
+      // Create new version with updated schema and scoring
+      const versionResponse = await api.post(`/api/assessments/forms/${currentAssessment.id}/versions`, {
+        schema,
+        scoring
+      });
+
+      const newVersion = versionResponse.data.version;
       
-    } catch (error) {
+      // Update current assessment with new version
+      const updatedAssessment = {
+        ...currentAssessment,
+        name: assessmentName,
+        description: assessmentDescription,
+        is_active: isActive,
+        versions: [newVersion, ...(currentAssessment.versions || [])]
+      };
+      
+      setCurrentAssessment(updatedAssessment);
+      setAssessments(assessments.map(a => 
+        a.id === currentAssessment.id ? updatedAssessment : a
+      ));
+
+      toast({
+        title: "Success",
+        description: "Assessment saved successfully! New version created.",
+      });
+    } catch (error: any) {
       console.error("Failed to save assessment:", error);
       toast({
         title: "Error",
@@ -314,23 +291,6 @@ export default function AssessmentForms() {
       });
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const publishAssessment = async () => {
-    if (!currentAssessment) {
-      await saveAssessment();
-    }
-    
-    if (user?.referral_link) {
-      setPreviewUrl(`${window.location.origin}${user.referral_link}`);
-      setShowPreview(true);
-    } else {
-      toast({
-        title: "Error",
-        description: "Referral link not found. Please check your profile settings.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -348,360 +308,324 @@ export default function AssessmentForms() {
   };
 
   const resetToDefaults = () => {
-    setQuestions([...defaultQuestions]);
+    setSchema(defaultSchema);
+    setScoring(defaultScoring);
     setAssessmentName("Default Risk Assessment");
     setAssessmentDescription("Comprehensive risk assessment for mutual fund investments");
     setIsActive(true);
+    
+    toast({
+      title: "Reset",
+      description: "Assessment reset to default values",
+    });
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p>Loading assessments...</p>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-lg">Loading assessments...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <>
       <Helmet>
-        <title>Assessment Builder – OneMFin</title>
-        <meta name="description" content="Create and edit risk assessments with AI generation." />
-        <link rel="canonical" href="/app/assessment/forms" />
+        <title>Assessment Forms - OneMFin</title>
       </Helmet>
 
-      <header className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => navigate('/app/assessments')}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Assessment Forms</h1>
+            <p className="text-gray-600 mt-2">Design and manage your risk assessment forms</p>
+          </div>
+          <Button onClick={() => navigate('/app/assessments')} variant="outline">
+            <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Assessments
           </Button>
-          
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={resetToDefaults}>
-              Reset to Defaults
-            </Button>
-            <Button variant="outline" onClick={saveAssessment} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save
-                </>
-              )}
-            </Button>
-            <Button onClick={publishAssessment} disabled={!currentAssessment || !user?.referral_link}>
-              <Eye className="mr-2 h-4 w-4" />
-              Preview & Publish
-            </Button>
-          </div>
-          
-          {/* Help text for disabled button */}
-          {(!currentAssessment || !user?.referral_link) && (
-            <div className="text-sm text-muted-foreground">
-              {!currentAssessment && "Save your assessment first to enable preview"}
-              {!user?.referral_link && "Complete your profile setup to get a referral link"}
-            </div>
-          )}
         </div>
-        
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold">Assessment Builder</h1>
-          <p className="text-muted-foreground">
-            Create and customize risk assessment forms for your leads
-          </p>
-        </div>
-      </header>
 
-      {/* Assessment Settings - Full Width */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center space-x-2">
-            <Settings className="h-5 w-5" />
-            <span>Assessment Settings</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Assessment Name *</label>
-              <Input
-                value={assessmentName}
-                onChange={(e) => setAssessmentName(e.target.value)}
-                placeholder="Enter assessment name"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-2">Description</label>
-              <Textarea
-                value={assessmentDescription}
-                onChange={(e) => setAssessmentDescription(e.target.value)}
-                placeholder="Enter assessment description"
-                rows={3}
-              />
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Switch
-              checked={isActive}
-              onCheckedChange={setIsActive}
-              id="is-active"
-            />
-            <label htmlFor="is-active" className="text-sm font-medium">
-              Set as Active Assessment
-            </label>
-          </div>
-          
-          {currentAssessment && (
-            <div className="pt-4 border-t">
-              <p className="text-sm text-muted-foreground mb-2">Referral Link</p>
-              <div className="flex items-center gap-2">
-                <Input
-                  value={user?.referral_link || ""}
-                  readOnly
-                  className="text-sm"
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={copyReferralLink}
-                >
-                  {copied ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Share this link with leads to access the assessment
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Questions and Live Preview - Side by Side */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Question Builder */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Questions</CardTitle>
-            <Button size="sm" onClick={addQuestion}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {questions.map((q, index) => (
-              <div key={q.id} className="border rounded-lg p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Question {index + 1}</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => removeQuestion(q.id)}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                
-                <Input
-                  value={q.question_text}
-                  onChange={(e) => updateQuestion(q.id, { question_text: e.target.value })}
-                  placeholder="Enter question text"
-                />
-                
-                <div className="flex flex-wrap items-center gap-3">
-                  <Select
-                    value={q.type}
-                    onValueChange={(v: Question["type"]) => updateQuestion(q.id, { type: v })}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="text">Text</SelectItem>
-                      <SelectItem value="number">Number</SelectItem>
-                      <SelectItem value="mcq">MCQ</SelectItem>
-                      <SelectItem value="dropdown">Dropdown</SelectItem>
-                      <SelectItem value="scale">Scale</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  <Input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={q.weight || 1}
-                    onChange={(e) => updateQuestion(q.id, { weight: parseInt(e.target.value) || 1 })}
-                    className="w-20"
-                    placeholder="Weight"
-                  />
-                  
-                  {(q.type === "mcq" || q.type === "dropdown") && (
-                    <Textarea
-                      placeholder="Comma-separated options"
-                      value={(q.options || []).join(", ")}
-                      onChange={(e) => updateQuestion(q.id, { 
-                        options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) 
-                      })}
-                      className="flex-1"
-                      rows={2}
+        {currentAssessment && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left Column - Form Builder */}
+            <div className="lg:col-span-2 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Form Builder
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Assessment Name
+                    </label>
+                    <Input
+                      value={assessmentName}
+                      onChange={(e) => setAssessmentName(e.target.value)}
+                      placeholder="Enter assessment name"
                     />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Description
+                    </label>
+                    <Textarea
+                      value={assessmentDescription}
+                      onChange={(e) => setAssessmentDescription(e.target.value)}
+                      placeholder="Enter assessment description"
+                      rows={3}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={isActive}
+                      onCheckedChange={setIsActive}
+                    />
+                    <label className="text-sm font-medium text-gray-700">
+                      Active
+                    </label>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Schema Editor */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Code className="w-5 h-5" />
+                    Form Schema (JSON)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    value={JSON.stringify(schema, null, 2)}
+                    onChange={(e) => {
+                      try {
+                        const newSchema = JSON.parse(e.target.value);
+                        setSchema(newSchema);
+                      } catch (error) {
+                        // Invalid JSON, don't update
+                      }
+                    }}
+                    placeholder="Enter JSON schema"
+                    rows={15}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    Edit the JSON schema to define your form structure. Use JSON Schema format.
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Scoring Configuration */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Settings className="w-5 h-5" />
+                    Scoring Configuration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    value={JSON.stringify(scoring, null, 2)}
+                    onChange={(e) => {
+                      try {
+                        const newScoring = JSON.parse(e.target.value);
+                        setScoring(newScoring);
+                      } catch (error) {
+                        // Invalid JSON, don't update
+                      }
+                    }}
+                    placeholder="Enter scoring configuration"
+                    rows={15}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    Define weights, scoring rules, and risk category thresholds.
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Action Buttons */}
+              <div className="flex gap-4">
+                <Button onClick={saveAssessment} disabled={isSaving} className="flex-1">
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Assessment
+                    </>
                   )}
-                </div>
-              </div>
-            ))}
-            
-            {questions.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>No questions added yet</p>
-                <Button variant="outline" onClick={addQuestion} className="mt-2">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add First Question
+                </Button>
+                
+                <Button onClick={resetToDefaults} variant="outline">
+                  Reset to Defaults
                 </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
 
-        {/* Live Preview */}
-        <Card className="bg-secondary/50">
-          <CardHeader>
-            <CardTitle className="text-lg">Live Preview</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form className="space-y-4">
-              {questions.map((q) => (
-                <div key={q.id} className="space-y-2">
-                  <label className="text-sm font-medium">
-                    {q.question_text}
-                    {q.weight && q.weight > 1 && (
-                      <span className="ml-2 text-xs text-muted-foreground">
-                        (Weight: {q.weight})
-                      </span>
-                    )}
-                  </label>
+            {/* Right Column - Preview & Actions */}
+            <div className="space-y-6">
+              {/* Assessment Info */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Assessment Info</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Current Version
+                    </label>
+                    <p className="text-sm text-gray-600">
+                      {currentAssessment.versions?.[0]?.version || 'No versions'}
+                    </p>
+                  </div>
                   
-                  {q.type === "text" && (
-                    <Input placeholder="Type here" disabled />
-                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Created
+                    </label>
+                    <p className="text-sm text-gray-600">
+                      {new Date(currentAssessment.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
                   
-                  {q.type === "number" && (
-                    <Input type="number" placeholder="0" disabled />
-                  )}
-                  
-                  {q.type === "mcq" && q.options && (
-                    <div className="space-y-2">
-                      {q.options.map((o) => (
-                        <label key={o} className="flex items-center space-x-2">
-                          <input type="radio" disabled className="text-blue-600" />
-                          <span className="text-sm">{o}</span>
-                        </label>
-                      ))}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Status
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {currentAssessment.is_active ? (
+                        <>
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          <span className="text-sm text-green-600">Active</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-4 h-4 rounded-full bg-gray-300"></div>
+                          <span className="text-sm text-gray-600">Inactive</span>
+                        </>
+                      )}
                     </div>
-                  )}
-                  
-                  {q.type === "dropdown" && q.options && (
-                    <Select disabled>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {q.options.map((o) => (
-                          <SelectItem key={o} value={o}>{o}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  
-                  {q.type === "scale" && (
-                    <div className="flex gap-2">
-                      {[1, 2, 3, 4, 5].map((value) => (
-                        <Button key={value} type="button" variant="outline" size="sm" disabled>
-                          {value}
-                        </Button>
-                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Referral Link */}
+              {user?.referral_link && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Referral Link</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={`${window.location.origin}${user.referral_link}`}
+                        readOnly
+                        className="text-sm"
+                      />
+                      <Button onClick={copyReferralLink} size="sm" variant="outline">
+                        {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </Button>
                     </div>
-                  )}
-                </div>
-              ))}
-              
-              {questions.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>Add questions to see preview</p>
-                </div>
+                    <p className="text-xs text-gray-500">
+                      Share this link with potential clients to complete your assessment.
+                    </p>
+                  </CardContent>
+                </Card>
               )}
-            </form>
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Preview Modal */}
-      {showPreview && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
+              {/* Quick Actions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button 
+                    onClick={() => setShowPreview(!showPreview)} 
+                    variant="outline" 
+                    className="w-full"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    {showPreview ? 'Hide' : 'Show'} Preview
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => navigate('/app/assessments')} 
+                    variant="outline" 
+                    className="w-full"
+                  >
+                    View All Forms
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* Preview Modal */}
+        {showPreview && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Assessment Preview</h3>
-                <Button variant="ghost" onClick={() => setShowPreview(false)}>
-                  ×
+                <h3 className="text-lg font-semibold">Form Preview</h3>
+                <Button onClick={() => setShowPreview(false)} variant="outline" size="sm">
+                  Close
                 </Button>
               </div>
               
               <div className="space-y-4">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">Your Assessment is Live!</h4>
-                  <p className="text-sm text-blue-800 mb-3">
-                    Share this link with your leads to capture them and get risk assessments:
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Input value={previewUrl} readOnly className="text-sm" />
-                    <Button size="sm" onClick={copyReferralLink}>
-                      {copied ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    </Button>
+                <h4 className="font-medium">{assessmentName}</h4>
+                {assessmentDescription && (
+                  <p className="text-gray-600">{assessmentDescription}</p>
+                )}
+                
+                <div className="border rounded-lg p-4 bg-gray-50">
+                  <h5 className="font-medium mb-3">Form Fields:</h5>
+                  <div className="space-y-3">
+                    {Object.entries(schema.properties || {}).map(([key, field]: [string, any]) => (
+                      <div key={key} className="border-b pb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {field.title || key}
+                          {schema.required?.includes(key) && <span className="text-red-500 ml-1">*</span>}
+                        </label>
+                        {field.type === 'string' && field.enum ? (
+                          <Select>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select option" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {field.enum.map((option: string) => (
+                                <SelectItem key={option} value={option}>
+                                  {option}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input placeholder={`Enter ${field.title || key}`} />
+                        )}
+                      </div>
+                    ))}
                   </div>
-                </div>
-                
-                <div className="border rounded-lg p-4">
-                  <h4 className="font-medium mb-2">What happens when a lead uses this link?</h4>
-                  <ul className="text-sm text-gray-600 space-y-1">
-                    <li>• Lead fills out the assessment form</li>
-                    <li>• Lead information is automatically captured</li>
-                    <li>• Risk assessment is calculated using AI</li>
-                    <li>• New lead appears in your dashboard</li>
-                    <li>• You can follow up with personalized recommendations</li>
-                  </ul>
-                </div>
-                
-                <div className="flex gap-2">
-                  <Button onClick={() => setShowPreview(false)} className="flex-1">
-                    Got it!
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => window.open(previewUrl, '_blank')}
-                  >
-                    Test the Form
-                  </Button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 }

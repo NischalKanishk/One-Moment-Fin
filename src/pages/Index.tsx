@@ -30,7 +30,7 @@ const Index = () => {
     <div className="min-h-screen bg-white">
       <Helmet>
         <title>OneMFin – AI for Mutual Fund Distributors</title>
-        <meta name="description" content="AI-powered lead to investor platform: capture, assess risk, run KYC, schedule meetings, suggest products, and report — fast." />
+        <meta name="description" content="AI-powered lead to investor platform: capture, assess risk, schedule meetings, suggest products, and report — fast." />
         <link rel="canonical" href={typeof window !== 'undefined' ? window.location.href : 'https://onemfin.app'} />
       </Helmet>
 
@@ -146,7 +146,7 @@ const Index = () => {
                   title: "Missed Leads",
                   desc: "Leads slip through cracks without proper tracking",
                 },
-                { icon: Clock, title: "Manual Onboarding", desc: "Hours spent on repetitive KYC processes" },
+                { icon: Clock, title: "Manual Onboarding", desc: "Hours spent on repetitive data entry" },
                 { icon: FileText, title: "No Central Tracking", desc: "Client data scattered across platforms" },
                 { icon: Target, title: "Slow Follow-ups", desc: "Delayed responses hurt conversion rates" },
               ].map((problem, index) => (
@@ -171,7 +171,7 @@ const Index = () => {
                   title: "Smart Lead Capture",
                   desc: "Automated forms with AI-powered risk scoring",
                 },
-                { icon: Zap, title: "Instant Onboarding", desc: "Streamlined KYC with progress tracking" },
+                { icon: Zap, title: "Instant Onboarding", desc: "Streamlined onboarding with progress tracking" },
                 { icon: BarChart3, title: "Unified Dashboard", desc: "All client data in one powerful interface" },
                 { icon: TrendingUp, title: "Automated Follow-ups", desc: "Smart reminders and engagement tools" },
               ].map((solution, index) => (
@@ -307,18 +307,18 @@ const Index = () => {
             {/* Feature 4 */}
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div className="bg-white rounded-2xl p-8 shadow-lg lg:order-1">
-                <img src="/kyc-onboarding-dashboard.png" alt="KYC Tracker" className="w-full h-auto rounded-lg" />
+                <img src="/meeting-scheduler-dashboard.png" alt="Meeting Scheduler" className="w-full h-auto rounded-lg" />
               </div>
               <div className="space-y-6 lg:order-2">
                 <div className="flex items-center space-x-3">
                   <div className="w-12 h-12 bg-[#FF8A4A] rounded-lg flex items-center justify-center">
                     <Shield className="h-6 w-5 text-white" />
                   </div>
-                  <h3 className="text-3xl font-bold text-black">KYC Tracker</h3>
+                  <h3 className="text-3xl font-bold text-black">Meeting Scheduler</h3>
                 </div>
                 <p className="text-lg text-gray-600 leading-relaxed">
-                  Track onboarding progress for each client with visual progress indicators. Automated follow-ups ensure
-                  smooth completion of KYC requirements.
+                  Streamlined meeting scheduling with calendar integration. Automated reminders and follow-ups ensure
+                  smooth client communication.
                 </p>
                 <ul className="space-y-3">
                   <li className="flex items-center space-x-3">

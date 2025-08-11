@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { ChevronDown } from 'lucide-react';
-import KYCPopup from '@/components/KYCPopup';
+
 
 interface Lead {
   id: string;
@@ -30,9 +30,9 @@ interface Lead {
   status?: string;
   source_link?: string;
   created_at: string;
-  risk_assessments?: any[];
+  assessment_submissions?: any[];
   meetings?: any[];
-  kyc_status?: any[];
+
 }
 
 interface LeadFormData {
@@ -72,8 +72,7 @@ export default function Leads(){
   const [statusFilter, setStatusFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
-  const [kycPopupOpen, setKycPopupOpen] = useState(false);
-  const [selectedLeadForKyc, setSelectedLeadForKyc] = useState<Lead | null>(null);
+
   
   const form = useForm<LeadFormData>({
     defaultValues: {
@@ -274,19 +273,13 @@ export default function Leads(){
     }
   };
 
-  const onKyc = async (leadId: string) => {
-    const lead = leads.find(l => l.id === leadId);
-    if (lead) {
-      setSelectedLeadForKyc(lead);
-      setKycPopupOpen(true);
-    }
-  };
+
 
   // Server-side filtering handles search and status filters
   // Client-side filtering only for risk (since it's a related table field)
   const filteredLeads = leads.filter(lead => {
     const matchesRisk = riskFilter === 'all' || 
-                       lead.risk_assessments?.[0]?.risk_category === riskFilter;
+                       lead.assessment_submissions?.[0]?.risk_category === riskFilter;
     
     return matchesRisk;
   });
@@ -471,7 +464,7 @@ export default function Leads(){
         <Table>
           <TableHeader>
             <TableRow>
-              {['Name','Contact','Age','Source','Risk','Meeting','KYC','Actions'].map(h => (
+              {['Name','Contact','Age','Source','Risk','Meeting','Actions'].map(h => (
                 <TableHead key={h}>{h}</TableHead>
               ))}
             </TableRow>
@@ -479,11 +472,11 @@ export default function Leads(){
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">Loading leads...</TableCell>
+                <TableCell colSpan={7} className="text-center py-8">Loading leads...</TableCell>
               </TableRow>
             ) : filteredLeads.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
+                <TableCell colSpan={7} className="text-center py-8">
                   <div className="text-muted-foreground">No leads found</div>
                 </TableCell>
               </TableRow>
@@ -504,15 +497,13 @@ export default function Leads(){
                   </TableCell>
                   <TableCell>
                     <span className="px-2 py-0.5 text-xs rounded bg-secondary">
-                      {lead.risk_assessments?.[0]?.risk_category || 'Not assessed'}
+                      {lead.assessment_submissions?.[0]?.risk_category || 'Not assessed'}
                     </span>
                   </TableCell>
                   <TableCell>
                     {lead.meetings?.[0]?.status || 'Not scheduled'}
                   </TableCell>
-                  <TableCell>
-                    {lead.kyc_status?.[0]?.status || 'Not started'}
-                  </TableCell>
+
                   <TableCell className="space-x-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -521,9 +512,7 @@ export default function Leads(){
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onKyc(lead.id)}>
-                          KYC
-                        </DropdownMenuItem>
+
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -580,19 +569,7 @@ export default function Leads(){
         </div>
       )}
 
-      {/* KYC Popup */}
-      {selectedLeadForKyc && (
-        <KYCPopup
-          isOpen={kycPopupOpen}
-          onClose={() => {
-            setKycPopupOpen(false);
-            setSelectedLeadForKyc(null);
-          }}
-          leadId={selectedLeadForKyc.id}
-          leadName={selectedLeadForKyc.full_name}
-          getToken={getToken}
-        />
-      )}
+
     </div>
   )
 }

@@ -50,6 +50,8 @@ export const authenticateUser = async (
             console.warn('⚠️ Auth: JWT token missing "sub" field, using fallback ID');
           }
           
+          console.log('🔍 Auth: Looking up user with clerk_id:', clerkUserId);
+          
           // Look up the corresponding Supabase user ID
           const { data: userData, error: userError } = await supabase
             .from('users')
@@ -57,32 +59,43 @@ export const authenticateUser = async (
             .eq('clerk_id', clerkUserId)
             .single();
           
-          if (userError && userError.code !== 'PGRST116') {
-            console.error('❌ Auth: Error looking up user in database:', userError);
-            return res.status(500).json({ error: 'Database lookup failed' });
+          if (userError) {
+            console.error('❌ Auth: Database error during user lookup:', userError);
+            if (userError.code === 'PGRST116') {
+              console.log('ℹ️ Auth: User not found in database, will create new user');
+            } else {
+              return res.status(500).json({ error: 'Database lookup failed' });
+            }
           }
           
           if (!userData) {
             console.log('⚠️ Auth: User not found in database, creating new user');
             // Create a new user in the database
+            const newUserData = {
+              clerk_id: clerkUserId,
+              full_name: payload.name || payload.full_name || 'New User',
+              email: payload.email || payload.email_address || 'dev@example.com',
+              phone: payload.phone_number || payload.phone || '+91 99999 99999',
+              auth_provider: 'clerk',
+              role: 'mfd',
+              referral_link: `/r/${clerkUserId.slice(-8)}` // Generate referral link
+            };
+            
+            console.log('🔍 Auth: Creating user with data:', newUserData);
+            
             const { data: newUser, error: createError } = await supabase
               .from('users')
-              .insert({
-                clerk_id: clerkUserId,
-                full_name: payload.name || payload.full_name || 'New User',
-                email: payload.email || payload.email_address || 'dev@example.com',
-                phone: payload.phone_number || payload.phone || '+91 99999 99999',
-                auth_provider: 'clerk',
-                role: 'mfd',
-                referral_link: `/r/${clerkUserId.slice(-8)}` // Generate referral link
-              })
+              .insert(newUserData)
               .select('id, email, phone, role')
               .single();
             
             if (createError) {
               console.error('❌ Auth: Error creating new user:', createError);
+              console.error('❌ Auth: User data that failed:', newUserData);
               return res.status(500).json({ error: 'User creation failed' });
             }
+            
+            console.log('✅ Auth: New user created successfully:', (newUser as any)?.id);
             
             req.user = {
               clerk_id: clerkUserId,
@@ -92,6 +105,7 @@ export const authenticateUser = async (
               role: newUser.role
             };
           } else {
+            console.log('✅ Auth: User found in database:', userData.id);
             req.user = {
               clerk_id: clerkUserId,
               supabase_user_id: userData.id,
@@ -134,6 +148,8 @@ export const authenticateUser = async (
         return res.status(401).json({ error: 'Invalid token - missing sub field' });
       }
 
+      console.log('🔍 Auth: Looking up user with clerk_id:', payload.sub);
+
       // Look up the corresponding Supabase user ID
       const { data: userData, error: userError } = await supabase
         .from('users')
@@ -150,6 +166,8 @@ export const authenticateUser = async (
         console.error('❌ Auth: User not found in database');
         return res.status(401).json({ error: 'User not found' });
       }
+
+      console.log('✅ Auth: User found in database:', userData.id);
 
       // Set user information from token and database
       req.user = {

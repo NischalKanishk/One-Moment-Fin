@@ -56,9 +56,10 @@ export interface Lead {
   notes?: string
   meeting_id?: string
   risk_profile_id?: string
-  kyc_status: 'pending' | 'incomplete' | 'completed'
+
 }
 
+// Legacy interfaces (for backward compatibility)
 export interface Assessment {
   id: string
   user_id: string
@@ -86,6 +87,64 @@ export interface RiskAssessment {
   risk_score?: number
   risk_category?: 'low' | 'medium' | 'high'
   ai_used: boolean
+  created_at: string
+}
+
+// New versioned JSON assessment interfaces
+export interface AssessmentForm {
+  id: string
+  user_id: string
+  name: string
+  description?: string
+  is_active: boolean
+  created_at: string
+  default_assessment_form_id?: string
+}
+
+export interface AssessmentFormVersion {
+  id: string
+  form_id: string
+  version: number
+  schema: any // JSON Schema
+  ui?: any    // UI layout hints
+  scoring?: any // Scoring configuration
+  created_at: string
+}
+
+export interface LeadAssessmentAssignment {
+  id: string
+  user_id: string
+  lead_id: string
+  form_id: string
+  version_id?: string
+  created_at: string
+}
+
+export interface AssessmentSubmission {
+  id: string
+  user_id: string
+  lead_id?: string
+  form_id: string
+  version_id: string
+  filled_by: 'lead' | 'mfd'
+  answers: any // Validated by schema
+  score?: number
+  risk_category?: 'low' | 'medium' | 'high'
+  status: 'submitted' | 'approved' | 'rejected'
+  review_reason?: string
+  created_at: string
+}
+
+export interface AssessmentLink {
+  id: string
+  token: string
+  user_id: string
+  lead_id?: string
+  form_id: string
+  version_id?: string
+  status: 'active' | 'submitted' | 'expired' | 'revoked'
+  expires_at: string
+  submitted_at?: string
   created_at: string
 }
 
@@ -118,18 +177,7 @@ export interface Meeting {
   created_at: string
 }
 
-export interface KYCStatus {
-  id: string
-  lead_id: string
-  user_id: string
-  kyc_method?: 'manual_entry' | 'file_upload' | 'third_party_api'
-  kyc_file_url?: string
-  form_data?: any
-  status: 'not_started' | 'in_progress' | 'submitted' | 'verified' | 'rejected'
-  verified_by?: string
-  created_at: string
-  updated_at: string
-}
+
 
 export interface SubscriptionPlan {
   id: string
@@ -139,7 +187,7 @@ export interface SubscriptionPlan {
   ai_enabled: boolean
   custom_form_enabled: boolean
   product_edit_enabled: boolean
-  kyc_enabled: boolean
+
   meeting_limit?: number
   created_at: string
 }
@@ -158,11 +206,11 @@ export interface UserSubscription {
 }
 
 export interface AIFeedback {
-  id: string
-  user_id: string
-  risk_assessment_id: string
-  product_ids?: any
-  rating: number
-  comment?: string
-  created_at: string
+  id: string;
+  user_id: string;
+  assessment_submission_id: string;
+  product_ids?: any;
+  rating: number;
+  comment?: string;
+  created_at: string;
 }

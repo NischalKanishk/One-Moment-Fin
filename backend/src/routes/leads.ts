@@ -1,10 +1,13 @@
 import express from 'express';
 import { body, query, validationResult } from 'express-validator';
 import { supabase } from '../config/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { authenticateUser, optionalAuth } from '../middleware/auth';
 import { AIService } from '../services/ai';
 
 const router = express.Router();
+
+
 
 // POST /api/leads (Authenticated endpoint for logged-in MFD to create a lead)
 router.post('/', authenticateUser, [
@@ -61,7 +64,7 @@ router.post('/', authenticateUser, [
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
     }
 
-    // Insert lead, enforce tenant isolation
+    // Insert lead, enforce tenant isolation using RLS policies
     const { data: leadData, error: leadError } = await supabase
       .from('leads')
       .insert({
@@ -72,7 +75,6 @@ router.post('/', authenticateUser, [
         age,
         source_link: 'Manually Added', // Auto-populate for manual submissions
         status: 'lead', // Default status
-        kyc_status: 'pending', // Default KYC status
       })
       .select()
       .single();
@@ -152,7 +154,6 @@ router.post('/create', [
         age,
         source_link: 'Link Submission', // Auto-populate for link submissions
         status: 'lead', // Default status
-        kyc_status: 'pending', // Default KYC status
       })
       .select()
       .single();
@@ -174,7 +175,7 @@ router.get('/', authenticateUser, [
   // Server-side validation for query parameters
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
-  query('sort_by').optional().isIn(['created_at', 'full_name', 'status', 'kyc_status', 'source_link']).withMessage('Invalid sort field'),
+  query('sort_by').optional().isIn(['created_at', 'full_name', 'status', 'source_link']).withMessage('Invalid sort field'),
   query('sort_order').optional().isIn(['asc', 'desc']).withMessage('Sort order must be asc or desc'),
   query('status').optional().isIn(['lead', 'assessment_done', 'meeting_scheduled', 'converted', 'dropped', 'halted', 'rejected']).withMessage('Invalid status filter'),
   query('search').optional().isString().isLength({ max: 100 }).withMessage('Search term too long'),
@@ -195,10 +196,12 @@ router.get('/', authenticateUser, [
     }
 
     const clerkUserId = req.user!.clerk_id;
+    console.log('🔍 Leads: Fetching leads for clerk user:', clerkUserId);
 
     // Get the actual user UUID from the users table using the Clerk ID
     let user_id;
     try {
+      console.log('🔍 Leads: Looking up user in database with clerk_id:', clerkUserId);
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('id')
@@ -206,12 +209,14 @@ router.get('/', authenticateUser, [
         .single();
 
       if (userError || !userData) {
+        console.error('❌ Leads: User lookup failed:', userError);
         throw new Error('User not found. Please complete your profile first.');
       }
       
       user_id = (userData as { id: string }).id;
+      console.log('✅ Leads: User found in database with ID:', user_id);
     } catch (error) {
-      console.error('User lookup error:', error);
+      console.error('❌ Leads: User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
     }
 
@@ -226,9 +231,40 @@ router.get('/', authenticateUser, [
     const statusFilter = req.query.status as string;
     const searchTerm = req.query.search as string;
 
-    // Try to get leads from database (may fail due to API key issues)
+    console.log('🔍 Leads: Query parameters:', { page, limit, sortBy, sortOrder, statusFilter, searchTerm, user_id });
+
+    // Try to get leads from database using RLS policies
     try {
-      let query = supabase
+      // Get the JWT token from the request headers
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.substring(7); // Remove 'Bearer ' prefix
+      
+      if (!token) {
+        throw new Error('No JWT token available');
+      }
+
+      console.log('🔍 Leads: JWT token received, length:', token.length);
+
+      // Create a Supabase client with the user's JWT token for RLS policies
+      const userSupabase = createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_ANON_KEY!,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          },
+          global: {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        }
+      );
+
+      console.log('🔍 Leads: Supabase client created with user token');
+
+      let query = userSupabase
         .from('leads')
         .select(`
           id,
@@ -238,42 +274,72 @@ router.get('/', authenticateUser, [
           age,
           status,
           source_link,
-          created_at,
-          kyc_status,
-          risk_assessments!risk_assessments_lead_id_fkey (
-            id,
-            risk_score,
-            risk_category,
-            ai_used,
-            created_at
-          ),
-          meetings!meetings_lead_id_fkey (
-            id,
-            title,
-            start_time,
-            status
-          ),
-          kyc_status!kyc_status_lead_id_fkey (
-            id,
-            status,
-            updated_at
-          )
-        `, { count: 'exact' })
-        .eq('user_id', user_id);
+          created_at
+        `, { count: 'exact' });
+
+      // Try to add related data if the tables exist
+      try {
+        console.log('🔍 Leads: Testing if new schema tables exist...');
+        
+        // Check if assessment_submissions table exists and has the right structure
+        const { data: testQuery, error: testError } = await userSupabase
+          .from('assessment_submissions')
+          .select('id')
+          .limit(1);
+        
+        if (!testError && testQuery !== null) {
+          console.log('✅ Leads: Assessment submissions table exists, using full query with joins');
+          
+          // Table exists, use the full query with joins
+          query = userSupabase
+            .from('leads')
+            .select(`
+              id,
+              full_name,
+              email,
+              phone,
+              age,
+              status,
+              source_link,
+              created_at,
+              assessment_submissions!assessment_submissions_lead_id_fkey (
+                id,
+                score,
+                risk_category,
+                status,
+                created_at
+              ),
+              meetings!meetings_lead_id_fkey (
+                id,
+                title,
+                start_time,
+                status
+              )
+            `, { count: 'exact' });
+        } else {
+          console.log('ℹ️ Leads: Assessment submissions table not available, using basic leads query');
+          console.log('ℹ️ Leads: Test error details:', testError);
+        }
+      } catch (joinError) {
+        console.log('ℹ️ Leads: Could not determine table structure, using basic leads query:', joinError);
+      }
 
       // Apply filters
       if (statusFilter) {
         query = query.eq('status', statusFilter);
+        console.log('🔍 Leads: Applied status filter:', statusFilter);
       }
 
       if (searchTerm) {
         query = query.or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
+        console.log('🔍 Leads: Applied search filter:', searchTerm);
       }
 
       // Apply source filter
       const sourceFilter = req.query.source_link as string;
       if (sourceFilter) {
         query = query.eq('source_link', sourceFilter);
+        console.log('🔍 Leads: Applied source filter:', sourceFilter);
       }
 
       // Apply sorting and pagination
@@ -281,41 +347,51 @@ router.get('/', authenticateUser, [
         .order(sortBy, { ascending: sortOrder === 'asc' })
         .range(offset, offset + limit - 1);
 
+      console.log('🔍 Leads: Query prepared, executing database query with RLS...');
+      console.log('🔍 Leads: Final query parameters:', { sortBy, sortOrder, offset, limit });
+      
       const { data: leads, error, count } = await query;
 
-      if (!error && leads) {
-        const totalPages = Math.ceil((count || 0) / limit);
-        
-        return res.json({ 
-          leads,
-          pagination: {
-            page,
-            limit,
-            total: count || 0,
-            totalPages,
-            hasNext: page < totalPages,
-            hasPrev: page > 1
-          }
+      if (error) {
+        console.error('❌ Leads: Database query error:', error);
+        console.error('❌ Leads: Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
         });
+        throw error;
       }
-    } catch (dbError) {
-      console.error('Database error (returning empty leads):', dbError);
-    }
 
-    // Return empty leads when database fails
-    return res.json({ 
-      leads: [], 
-      pagination: {
-        page: 1,
-        limit: 20,
-        total: 0,
-        totalPages: 0,
-        hasNext: false,
-        hasPrev: false
+      console.log('✅ Leads: Database query successful. Found leads:', leads?.length || 0);
+      console.log('✅ Leads: Total count:', count);
+
+      if (leads && leads.length > 0) {
+        console.log('🔍 Leads: Sample lead data:', leads[0]);
       }
-    });
+
+      const totalPages = Math.ceil((count || 0) / limit);
+      
+      return res.json({ 
+        leads: leads || [],
+        pagination: {
+          page,
+          limit,
+          total: count || 0,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1
+        }
+      });
+    } catch (dbError) {
+      console.error('❌ Leads: Database error:', dbError);
+      return res.status(500).json({ 
+        error: 'Database query failed',
+        details: dbError instanceof Error ? dbError.message : 'Unknown database error'
+      });
+    }
   } catch (error) {
-    console.error('Leads fetch error:', error);
+    console.error('❌ Leads: Unexpected error:', error);
     return res.status(500).json({ error: 'Failed to fetch leads' });
   }
 });
@@ -399,6 +475,12 @@ router.get('/stats', authenticateUser, async (req: express.Request, res: express
   }
 });
 
+// Test route to verify routing is working
+router.get('/test', (req: express.Request, res: express.Response) => {
+  console.log('🔍 Backend: Test route hit');
+  res.json({ message: 'Test route working', timestamp: new Date().toISOString() });
+});
+
 // GET /api/leads/search (Search leads for autocomplete)
 router.get('/search', authenticateUser, [
   query('search').notEmpty().withMessage('Search term is required'),
@@ -470,6 +552,7 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
         .single();
 
       if (userError || !userData) {
+        console.error('User lookup failed:', userError);
         throw new Error('User not found. Please complete your profile first.');
       }
       
@@ -479,6 +562,8 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
     }
 
+    console.log('🔍 Backend: Querying lead with ID:', id, 'for user:', user_id);
+    
     const { data: lead, error } = await supabase
       .from('leads')
       .select(`
@@ -490,23 +575,14 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
         status,
         source_link,
         created_at,
-        kyc_status,
-        risk_assessments!risk_assessments_lead_id_fkey (
+        assessment_submissions!assessment_submissions_lead_id_fkey (
           id,
-          risk_score,
+          score,
           risk_category,
-          ai_used,
+          status,
           created_at,
-          risk_assessment_answers (
-            id,
-            answer_value,
-            assessment_questions (
-              id,
-              question_text,
-              type,
-              options
-            )
-          )
+          form_id,
+          version_id
         ),
         meetings!meetings_lead_id_fkey (
           id,
@@ -517,13 +593,6 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
           status,
           meeting_link,
           platform
-        ),
-        kyc_status!kyc_status_lead_id_fkey (
-          id,
-          status,
-          kyc_method,
-          form_data,
-          updated_at
         )
       `)
       .eq('id', id)
@@ -531,6 +600,7 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
       .single();
 
     if (error || !lead) {
+      console.error('Lead query failed:', error);
       return res.status(404).json({ error: 'Lead not found' });
     }
 
@@ -703,6 +773,86 @@ router.delete('/:id', authenticateUser, async (req: express.Request, res: expres
   } catch (error) {
     console.error('Lead deletion error:', error);
     return res.status(500).json({ error: 'Failed to delete lead' });
+  }
+});
+
+// Debug endpoint to test database connectivity and table structure
+router.get('/debug', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    const clerkUserId = req.user!.clerk_id;
+    console.log('🔍 Debug: Testing database connectivity for user:', clerkUserId);
+
+    const results: any = {};
+
+    // Test 1: Check if user exists
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id, clerk_id, full_name')
+        .eq('clerk_id', clerkUserId)
+        .single();
+
+      if (userError) {
+        results.user_lookup = { error: userError.message, code: userError.code };
+      } else {
+        results.user_lookup = { success: true, user: userData };
+      }
+    } catch (error) {
+      results.user_lookup = { error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+
+    // Test 2: Check if leads table exists and has data
+    try {
+      const { data: leadsData, error: leadsError } = await supabase
+        .from('leads')
+        .select('id, full_name, created_at')
+        .limit(5);
+
+      if (leadsError) {
+        results.leads_query = { error: leadsError.message, code: leadsError.code };
+      } else {
+        results.leads_query = { success: true, count: leadsData?.length || 0, sample: leadsData?.[0] };
+      }
+    } catch (error) {
+      results.leads_query = { error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+
+    // Test 3: Check if new schema tables exist
+    try {
+      const { data: formsData, error: formsError } = await supabase
+        .from('assessment_forms')
+        .select('id, name')
+        .limit(1);
+
+      if (formsError) {
+        results.assessment_forms = { error: formsError.message, code: formsError.code };
+      } else {
+        results.assessment_forms = { success: true, exists: true };
+      }
+    } catch (error) {
+      results.assessment_forms = { error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+
+          // Test 4: Check RLS policies
+      try {
+        const { data: policiesData, error: policiesError } = await supabase
+          .rpc('get_rls_status', { table_name: 'leads' });
+
+        if (policiesError) {
+          results.rls_status = { error: policiesError.message, code: policiesError.code };
+        } else {
+          results.rls_status = { success: true, data: policiesData };
+        }
+      } catch (error) {
+        results.rls_status = { error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+
+    console.log('🔍 Debug: Results:', results);
+    return res.json({ debug: results });
+
+  } catch (error) {
+    console.error('❌ Debug: Unexpected error:', error);
+    return res.status(500).json({ error: 'Debug failed', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 

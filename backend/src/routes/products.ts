@@ -98,23 +98,25 @@ router.get('/recommended/:lead_id', authenticateUser, async (req: express.Reques
   try {
     const { lead_id } = req.params;
 
-    // Get lead's risk assessment
-    const { data: riskAssessment, error: riskError } = await supabase
-      .from('risk_assessments')
+    // Get lead's risk assessment from assessment submissions
+    const { data: assessmentSubmission, error: assessmentError } = await supabase
+      .from('assessment_submissions')
       .select('risk_category')
       .eq('lead_id', lead_id)
       .eq('user_id', req.user!.supabase_user_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .single();
 
-    if (riskError || !riskAssessment) {
-      return res.status(404).json({ error: 'Risk assessment not found' });
+    if (assessmentError || !assessmentSubmission) {
+      return res.status(404).json({ error: 'Assessment submission not found' });
     }
 
     // Get recommended products for this risk category
     const { data: products, error } = await supabase
       .from('product_recommendations')
       .select('*')
-      .eq('risk_category', riskAssessment.risk_category)
+      .eq('risk_category', assessmentSubmission.risk_category)
       .or(`user_id.eq.${req.user!.supabase_user_id},visibility.eq.public`)
       .order('created_at', { ascending: false });
 

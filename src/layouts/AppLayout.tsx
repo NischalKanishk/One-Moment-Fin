@@ -37,12 +37,12 @@ const mockNotifications = [
   },
   {
     id: 3,
-    type: 'kyc',
-    title: 'KYC completed',
-    description: 'KYC verification completed for Sarah Wilson',
+    type: 'meeting',
+    title: 'Meeting scheduled',
+    description: 'Meeting scheduled with Sarah Wilson',
     time: '3 hours ago',
     read: true,
-    icon: <CheckCircle className="h-4 w-4 text-emerald-500" />
+    icon: <Calendar className="h-4 w-4 text-emerald-500" />
   },
   {
     id: 4,

@@ -15,7 +15,14 @@ interface Assessment {
   description?: string;
   is_active: boolean;
   created_at: string;
-  assessment_questions: any[];
+  latest_version?: {
+    id: string;
+    version: number;
+    schema: any;
+    ui?: any;
+    scoring?: any;
+    created_at: string;
+  };
 }
 
 export default function Assessments() {

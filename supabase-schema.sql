@@ -59,28 +59,36 @@ CREATE INDEX idx_user_settings_user_id ON user_settings(user_id);
 -- Enable Row Level Security
 -- ALTER TABLE users ENABLE ROW LEVEL SECURITY; -- Temporarily disabled for development
 
+-- Function to extract Clerk user ID from JWT token
+CREATE OR REPLACE FUNCTION get_clerk_user_id()
+RETURNS TEXT AS $$
+BEGIN
+  -- Extract the 'sub' claim from the JWT token
+  -- This is the Clerk user ID
+  RETURN current_setting('request.jwt.claims', true)::json->>'sub';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- RLS Policies for users table
 -- Updated for Clerk authentication instead of Supabase Auth
 -- Allow users to read their own data (by clerk_id)
--- CREATE POLICY "Users can view own data" ON users
---     FOR SELECT USING (clerk_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can view own data" ON users
+    FOR SELECT USING (clerk_id = get_clerk_user_id());
 
 -- Allow users to insert their own data (by clerk_id)
--- CREATE POLICY "Users can insert own data" ON users
---     FOR INSERT WITH CHECK (clerk_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can insert own data" ON users
+    FOR INSERT WITH CHECK (clerk_id = get_clerk_user_id());
 
 -- Allow users to update their own data (by clerk_id)
--- CREATE POLICY "Users can update own data" ON users
---     FOR UPDATE USING (clerk_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can update own data" ON users
+    FOR UPDATE USING (clerk_id = get_clerk_user_id());
 
 -- Allow service role to manage all users (for backend operations)
--- CREATE POLICY "Service role can manage all users" ON users
---     FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service role can manage all users" ON users
+    FOR ALL USING (auth.role() = 'service_role');
 
--- TEMPORARY: Allow all operations for development (remove in production)
--- This bypasses RLS temporarily to allow Clerk users to be created
--- CREATE POLICY "Allow all operations temporarily" ON users
---     FOR ALL USING (true);
+-- Enable RLS for users table
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
 -- 2. Leads table
 CREATE TABLE leads (
@@ -95,26 +103,43 @@ CREATE TABLE leads (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     notes TEXT,
     meeting_id UUID,
-    risk_profile_id UUID,
-    kyc_status TEXT DEFAULT 'pending' CHECK (kyc_status IN ('pending', 'incomplete', 'completed'))
+    risk_profile_id UUID
 );
 
 -- Enable RLS for leads
 ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for leads table
+-- Updated for Clerk authentication instead of Supabase Auth
+-- Function to get user_id from clerk_id
+CREATE OR REPLACE FUNCTION get_user_id_from_clerk()
+RETURNS UUID AS $$
+BEGIN
+  -- Get the user_id from users table based on clerk_id from JWT
+  RETURN (
+    SELECT id FROM users 
+    WHERE clerk_id = get_clerk_user_id()
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Users can view their own leads
 CREATE POLICY "Users can view own leads" ON leads
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING (user_id = get_user_id_from_clerk());
 
+-- Users can insert leads for themselves
 CREATE POLICY "Users can insert own leads" ON leads
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+    FOR INSERT WITH CHECK (user_id = get_user_id_from_clerk());
 
+-- Users can update their own leads
 CREATE POLICY "Users can update own leads" ON leads
-    FOR UPDATE USING (auth.uid() = user_id);
+    FOR UPDATE USING (user_id = get_user_id_from_clerk());
 
+-- Users can delete their own leads
 CREATE POLICY "Users can delete own leads" ON leads
-    FOR DELETE USING (auth.uid() = user_id);
+    FOR DELETE USING (user_id = get_user_id_from_clerk());
 
+-- Service role can manage all leads (for backend operations)
 CREATE POLICY "Service role can manage all leads" ON leads
     FOR ALL USING (auth.role() = 'service_role');
 
@@ -133,16 +158,16 @@ ALTER TABLE assessments ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for assessments table
 CREATE POLICY "Users can view own assessments" ON assessments
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can insert own assessments" ON assessments
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+    FOR INSERT WITH CHECK (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can update own assessments" ON assessments
-    FOR UPDATE USING (auth.uid() = user_id);
+    FOR UPDATE USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can delete own assessments" ON assessments
-    FOR DELETE USING (auth.uid() = user_id);
+    FOR DELETE USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Service role can manage all assessments" ON assessments
     FOR ALL USING (auth.role() = 'service_role');
@@ -167,7 +192,7 @@ CREATE POLICY "Users can view assessment questions" ON assessment_questions
         EXISTS (
             SELECT 1 FROM assessments 
             WHERE assessments.id = assessment_questions.assessment_id 
-            AND assessments.user_id = auth.uid()
+            AND assessments.user_id = get_user_id_from_clerk()
         )
     );
 
@@ -176,7 +201,7 @@ CREATE POLICY "Users can insert assessment questions" ON assessment_questions
         EXISTS (
             SELECT 1 FROM assessments 
             WHERE assessments.id = assessment_questions.assessment_id 
-            AND assessments.user_id = auth.uid()
+            AND assessments.user_id = get_user_id_from_clerk()
         )
     );
 
@@ -185,7 +210,7 @@ CREATE POLICY "Users can update assessment questions" ON assessment_questions
         EXISTS (
             SELECT 1 FROM assessments 
             WHERE assessments.id = assessment_questions.assessment_id 
-            AND assessments.user_id = auth.uid()
+            AND assessments.user_id = get_user_id_from_clerk()
         )
     );
 
@@ -353,68 +378,7 @@ CREATE POLICY "Users can delete own meetings" ON meetings
 CREATE POLICY "Service role can manage all meetings" ON meetings
     FOR ALL USING (auth.role() = 'service_role');
 
--- 9. KYC Status table
-CREATE TABLE kyc_status (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    kyc_method TEXT CHECK (kyc_method IN ('manual_entry', 'file_upload', 'third_party_api')),
-    kyc_file_url TEXT,
-    form_data JSONB,
-    status TEXT DEFAULT 'not_started' CHECK (status IN ('not_started', 'in_progress', 'submitted', 'verified', 'rejected')),
-    verified_by TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 9.1. KYC Templates table
-CREATE TABLE kyc_templates (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    description TEXT,
-    fields JSONB NOT NULL, -- Array of field definitions based on KYC schema
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Enable RLS for kyc_status
-ALTER TABLE kyc_status ENABLE ROW LEVEL SECURITY;
-
--- Enable RLS for kyc_templates
-ALTER TABLE kyc_templates ENABLE ROW LEVEL SECURITY;
-
--- RLS Policies for kyc_status table
-CREATE POLICY "Users can view own kyc" ON kyc_status
-    FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own kyc" ON kyc_status
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own kyc" ON kyc_status
-    FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Service role can manage all kyc" ON kyc_status
-    FOR ALL USING (auth.role() = 'service_role');
-
--- RLS Policies for kyc_templates table
-CREATE POLICY "Users can view own kyc templates" ON kyc_templates
-    FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own kyc templates" ON kyc_templates
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own kyc templates" ON kyc_templates
-    FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own kyc templates" ON kyc_templates
-    FOR DELETE USING (auth.uid() = user_id);
-
-CREATE POLICY "Service role can manage all kyc templates" ON kyc_templates
-    FOR ALL USING (auth.role() = 'service_role');
-
--- 10. Subscription Plans table
+-- 9. Subscription Plans table
 CREATE TABLE subscription_plans (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
@@ -423,7 +387,6 @@ CREATE TABLE subscription_plans (
     ai_enabled BOOLEAN DEFAULT false,
     custom_form_enabled BOOLEAN DEFAULT false,
     product_edit_enabled BOOLEAN DEFAULT false,
-    kyc_enabled BOOLEAN DEFAULT false,
     meeting_limit INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -439,7 +402,7 @@ CREATE POLICY "Anyone can view plans" ON subscription_plans
 CREATE POLICY "Service role can manage all subscription plans" ON subscription_plans
     FOR ALL USING (auth.role() = 'service_role');
 
--- 11. User Subscriptions table
+-- 10. User Subscriptions table
 CREATE TABLE user_subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -469,7 +432,7 @@ CREATE POLICY "Users can update own user subscriptions" ON user_subscriptions
 CREATE POLICY "Service role can manage all user subscriptions" ON user_subscriptions
     FOR ALL USING (auth.role() = 'service_role');
 
--- 12. AI Feedback table
+-- 11. AI Feedback table
 CREATE TABLE ai_feedback (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -479,10 +442,6 @@ CREATE TABLE ai_feedback (
     comment TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
--- Create triggers for updated_at columns
-CREATE TRIGGER update_kyc_templates_updated_at BEFORE UPDATE ON kyc_templates
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Enable RLS for ai_feedback
 ALTER TABLE ai_feedback ENABLE ROW LEVEL SECURITY;
@@ -506,21 +465,19 @@ CREATE INDEX idx_leads_status ON leads(status);
 CREATE INDEX idx_assessments_user_id ON assessments(user_id);
 CREATE INDEX idx_assessment_questions_assessment_id ON assessment_questions(assessment_id);
 CREATE INDEX idx_risk_assessments_lead_id ON risk_assessments(lead_id);
-CREATE INDEX idx_risk_assessment_answers_assessment_id ON risk_assessment_answers(risk_assessment_id);
+CREATE INDEX idx_risk_assessment_answers_assessment_id ON risk_assessment_answers(assessment_id);
 CREATE INDEX idx_product_recommendations_user_id ON product_recommendations(user_id);
 CREATE INDEX idx_product_recommendations_risk_category ON product_recommendations(risk_category);
 CREATE INDEX idx_meetings_user_id ON meetings(user_id);
 CREATE INDEX idx_meetings_lead_id ON meetings(lead_id);
-CREATE INDEX idx_kyc_status_lead_id ON kyc_status(lead_id);
-CREATE INDEX idx_kyc_templates_user_id ON kyc_templates(user_id);
 CREATE INDEX idx_user_subscriptions_user_id ON user_subscriptions(user_id);
 CREATE INDEX idx_ai_feedback_user_id ON ai_feedback(user_id);
 
 -- Insert default subscription plans
-INSERT INTO subscription_plans (name, price_per_month, lead_limit, ai_enabled, custom_form_enabled, product_edit_enabled, kyc_enabled, meeting_limit) VALUES
-('Free', 0, 10, false, false, false, false, 5),
-('Starter', 999, 100, true, false, false, true, 50),
-('Pro', 1999, 500, true, true, true, true, 200);
+INSERT INTO subscription_plans (name, price_per_month, lead_limit, ai_enabled, custom_form_enabled, product_edit_enabled, meeting_limit) VALUES
+('Free', 0, 10, false, false, false, 5),
+('Starter', 999, 100, true, false, false, 50),
+('Pro', 1999, 500, true, true, true, 200);
 
 -- Create a function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -530,10 +487,6 @@ BEGIN
     RETURN NEW;
 END;
 $$ language 'plpgsql';
-
--- Create trigger for kyc_status table
-CREATE TRIGGER update_kyc_status_updated_at BEFORE UPDATE ON kyc_status
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Add trigger for users table
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users

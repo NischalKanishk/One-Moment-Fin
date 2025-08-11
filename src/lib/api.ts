@@ -186,8 +186,22 @@ export const leadsAPI = {
 
   getById: async (token: string, id: string) => {
     const authApi = createAuthenticatedApi(token);
-    const response = await authApi.get(`/api/leads/${id}`);
-    return response.data;
+    
+    try {
+      const response = await authApi.get(`/api/leads/${id}`);
+      return response.data.lead;
+    } catch (error: any) {
+      // Enhance error with more context
+      if (error.response?.status === 404) {
+        error.message = `Lead with ID ${id} not found or you don't have access to it. This usually means the lead belongs to another user or has been moved.`;
+      } else if (error.response?.status === 401) {
+        error.message = 'Authentication failed. Please try signing out and signing back in.';
+      } else if (error.response?.status === 403) {
+        error.message = 'You don\'t have permission to access this lead.';
+      }
+      
+      throw error;
+    }
   },
 
   updateStatus: async (token: string, id: string, status: string, notes?: string) => {
@@ -321,71 +335,6 @@ export const meetingsAPI = {
 
   updateStatus: async (id: string, status: string) => {
     const response = await api.patch(`/api/meetings/${id}/status`, { status });
-    return response.data;
-  },
-};
-
-// KYC API
-export const kycAPI = {
-  getByLeadId: async (leadId: string) => {
-    const response = await api.get(`/api/kyc/${leadId}`);
-    return response.data;
-  },
-
-  upload: async (data: { lead_id: string; kyc_method: string; form_data?: any; kyc_file_url?: string }) => {
-    const response = await api.post('/api/kyc/upload', data);
-    return response.data;
-  },
-
-  updateStatus: async (leadId: string, status: string, verifiedBy?: string) => {
-    const response = await api.patch(`/api/kyc/${leadId}/status`, { status, verified_by: verifiedBy });
-    return response.data;
-  },
-};
-
-// KYC Templates API
-export const kycTemplatesAPI = {
-  getAll: async (token: string) => {
-    const authApi = createAuthenticatedApi(token);
-    const response = await authApi.get('/api/kyc-templates');
-    return response.data;
-  },
-
-  getById: async (token: string, id: string) => {
-    const authApi = createAuthenticatedApi(token);
-    const response = await authApi.get(`/api/kyc-templates/${id}`);
-    return response.data;
-  },
-
-  create: async (token: string, data: { name: string; description?: string; fields: any[]; is_active?: boolean }) => {
-    const authApi = createAuthenticatedApi(token);
-    const response = await authApi.post('/api/kyc-templates', data);
-    return response.data;
-  },
-
-  update: async (token: string, id: string, data: { name?: string; description?: string; fields?: any[]; is_active?: boolean }) => {
-    const authApi = createAuthenticatedApi(token);
-    const response = await authApi.put(`/api/kyc-templates/${id}`, data);
-    return response.data;
-  },
-
-  delete: async (token: string, id: string) => {
-    const authApi = createAuthenticatedApi(token);
-    const response = await authApi.delete(`/api/kyc-templates/${id}`);
-    return response.data;
-  },
-
-  // Seed dummy templates for demonstration
-  seed: async (token: string) => {
-    const authApi = createAuthenticatedApi(token);
-    const response = await authApi.post('/api/kyc-templates/seed');
-    return response.data;
-  },
-
-  // Clear all templates for the user
-  clearAll: async (token: string) => {
-    const authApi = createAuthenticatedApi(token);
-    const response = await authApi.delete('/api/kyc-templates/seed');
     return response.data;
   },
 };

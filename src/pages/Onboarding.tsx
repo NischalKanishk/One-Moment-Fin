@@ -76,7 +76,7 @@ export default function Onboarding() {
                 <div className="grid md:grid-cols-3 gap-4 text-sm">
                   <div className="border rounded-md p-4">Google Calendar</div>
                   <div className="border rounded-md p-4">WhatsApp API</div>
-                  <div className="border rounded-md p-4">KYC provider</div>
+                  <div className="border rounded-md p-4">Payment Gateway</div>
                 </div>
               </div>
             )}

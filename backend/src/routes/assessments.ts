@@ -2,52 +2,21 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { supabase } from '../config/supabase';
 import { authenticateUser } from '../middleware/auth';
+import { AssessmentFormService } from '../services/assessmentFormService';
 import { AIService } from '../services/ai';
 import { LeadStatusService } from '../services/leadStatusService';
-import { DefaultAssessmentService } from '../services/defaultAssessmentService';
-import { MigrateExistingUsersService } from '../services/migrateExistingUsers';
 
 const router = express.Router();
 
-// GET /api/assessments/test (Test endpoint for debugging - NO AUTH REQUIRED)
-router.get('/test', async (req: express.Request, res: express.Response) => {
-  try {
-    return res.json({ 
-      message: 'Assessments API is working',
-      timestamp: new Date().toISOString(),
-      headers: {
-        authorization: req.headers.authorization ? 'Present' : 'Missing',
-        contentType: req.headers['content-type'] || 'Not set'
-      }
-    });
-  } catch (error) {
-    console.error('Test endpoint error:', error);
-    return res.status(500).json({ error: 'Test failed' });
-  }
-});
+// ============================================================================
+// AUTHENTICATED ROUTES (MFD Dashboard)
+// ============================================================================
 
-// GET /api/assessments/public-test (Test public endpoint - NO AUTH REQUIRED)
-router.get('/public-test', async (req: express.Request, res: express.Response) => {
-  try {
-    return res.json({ 
-      message: 'Public assessments endpoint is working',
-      timestamp: new Date().toISOString(),
-      requestUrl: req.url,
-      method: req.method
-    });
-  } catch (error) {
-    console.error('Public test endpoint error:', error);
-    return res.status(500).json({ error: 'Public test failed' });
-  }
-});
-
-// POST /api/assessments/submit (Public endpoint for assessment submission)
-router.post('/submit', [
-  body('lead_id').notEmpty().withMessage('Lead ID is required'),
-  body('assessment_id').notEmpty().withMessage('Assessment ID is required'),
-  body('responses').isArray().withMessage('Responses must be an array'),
-  body('responses.*.question_id').notEmpty().withMessage('Question ID is required'),
-  body('responses.*.answer_value').notEmpty().withMessage('Answer value is required')
+// POST /api/assessments/forms - Create a new assessment form
+router.post('/forms', authenticateUser, [
+  body('name').notEmpty().withMessage('Form name is required'),
+  body('description').optional().isString().withMessage('Description must be a string'),
+  body('is_active').optional().isBoolean().withMessage('is_active must be a boolean')
 ], async (req: express.Request, res: express.Response) => {
   try {
     const errors = validationResult(req);
@@ -55,312 +24,195 @@ router.post('/submit', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { lead_id, assessment_id, responses } = req.body;
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
 
-    // Get lead details
+    const { name, description, is_active } = req.body;
+
+    const form = await AssessmentFormService.createForm(req.user.supabase_user_id, {
+      name,
+      description,
+      is_active
+    });
+
+    return res.status(201).json({ form });
+  } catch (error) {
+    console.error('Create form error:', error);
+    return res.status(500).json({ error: 'Failed to create assessment form' });
+  }
+});
+
+// POST /api/assessments/forms/:formId/versions - Create a new version
+router.post('/forms/:formId/versions', authenticateUser, [
+  body('schema').isObject().withMessage('Schema is required'),
+  body('ui').optional().isObject().withMessage('UI must be an object'),
+  body('scoring').optional().isObject().withMessage('Scoring must be an object')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const { formId } = req.params;
+    const { schema, ui, scoring } = req.body;
+
+    // Verify form ownership
+    const { data: form, error: formError } = await supabase
+      .from('assessment_forms')
+      .select('id')
+      .eq('id', formId)
+      .eq('user_id', req.user.supabase_user_id)
+      .single();
+
+    if (formError || !form) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+
+    const version = await AssessmentFormService.createVersion(formId, {
+      schema,
+      ui,
+      scoring
+    });
+
+    return res.status(201).json({ version });
+  } catch (error) {
+    console.error('Create version error:', error);
+    return res.status(500).json({ error: 'Failed to create form version' });
+  }
+});
+
+// GET /api/assessments/forms - List user forms with latest versions
+router.get('/forms', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const forms = await AssessmentFormService.getUserForms(req.user.supabase_user_id);
+    return res.json({ forms });
+  } catch (error) {
+    console.error('Get forms error:', error);
+    return res.status(500).json({ error: 'Failed to fetch forms' });
+  }
+});
+
+// GET /api/assessments/forms/:formId - Get form with all versions
+router.get('/forms/:formId', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const { formId } = req.params;
+    const form = await AssessmentFormService.getFormWithVersions(formId, req.user.supabase_user_id);
+    return res.json({ form });
+  } catch (error) {
+    console.error('Get form error:', error);
+    if (error instanceof Error && error.message === 'Form not found') {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+    return res.status(500).json({ error: 'Failed to fetch form' });
+  }
+});
+
+// POST /api/assessments/users/default - Set default assessment form
+router.post('/users/default', authenticateUser, [
+  body('formId').isUUID().withMessage('Valid form ID is required')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const { formId } = req.body;
+
+    // Verify form ownership
+    const { data: form, error: formError } = await supabase
+      .from('assessment_forms')
+      .select('id')
+      .eq('id', formId)
+      .eq('user_id', req.user.supabase_user_id)
+      .single();
+
+    if (formError || !form) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+
+    await AssessmentFormService.setDefaultForm(req.user.supabase_user_id, formId);
+    return res.json({ message: 'Default form updated successfully' });
+  } catch (error) {
+    console.error('Set default form error:', error);
+    return res.status(500).json({ error: 'Failed to set default form' });
+  }
+});
+
+// POST /api/assessments/assign - Assign form to a lead
+router.post('/assign', authenticateUser, [
+  body('leadId').isUUID().withMessage('Valid lead ID is required'),
+  body('formId').isUUID().withMessage('Valid form ID is required'),
+  body('versionId').optional().isUUID().withMessage('Version ID must be a valid UUID')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const { leadId, formId, versionId } = req.body;
+
+    // Verify lead ownership
     const { data: lead, error: leadError } = await supabase
       .from('leads')
-      .select('*')
-      .eq('id', lead_id)
+      .select('id')
+      .eq('id', leadId)
+      .eq('user_id', req.user.supabase_user_id)
       .single();
 
     if (leadError || !lead) {
       return res.status(404).json({ error: 'Lead not found' });
     }
 
-    // Get assessment questions
-    const { data: questions, error: questionsError } = await supabase
-      .from('assessment_questions')
-      .select('*')
-      .eq('assessment_id', assessment_id);
-
-    if (questionsError) {
-      console.error('Questions fetch error:', questionsError);
-      return res.status(500).json({ error: 'Failed to fetch assessment questions' });
-    }
-
-    // Create risk assessment
-    const { data: riskAssessment, error: riskError } = await supabase
-      .from('risk_assessments')
-      .insert({
-        lead_id,
-        user_id: lead.user_id,
-        assessment_id,
-        ai_used: true
-      })
-      .select()
-      .single();
-
-    if (riskError) {
-      console.error('Risk assessment creation error:', riskError);
-      return res.status(500).json({ error: 'Failed to create risk assessment' });
-    }
-
-    // Save answers
-    const answersToInsert = responses.map((response: any) => ({
-      risk_assessment_id: riskAssessment.id,
-      question_id: response.question_id,
-      answer_value: response.answer_value
-    }));
-
-    const { error: answersError } = await supabase
-      .from('risk_assessment_answers')
-      .insert(answersToInsert);
-
-    if (answersError) {
-      console.error('Answers save error:', answersError);
-      return res.status(500).json({ error: 'Failed to save answers' });
-    }
-
-    // Prepare answers for AI analysis
-    const answersWithQuestions = responses.map((response: any) => {
-      const question = questions.find((q: any) => q.id === response.question_id);
-      return {
-        question_text: question?.question_text || 'Unknown question',
-        answer_value: response.answer_value
-      };
-    });
-
-    // Get AI risk assessment
-    const aiResult = await AIService.assessRisk(answersWithQuestions, lead.age);
-
-    // Update risk assessment with AI results
-    const { error: updateError } = await supabase
-      .from('risk_assessments')
-      .update({
-        risk_score: aiResult.risk_score,
-        risk_category: aiResult.risk_category
-      })
-      .eq('id', riskAssessment.id);
-
-    if (updateError) {
-      console.error('Risk assessment update error:', updateError);
-    }
-
-    // Update lead status to "Risk analyzed" when assessment form is submitted
-    await LeadStatusService.updateStatusToRiskAnalyzed(lead_id);
-
-    return res.json({
-      message: 'Assessment submitted successfully',
-      risk_assessment: {
-        ...riskAssessment,
-        risk_score: aiResult.risk_score,
-        risk_category: aiResult.risk_category,
-        reasoning: aiResult.reasoning,
-        confidence: aiResult.confidence
-      }
-    });
-  } catch (error) {
-    console.error('Assessment submission error:', error);
-    return res.status(500).json({ error: 'Assessment submission failed' });
-  }
-});
-
-// GET /api/assessments/forms (Get user's assessment forms)
-router.get('/forms', authenticateUser, async (req: express.Request, res: express.Response) => {
-  try {
-    // Ensure user has supabase_user_id
-    if (!req.user?.supabase_user_id) {
-      return res.status(400).json({ error: 'User not properly authenticated' });
-    }
-
-    const { data: forms, error } = await supabase
-      .from('assessments')
-      .select(`
-        *,
-        assessment_questions (
-          id,
-          question_text,
-          type,
-          options,
-          weight
-        )
-      `)
-      .eq('user_id', req.user.supabase_user_id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Forms fetch error:', error);
-      return res.status(500).json({ error: 'Failed to fetch forms' });
-    }
-
-    return res.json({ forms });
-  } catch (error) {
-    console.error('Forms fetch error:', error);
-    return res.status(500).json({ error: 'Failed to fetch forms' });
-  }
-});
-
-// GET /api/assessments/:lead_id (Get assessments for a lead)
-router.get('/:lead_id', authenticateUser, async (req: express.Request, res: express.Response) => {
-  try {
-    const { lead_id } = req.params;
-
-    // Ensure user has supabase_user_id
-    if (!req.user?.supabase_user_id) {
-      return res.status(400).json({ error: 'User not properly authenticated' });
-    }
-
-    const { data: assessments, error } = await supabase
-      .from('risk_assessments')
-      .select(`
-        *,
-        risk_assessment_answers (
-          id,
-          answer_value,
-          assessment_questions (
-            id,
-            question_text,
-            type,
-          options
-          )
-        )
-      `)
-      .eq('lead_id', lead_id)
-      .eq('user_id', req.user.supabase_user_id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Assessments fetch error:', error);
-      return res.status(500).json({ error: 'Failed to fetch assessments' });
-    }
-
-    return res.json({ assessments });
-  } catch (error) {
-    console.error('Assessments fetch error:', error);
-    return res.status(500).json({ error: 'Failed to fetch assessments' });
-  }
-});
-
-// POST /api/assessments/score (Internal AI scoring endpoint)
-router.post('/score', authenticateUser, [
-  body('answers').isArray().withMessage('Answers must be an array'),
-  body('lead_age').optional().isInt().withMessage('Lead age must be a number')
-], async (req: express.Request, res: express.Response) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { answers, lead_age } = req.body;
-
-    const aiResult = await AIService.assessRisk(answers, lead_age);
-
-    return res.json({
-      risk_score: aiResult.risk_score,
-      risk_category: aiResult.risk_category,
-      reasoning: aiResult.reasoning,
-      confidence: aiResult.confidence
-    });
-  } catch (error) {
-    console.error('AI scoring error:', error);
-    return res.status(500).json({ error: 'AI scoring failed' });
-  }
-});
-
-// POST /api/assessments/forms (Create new assessment form)
-router.post('/forms', authenticateUser, [
-  body('name').notEmpty().withMessage('Form name is required'),
-  body('description').optional().isString().withMessage('Description must be a string'),
-  body('questions').isArray().withMessage('Questions must be an array'),
-  body('questions.*.question_text').notEmpty().withMessage('Question text is required'),
-  body('questions.*.type').isIn(['mcq', 'scale', 'text', 'dropdown', 'number']).withMessage('Valid question type required'),
-  body('questions.*.options').optional().isArray().withMessage('Options must be an array'),
-  body('questions.*.weight').optional().isInt({ min: 1 }).withMessage('Weight must be a positive integer')
-], async (req: express.Request, res: express.Response) => {
-  try {
-    console.log('🔍 Assessment creation request received');
-    console.log('🔍 Request body:', req.body);
-    console.log('🔍 Authenticated user:', req.user);
-    
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      console.log('❌ Validation errors:', errors.array());
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    // Ensure user has supabase_user_id
-    if (!req.user?.supabase_user_id) {
-      console.error('❌ User missing supabase_user_id:', req.user);
-      return res.status(400).json({ error: 'User not properly authenticated' });
-    }
-
-    const { name, description, questions, is_active } = req.body;
-    console.log('🔍 Creating assessment with data:', { name, description, questionsCount: questions.length, is_active });
-
-    // If this is set as active, deactivate other forms
-    if (is_active) {
-      console.log('🔍 Deactivating other forms for user:', req.user.supabase_user_id);
-      await supabase
-        .from('assessments')
-        .update({ is_active: false })
-        .eq('user_id', req.user.supabase_user_id);
-    }
-
-    // Create assessment form
+    // Verify form ownership
     const { data: form, error: formError } = await supabase
-      .from('assessments')
-      .insert({
-        user_id: req.user.supabase_user_id,
-        name,
-        description,
-        is_active: is_active || false
-      })
-      .select()
+      .from('assessment_forms')
+      .select('id')
+      .eq('id', formId)
+      .eq('user_id', req.user.supabase_user_id)
       .single();
 
-    if (formError) {
-      console.error('❌ Form creation error:', formError);
-      return res.status(500).json({ error: 'Failed to create form' });
+    if (formError || !form) {
+      return res.status(404).json({ error: 'Form not found' });
     }
 
-    console.log('✅ Assessment form created:', form);
-
-    // Create questions
-    const questionsToInsert = questions.map((q: any) => ({
-      assessment_id: form.id,
-      question_text: q.question_text,
-      type: q.type,
-      options: q.options || null,
-      weight: q.weight || 1
-    }));
-
-    console.log('🔍 Inserting questions:', questionsToInsert);
-
-    const { error: questionsError } = await supabase
-      .from('assessment_questions')
-      .insert(questionsToInsert);
-
-    if (questionsError) {
-      console.error('❌ Questions creation error:', questionsError);
-      return res.status(500).json({ error: 'Failed to create questions' });
-    }
-
-    console.log('✅ Questions created successfully');
-
-    return res.json({
-      message: 'Assessment form created successfully',
-      form: {
-        ...form,
-        questions: questionsToInsert
-      }
-    });
+    await AssessmentFormService.assignFormToLead(req.user.supabase_user_id, leadId, formId, versionId);
+    return res.json({ message: 'Form assigned to lead successfully' });
   } catch (error) {
-    console.error('❌ Assessment creation error:', error);
-    return res.status(500).json({ error: 'Failed to create assessment form' });
+    console.error('Assign form error:', error);
+    return res.status(500).json({ error: 'Failed to assign form to lead' });
   }
 });
 
-// PUT /api/assessments/forms/:id (Update assessment form)
-router.put('/forms/:id', authenticateUser, [
-  body('name').notEmpty().withMessage('Form name is required'),
-  body('description').optional().isString().withMessage('Description must be a string'),
-  body('questions').isArray().withMessage('Questions must be an array'),
-  body('questions.*.question_text').notEmpty().withMessage('Question text is required'),
-  body('questions.*.type').isIn(['mcq', 'scale', 'text', 'dropdown', 'number']).withMessage('Valid question type required'),
-  body('questions.*.options').optional().isArray().withMessage('Options must be an array'),
-  body('questions.*.weight').optional().isInt({ min: 1 }).withMessage('Weight must be a positive integer')
+// POST /api/assessments/links - Create expiring assessment link
+router.post('/links', authenticateUser, [
+  body('formId').isUUID().withMessage('Valid form ID is required'),
+  body('leadId').optional().isUUID().withMessage('Lead ID must be a valid UUID'),
+  body('versionId').optional().isUUID().withMessage('Version ID must be a valid UUID'),
+  body('expiresInDays').optional().isInt({ min: 1, max: 30 }).withMessage('Expires in days must be 1-30')
 ], async (req: express.Request, res: express.Response) => {
   try {
     const errors = validationResult(req);
@@ -368,298 +220,366 @@ router.put('/forms/:id', authenticateUser, [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    // Ensure user has supabase_user_id
     if (!req.user?.supabase_user_id) {
       return res.status(400).json({ error: 'User not properly authenticated' });
     }
 
-    const { id } = req.params;
-    const { name, description, questions, is_active } = req.body;
+    const { formId, leadId, versionId, expiresInDays } = req.body;
 
-    // Check if user owns this assessment
-    const { data: existingForm, error: checkError } = await supabase
-      .from('assessments')
-      .select('*')
-      .eq('id', id)
+    // Verify form ownership
+    const { data: form, error: formError } = await supabase
+      .from('assessment_forms')
+      .select('id')
+      .eq('id', formId)
       .eq('user_id', req.user.supabase_user_id)
       .single();
 
-    if (checkError || !existingForm) {
-      return res.status(404).json({ error: 'Assessment form not found' });
+    if (formError || !form) {
+      return res.status(404).json({ error: 'Form not found' });
     }
 
-    // If this is set as active, deactivate other forms
-    if (is_active) {
-      await supabase
-        .from('assessments')
-        .update({ is_active: false })
-        .eq('user_id', req.user.supabase_user_id);
-    }
+    const link = await AssessmentFormService.createAssessmentLink(req.user.supabase_user_id, {
+      leadId,
+      formId,
+      versionId,
+      expiresInDays
+    });
 
-    // Update assessment form
-    const { data: form, error: formError } = await supabase
-      .from('assessments')
-      .update({
-        name,
-        description,
-        is_active: is_active || false
-      })
-      .eq('id', id)
-      .select()
-      .single();
+    const publicUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/assess/${link.token}`;
 
-    if (formError) {
-      console.error('Form update error:', formError);
-      return res.status(500).json({ error: 'Failed to update form' });
-    }
-
-    // Delete existing questions
-    await supabase
-      .from('assessment_questions')
-      .delete()
-      .eq('assessment_id', id);
-
-    // Create new questions
-    const questionsToInsert = questions.map((q: any) => ({
-      assessment_id: id,
-      question_text: q.question_text,
-      type: q.type,
-      options: q.options || null,
-      weight: q.weight || 1
-    }));
-
-    const { error: questionsError } = await supabase
-      .from('assessment_questions')
-      .insert(questionsToInsert);
-
-    if (questionsError) {
-      console.error('Questions update error:', questionsError);
-      return res.status(500).json({ error: 'Failed to update questions' });
-    }
-
-    return res.json({
-      message: 'Assessment form updated successfully',
-      form: {
-        ...form,
-        questions: questionsToInsert
-      }
+    return res.json({ 
+      link,
+      publicUrl,
+      message: 'Assessment link created successfully'
     });
   } catch (error) {
-    console.error('Form update error:', error);
-    return res.status(500).json({ error: 'Failed to update assessment form' });
+    console.error('Create link error:', error);
+    return res.status(500).json({ error: 'Failed to create assessment link' });
   }
 });
 
-// DELETE /api/assessments/forms/:id (Delete assessment form)
-router.delete('/forms/:id', authenticateUser, async (req: express.Request, res: express.Response) => {
+// POST /api/assessments/manual-submit - Manual submission by MFD
+router.post('/manual-submit', authenticateUser, [
+  body('leadId').isUUID().withMessage('Valid lead ID is required'),
+  body('formId').isUUID().withMessage('Valid form ID is required'),
+  body('versionId').optional().isUUID().withMessage('Version ID must be a valid UUID'),
+  body('answers').isObject().withMessage('Answers must be an object')
+], async (req: express.Request, res: express.Response) => {
   try {
-    const { id } = req.params;
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
 
-    // Ensure user has supabase_user_id
     if (!req.user?.supabase_user_id) {
       return res.status(400).json({ error: 'User not properly authenticated' });
     }
 
-    // Check if user owns this assessment
-    const { data: existingForm, error: checkError } = await supabase
-      .from('assessments')
-      .select('*')
-      .eq('id', id)
+    const { leadId, formId, versionId, answers } = req.body;
+
+    // Verify lead ownership
+    const { data: lead, error: leadError } = await supabase
+      .from('leads')
+      .select('id')
+      .eq('id', leadId)
       .eq('user_id', req.user.supabase_user_id)
       .single();
 
-    if (checkError || !existingForm) {
-      return res.status(404).json({ error: 'Assessment form not found' });
+    if (leadError || !lead) {
+      return res.status(404).json({ error: 'Lead not found' });
     }
 
-    // Delete questions first
-    await supabase
-      .from('assessment_questions')
-      .delete()
-      .eq('assessment_id', id);
+    // Get effective form and version
+    const { form, version } = await AssessmentFormService.getEffectiveFormForLead(
+      req.user.supabase_user_id, 
+      leadId
+    );
 
-    // Delete assessment
-    const { error: deleteError } = await supabase
-      .from('assessments')
-      .delete()
-      .eq('id', id);
+    const submission = await AssessmentFormService.submitAssessment({
+      userId: req.user.supabase_user_id,
+      leadId,
+      formId: form.id,
+      versionId: version.id,
+      filledBy: 'mfd',
+      answers
+    });
 
-    if (deleteError) {
-      console.error('Form deletion error:', deleteError);
-      return res.status(500).json({ error: 'Failed to delete form' });
-    }
+    // Update lead status
+    await LeadStatusService.updateStatusToRiskAnalyzed(leadId);
 
-    return res.json({ message: 'Assessment form deleted successfully' });
+    return res.json({ 
+      submission,
+      message: 'Assessment submitted successfully'
+    });
   } catch (error) {
-    console.error('Form deletion error:', error);
-    return res.status(500).json({ error: 'Failed to delete assessment form' });
+    console.error('Manual submit error:', error);
+    return res.status(500).json({ error: 'Failed to submit assessment' });
   }
 });
 
-// GET /api/assessments/public/:referralCode (Get public assessment by referral code)
+// GET /api/assessments/submissions/:leadId - Get submissions for a lead
+router.get('/submissions/:leadId', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const { leadId } = req.params;
+
+    // Verify lead ownership
+    const { data: lead, error: leadError } = await supabase
+      .from('leads')
+      .select('id')
+      .eq('id', leadId)
+      .eq('user_id', req.user.supabase_user_id)
+      .single();
+
+    if (leadError || !lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    const submissions = await AssessmentFormService.getLeadSubmissions(req.user.supabase_user_id, leadId);
+    return res.json({ submissions });
+  } catch (error) {
+    console.error('Get submissions error:', error);
+    return res.status(500).json({ error: 'Failed to fetch submissions' });
+  }
+});
+
+// PATCH /api/assessments/submissions/:submissionId/status - Update submission status
+router.patch('/submissions/:submissionId/status', authenticateUser, [
+  body('status').isIn(['approved', 'rejected']).withMessage('Status must be approved or rejected'),
+  body('reviewReason').optional().isString().withMessage('Review reason must be a string')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const { submissionId } = req.params;
+    const { status, reviewReason } = req.body;
+
+    await AssessmentFormService.updateSubmissionStatus(
+      submissionId,
+      req.user.supabase_user_id,
+      status,
+      reviewReason
+    );
+
+    return res.json({ message: 'Submission status updated successfully' });
+  } catch (error) {
+    console.error('Update submission status error:', error);
+    return res.status(500).json({ error: 'Failed to update submission status' });
+  }
+});
+
+// ============================================================================
+// PUBLIC ROUTES (No authentication required)
+// ============================================================================
+
+// GET /api/assessments/public/:referralCode - Get public assessment by referral code
 router.get('/public/:referralCode', async (req: express.Request, res: express.Response) => {
   try {
     const { referralCode } = req.params;
-    console.log('🔍 Public assessment request for referral code:', referralCode);
-    
-    // The referral code from the URL will be like "nischalEfM7c9"
-    // But the database stores it as "/r/nischalEfM7c9"
-    // So we need to construct the full referral link to search
-    const fullReferralLink = `/r/${referralCode}`;
-    console.log('🔍 Searching for referral link:', fullReferralLink);
-    
-    // First, find the user by their referral_link
+
+    // Get user by referral code
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('id, referral_link, full_name')
-      .eq('referral_link', fullReferralLink)
+      .select('id, full_name, default_assessment_form_id')
+      .eq('referral_link', `/r/${referralCode}`)
       .single();
-    
+
     if (userError || !user) {
-      console.log('❌ No user found for referral link:', fullReferralLink);
-      console.log('🔍 User error:', userError);
-      
-      // Let's also check what users exist in the database
-      const { data: allUsers, error: allUsersError } = await supabase
-        .from('users')
-        .select('id, referral_link, full_name')
-        .limit(5);
-      
-      if (!allUsersError && allUsers) {
-        console.log('🔍 Available users in database:', allUsers);
-      }
-      
-      return res.status(404).json({ error: 'Assessment not found or not published' });
+      return res.status(404).json({ error: 'Referral code not found' });
     }
 
-    console.log('✅ User found:', user);
+    if (!user.default_assessment_form_id) {
+      return res.status(404).json({ error: 'No assessment form configured' });
+    }
 
-    // Get the active assessment for this user
-    const { data: assessment, error } = await supabase
-      .from('assessments')
-      .select(`
-        *,
-        assessment_questions (
-          id,
-          question_text,
-          type,
-          options,
-          weight
-        )
-      `)
-      .eq('user_id', user.id)
-      .eq('is_active', true)
+    // Get the latest version of the default form
+    const { data: version, error: versionError } = await supabase
+      .from('assessment_form_versions')
+      .select('*')
+      .eq('form_id', user.default_assessment_form_id)
+      .order('version', { ascending: false })
+      .limit(1)
       .single();
 
-    if (error || !assessment) {
-      console.log('❌ No active assessment found for user:', user.id);
-      console.log('🔍 Assessment error:', error);
-      
-      // Let's check what assessments exist for this user
-      const { data: userAssessments, error: userAssessmentsError } = await supabase
-        .from('assessments')
-        .select('id, name, is_active')
-        .eq('user_id', user.id);
-      
-      if (!userAssessmentsError && userAssessments) {
-        console.log('🔍 User assessments:', userAssessments);
-      }
-      
-      return res.status(404).json({ error: 'Assessment not found or not published' });
+    if (versionError || !version) {
+      return res.status(404).json({ error: 'Assessment form not available' });
     }
 
-    console.log('✅ Assessment found:', assessment);
-    return res.json({ assessment });
-  } catch (error) {
-    console.error('❌ Public assessment fetch error:', error);
-    return res.status(500).json({ error: 'Failed to fetch assessment' });
-  }
-});
-
-// GET /api/assessments/default-questions (Get default assessment questions)
-router.get('/default-questions', authenticateUser, async (req: express.Request, res: express.Response) => {
-  try {
-    const defaultQuestions = DefaultAssessmentService.getDefaultQuestions();
-    return res.json({ questions: defaultQuestions });
-  } catch (error) {
-    console.error('Default questions fetch error:', error);
-    return res.status(500).json({ error: 'Failed to fetch default questions' });
-  }
-});
-
-// POST /api/assessments/reset-to-default/:id (Reset assessment to default questions)
-router.post('/reset-to-default/:id', authenticateUser, async (req: express.Request, res: express.Response) => {
-  try {
-    const { id } = req.params;
-
-    // Ensure user has supabase_user_id
-    if (!req.user?.supabase_user_id) {
-      return res.status(400).json({ error: 'User not properly authenticated' });
-    }
-
-    // Check if user owns this assessment
-    const { data: existingForm, error: checkError } = await supabase
-      .from('assessments')
-      .select('id')
-      .eq('id', id)
-      .eq('user_id', req.user.supabase_user_id)
+    // Get form details
+    const { data: form, error: formError } = await supabase
+      .from('assessment_forms')
+      .select('name, description')
+      .eq('id', user.default_assessment_form_id)
       .single();
 
-    if (checkError || !existingForm) {
+    if (formError || !form) {
       return res.status(404).json({ error: 'Assessment form not found' });
     }
 
-    // Reset to default questions
-    const result = await DefaultAssessmentService.resetToDefault(req.user.supabase_user_id, id);
-
-    if (result.success) {
-      return res.json({
-        message: 'Assessment reset to default successfully',
-        questionsCount: result.questionsCount
-      });
-    } else {
-      return res.status(500).json({ error: 'Failed to reset assessment to default' });
-    }
-  } catch (error) {
-    console.error('Reset to default error:', error);
-    return res.status(500).json({ error: 'Failed to reset assessment to default' });
-  }
-});
-
-// POST /api/assessments/migrate-users (Admin endpoint to migrate existing users)
-router.post('/migrate-users', authenticateUser, async (req: express.Request, res: express.Response) => {
-  try {
-    // Check if user is admin
-    if (req.user!.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    const result = await MigrateExistingUsersService.migrateAllUsers();
-    
     return res.json({
-      message: 'Migration completed',
-      ...result
+      assessment: {
+        id: user.default_assessment_form_id,
+        name: form.name,
+        description: form.description,
+        schema: version.schema,
+        ui: version.ui,
+        branding: {
+          mfd_name: user.full_name
+        }
+      }
     });
   } catch (error) {
-    console.error('Migration error:', error);
-    return res.status(500).json({ error: 'Migration failed' });
+    console.error('Public assessment error:', error);
+    return res.status(500).json({ error: 'Failed to load assessment' });
   }
 });
 
-// GET /api/assessments/migration-status (Admin endpoint to check migration status)
-router.get('/migration-status', authenticateUser, async (req: express.Request, res: express.Response) => {
+// GET /api/assessments/token/:token - Get assessment by token
+router.get('/token/:token', async (req: express.Request, res: express.Response) => {
   try {
-    // Check if user is admin
-    if (req.user!.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
+    const { token } = req.params;
+
+    // Get assessment link
+    const { data: link, error: linkError } = await supabase
+      .from('assessment_links')
+      .select(`
+        *,
+        form:assessment_forms(name, description),
+        version:assessment_form_versions(*)
+      `)
+      .eq('token', token)
+      .eq('status', 'active')
+      .gt('expires_at', new Date().toISOString())
+      .single();
+
+    if (linkError || !link) {
+      return res.status(404).json({ error: 'Assessment link not found or expired' });
     }
 
-    const status = await MigrateExistingUsersService.getMigrationStatus();
-    
-    return res.json(status);
+    return res.json({
+      assessment: {
+        id: link.form_id,
+        name: link.form.name,
+        description: link.form.description,
+        schema: link.version.schema,
+        ui: link.version.ui,
+        branding: {
+          mfd_name: 'Financial Advisor' // Generic branding for token links
+        }
+      }
+    });
   } catch (error) {
-    console.error('Migration status error:', error);
-    return res.status(500).json({ error: 'Failed to get migration status' });
+    console.error('Token assessment error:', error);
+    return res.status(500).json({ error: 'Failed to load assessment' });
+  }
+});
+
+// POST /api/assessments/token/:token/submit - Submit assessment via token
+router.post('/token/:token/submit', [
+  body('answers').isObject().withMessage('Answers must be an object'),
+  body('leadData').optional().isObject().withMessage('Lead data must be an object')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { token } = req.params;
+    const { answers, leadData } = req.body;
+
+    // Get and validate assessment link
+    const { data: link, error: linkError } = await supabase
+      .from('assessment_links')
+      .select('*')
+      .eq('token', token)
+      .eq('status', 'active')
+      .gt('expires_at', new Date().toISOString())
+      .single();
+
+    if (linkError || !link) {
+      return res.status(404).json({ error: 'Assessment link not found or expired' });
+    }
+
+    let leadId = link.lead_id;
+
+    // Create lead if not exists (new intake)
+    if (!leadId && leadData) {
+      const { data: newLead, error: leadCreateError } = await supabase
+        .from('leads')
+        .insert({
+          user_id: link.user_id,
+          full_name: leadData.full_name,
+          email: leadData.email,
+          phone: leadData.phone,
+          age: leadData.age,
+          source_link: `Token: ${token.substring(0, 8)}...`,
+          status: 'lead'
+        })
+        .select()
+        .single();
+
+      if (leadCreateError) {
+        throw new Error(`Failed to create lead: ${leadCreateError.message}`);
+      }
+
+      leadId = newLead.id;
+    }
+
+    // Submit assessment
+    const submission = await AssessmentFormService.submitAssessment({
+      userId: link.user_id,
+      leadId,
+      formId: link.form_id,
+      versionId: link.version_id || '', // Should always have version for token links
+      filledBy: 'lead',
+      answers
+    });
+
+    // Mark link as submitted
+    await supabase
+      .from('assessment_links')
+      .update({ 
+        status: 'submitted',
+        submitted_at: new Date().toISOString()
+      })
+      .eq('id', link.id);
+
+    return res.json({ 
+      submission,
+      message: 'Assessment submitted successfully'
+    });
+  } catch (error) {
+    console.error('Token submit error:', error);
+    return res.status(500).json({ error: 'Failed to submit assessment' });
+  }
+});
+
+// ============================================================================
+// LEGACY COMPATIBILITY ROUTES (for backward compatibility)
+// ============================================================================
+
+// GET /api/assessments/test - Test endpoint
+router.get('/test', async (req: express.Request, res: express.Response) => {
+  try {
+    return res.json({ 
+      message: 'Assessments API v2 is working',
+      timestamp: new Date().toISOString(),
+      version: '2.0.0'
+    });
+  } catch (error) {
+    console.error('Test endpoint error:', error);
+    return res.status(500).json({ error: 'Test failed' });
   }
 });
 
