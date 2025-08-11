@@ -101,15 +101,34 @@ router.post('/create', [
   body('phone').optional().custom((value) => {
     // More flexible phone validation for Indian numbers
     if (value === undefined || value === null || value === '') return true;
-    const phoneRegex = /^(\+91|91|0)?[6-9]\d{9}$/;
-    return phoneRegex.test(value.replace(/\s+/g, ''));
-  }).withMessage('Valid phone number required'),
+    
+    // Remove all non-digit characters
+    const cleanPhone = value.replace(/\D/g, '');
+    
+    // Check if it's a valid Indian mobile number (10 digits starting with 6-9)
+    if (cleanPhone.length === 10 && /^[6-9]/.test(cleanPhone)) {
+      return true;
+    }
+    
+    // Check if it's a valid Indian mobile number with country code (12 digits starting with 91)
+    if (cleanPhone.length === 12 && cleanPhone.startsWith('91') && /^91[6-9]/.test(cleanPhone)) {
+      return true;
+    }
+    
+    // Check if it's a valid Indian mobile number with +91 (13 digits starting with +91)
+    if (cleanPhone.length === 13 && cleanPhone.startsWith('91') && /^91[6-9]/.test(cleanPhone)) {
+      return true;
+    }
+    
+    return false;
+  }).withMessage('Please enter a valid Indian mobile number (10 digits starting with 6, 7, 8, or 9)'),
   body('age').optional().custom((value) => {
     if (value === undefined || value === null || value === '') return true;
     const age = parseInt(value);
     return !isNaN(age) && age >= 18 && age <= 100;
   }).withMessage('Age must be between 18 and 100'),
   body('user_id').notEmpty().withMessage('User ID is required'),
+  body('source_link').optional().isString().withMessage('Source link must be a string'),
 ], async (req: express.Request, res: express.Response) => {
   try {
     const errors = validationResult(req);
@@ -125,7 +144,7 @@ router.post('/create', [
     }
 
     // Only allow whitelisted fields
-    const { full_name, email, phone, age, user_id } = req.body;
+    const { full_name, email, phone, age, user_id, source_link } = req.body;
 
     // Verify the user_id exists and is valid
     try {
@@ -152,7 +171,7 @@ router.post('/create', [
         email,
         phone,
         age,
-        source_link: 'Link Submission', // Auto-populate for link submissions
+        source_link: source_link || 'Link Submission', // Use provided source_link or default
         status: 'lead', // Default status
       })
       .select()

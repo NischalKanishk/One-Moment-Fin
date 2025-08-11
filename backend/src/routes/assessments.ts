@@ -382,6 +382,101 @@ router.patch('/submissions/:submissionId/status', authenticateUser, [
 // PUBLIC ROUTES (No authentication required)
 // ============================================================================
 
+// POST /api/assessments/submit - Submit assessment responses (public)
+router.post('/submit', [
+  body('lead_id').isUUID().withMessage('Valid lead ID is required'),
+  body('assessment_id').isUUID().withMessage('Valid assessment ID is required'),
+  body('responses').isArray().withMessage('Responses must be an array'),
+  body('responses.*.question_id').isString().withMessage('Question ID is required'),
+  body('responses.*.answer_value').notEmpty().withMessage('Answer value is required')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { lead_id, assessment_id, responses } = req.body;
+
+    // Verify the lead exists
+    const { data: lead, error: leadError } = await supabase
+      .from('leads')
+      .select('id, user_id')
+      .eq('id', lead_id)
+      .single();
+
+    if (leadError || !lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    // Verify the assessment form exists
+    const { data: form, error: formError } = await supabase
+      .from('assessment_forms')
+      .select('id, user_id')
+      .eq('id', assessment_id)
+      .single();
+
+    if (formError || !form) {
+      return res.status(404).json({ error: 'Assessment form not found' });
+    }
+
+    // Verify the lead belongs to the same user as the assessment form
+    if (lead.user_id !== form.user_id) {
+      return res.status(403).json({ error: 'Lead and assessment form mismatch' });
+    }
+
+    // Get the latest version of the assessment form
+    const { data: version, error: versionError } = await supabase
+      .from('assessment_form_versions')
+      .select('*')
+      .eq('form_id', assessment_id)
+      .order('version', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (versionError || !version) {
+      return res.status(404).json({ error: 'Assessment form version not found' });
+    }
+
+    // Create assessment submission
+    const { data: submission, error: submissionError } = await supabase
+      .from('assessment_submissions')
+      .insert({
+        user_id: lead.user_id,
+        lead_id: lead_id,
+        form_id: assessment_id,
+        version_id: version.id,
+        filled_by: 'lead',
+        answers: responses,
+        status: 'submitted'
+      })
+      .select()
+      .single();
+
+    if (submissionError) {
+      console.error('Assessment submission error:', submissionError);
+      return res.status(500).json({ error: 'Failed to submit assessment' });
+    }
+
+    // Update lead status to 'assessment_done'
+    await supabase
+      .from('leads')
+      .update({ status: 'assessment_done' })
+      .eq('id', lead_id);
+
+    // TODO: Trigger AI scoring here if needed
+    // For now, just return success
+
+    return res.json({ 
+      submission,
+      message: 'Assessment submitted successfully'
+    });
+  } catch (error) {
+    console.error('Public assessment submission error:', error);
+    return res.status(500).json({ error: 'Failed to submit assessment' });
+  }
+});
+
 // GET /api/assessments/public/:referralCode - Get public assessment by referral code
 router.get('/public/:referralCode', async (req: express.Request, res: express.Response) => {
   try {
@@ -433,6 +528,7 @@ router.get('/public/:referralCode', async (req: express.Request, res: express.Re
         description: form.description,
         schema: version.schema,
         ui: version.ui,
+        user_id: user.id, // Include user_id for lead creation
         branding: {
           mfd_name: user.full_name
         }

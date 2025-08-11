@@ -1,21 +1,57 @@
 import { Helmet } from "react-helmet-async";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Plus, Save, Eye, Trash2, Copy, CheckCircle, ArrowLeft, Settings, FileText, Code } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  Plus, 
+  Save, 
+  Eye, 
+  Trash2, 
+  Copy, 
+  CheckCircle, 
+  ArrowLeft, 
+  Settings, 
+  FileText, 
+  Code,
+  Brain,
+  Sparkles,
+  GripVertical,
+  X,
+  Edit3,
+  Zap,
+  Lightbulb,
+  Target,
+  BarChart3,
+  Link,
+  ExternalLink,
+  ChevronRight,
+  AlertCircle,
+  CheckCircle2
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { createAuthenticatedApi } from "@/lib/api";
+import { cn } from "@/lib/utils";
+
+interface Question {
+  id: string;
+  title: string;
+  type: 'text' | 'select' | 'multiselect' | 'number' | 'radio' | 'checkbox';
+  required: boolean;
+  options?: string[];
+  placeholder?: string;
+  helpText?: string;
+}
 
 interface AssessmentForm {
   id: string;
   name: string;
-  description?: string;
   is_active: boolean;
   created_at: string;
   versions?: AssessmentFormVersion[];
@@ -30,64 +66,68 @@ interface AssessmentFormVersion {
   created_at: string;
 }
 
-const defaultSchema = {
-  type: "object",
-  properties: {
-    investment_experience: {
-      type: "string",
-      title: "What is your investment experience?",
-      enum: ["None", "Beginner", "Intermediate", "Advanced"],
-      default: "None"
-    },
-    risk_tolerance: {
-      type: "string",
-      title: "How would you describe your risk tolerance?",
-      enum: ["Conservative", "Moderate", "Aggressive"],
-      default: "Moderate"
-    },
-    investment_horizon: {
-      type: "string",
-      title: "What is your investment time horizon?",
-      enum: ["Less than 3 years", "3-5 years", "5-10 years", "More than 10 years"],
-      default: "5-10 years"
-    },
-    financial_goals: {
-      type: "string",
-      title: "What is your primary financial goal?",
-      enum: ["Capital preservation", "Income generation", "Growth", "Tax efficiency"],
-      default: "Growth"
-    },
-    emergency_fund: {
-      type: "string",
-      title: "Do you have an emergency fund?",
-      enum: ["Yes, 6+ months", "Yes, 3-6 months", "Yes, less than 3 months", "No"],
-      default: "Yes, 3-6 months"
-    }
-  },
-  required: ["investment_experience", "risk_tolerance", "investment_horizon", "financial_goals", "emergency_fund"]
-};
-
-const defaultScoring = {
-  weights: {
-    investment_experience: 0.2,
-    risk_tolerance: 0.3,
-    investment_horizon: 0.25,
-    financial_goals: 0.15,
-    emergency_fund: 0.1
-  },
-  scoring: {
-    investment_experience: { "None": 1, "Beginner": 2, "Intermediate": 3, "Advanced": 4 },
-    risk_tolerance: { "Conservative": 1, "Moderate": 2, "Aggressive": 3 },
-    investment_horizon: { "Less than 3 years": 1, "3-5 years": 2, "5-10 years": 3, "More than 10 years": 4 },
-    financial_goals: { "Capital preservation": 1, "Income generation": 2, "Growth": 3, "Tax efficiency": 2 },
-    emergency_fund: { "Yes, 6+ months": 3, "Yes, 3-6 months": 2, "Yes, less than 3 months": 1, "No": 0 }
-  },
+interface ScoringConfig {
+  weights: Record<string, number>;
+  scoring: Record<string, Record<string, number>>;
   thresholds: {
-    low: { min: 0, max: 8 },
-    medium: { min: 9, max: 12 },
-    high: { min: 13, max: 16 }
+    low: { min: number; max: number };
+    medium: { min: number; max: number };
+    high: { min: number; max: number };
+  };
+  reasoning?: string;
+}
+
+const defaultQuestions: Question[] = [
+  {
+    id: 'investment_experience',
+    title: 'What is your investment experience?',
+    type: 'select',
+    required: true,
+    options: ['None', 'Beginner', 'Intermediate', 'Advanced'],
+    helpText: 'This helps us understand your familiarity with financial products'
+  },
+  {
+    id: 'risk_tolerance',
+    title: 'How would you describe your risk tolerance?',
+    type: 'select',
+    required: true,
+    options: ['Conservative', 'Moderate', 'Aggressive'],
+    helpText: 'Your comfort level with investment volatility'
+  },
+  {
+    id: 'investment_horizon',
+    title: 'What is your investment time horizon?',
+    type: 'select',
+    required: true,
+    options: ['Less than 3 years', '3-5 years', '5-10 years', 'More than 10 years'],
+    helpText: 'How long you plan to stay invested'
+  },
+  {
+    id: 'financial_goals',
+    title: 'What is your primary financial goal?',
+    type: 'select',
+    required: true,
+    options: ['Capital preservation', 'Income generation', 'Growth', 'Tax efficiency'],
+    helpText: 'Your main objective for this investment'
+  },
+  {
+    id: 'emergency_fund',
+    title: 'Do you have an emergency fund?',
+    type: 'select',
+    required: true,
+    options: ['Yes, 6+ months', 'Yes, 3-6 months', 'Yes, less than 3 months', 'No'],
+    helpText: 'This indicates your financial preparedness'
   }
-};
+];
+
+const questionTypes = [
+  { value: 'text', label: 'Text Input', icon: '📝', description: 'Free text response' },
+  { value: 'select', label: 'Single Select', icon: '🔽', description: 'Choose one option' },
+  { value: 'multiselect', label: 'Multi Select', icon: '☑️', description: 'Choose multiple options' },
+  { value: 'number', label: 'Number Input', icon: '🔢', description: 'Numeric response' },
+  { value: 'radio', label: 'Radio Buttons', icon: '🔘', description: 'Single choice from options' },
+  { value: 'checkbox', label: 'Checkboxes', icon: '☑️', description: 'Multiple choice from options' }
+];
 
 export default function AssessmentForms() {
   const { toast } = useToast();
@@ -96,17 +136,25 @@ export default function AssessmentForms() {
   
   const [assessments, setAssessments] = useState<AssessmentForm[]>([]);
   const [currentAssessment, setCurrentAssessment] = useState<AssessmentForm | null>(null);
-  const [schema, setSchema] = useState(defaultSchema);
-  const [scoring, setScoring] = useState(defaultScoring);
+  const [questions, setQuestions] = useState<Question[]>(defaultQuestions);
   const [assessmentName, setAssessmentName] = useState("Default Risk Assessment");
-  const [assessmentDescription, setAssessmentDescription] = useState("Comprehensive risk assessment for mutual fund investments");
   const [isActive, setIsActive] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<'form' | 'schema' | 'scoring'>('form');
+  const [activeTab, setActiveTab] = useState<'form' | 'scoring'>('form');
+  const [aiScoringEnabled, setAiScoringEnabled] = useState(true);
+  const [scoringConfig, setScoringConfig] = useState<ScoringConfig>({
+    weights: {},
+    scoring: {},
+    thresholds: {
+      low: { min: 0, max: 8 },
+      medium: { min: 9, max: 12 },
+      high: { min: 13, max: 16 }
+    }
+  });
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
 
   useEffect(() => {
     loadAssessments();
@@ -114,11 +162,7 @@ export default function AssessmentForms() {
 
   useEffect(() => {
     if (user) {
-      console.log('🔍 AssessmentForms: User data:', user);
-      console.log('🔍 AssessmentForms: User referral_link:', user.referral_link);
-      
       if (!user.referral_link) {
-        console.warn('⚠️ AssessmentForms: User missing referral_link');
         toast({
           title: "Warning",
           description: "Referral link not found. Please complete your profile setup.",
@@ -148,21 +192,30 @@ export default function AssessmentForms() {
       if (response.data.forms && response.data.forms.length > 0) {
         setAssessments(response.data.forms);
         
-        // Set the first assessment as current
         const firstAssessment = response.data.forms[0];
         setCurrentAssessment(firstAssessment);
         setAssessmentName(firstAssessment.name);
-        setAssessmentDescription(firstAssessment.description || '');
         setIsActive(firstAssessment.is_active);
         
-        // Load the latest version's schema and scoring
         if (firstAssessment.versions && firstAssessment.versions.length > 0) {
-          const latestVersion = firstAssessment.versions[0]; // Assuming sorted by version desc
-          setSchema(latestVersion.schema);
-          setScoring(latestVersion.scoring || defaultScoring);
+          const latestVersion = firstAssessment.versions[0];
+          if (latestVersion.schema?.properties) {
+            const loadedQuestions = Object.entries(latestVersion.schema.properties).map(([key, field]: [string, any]) => ({
+              id: key,
+              title: field.title || key,
+              type: (field.type === 'string' && field.enum ? 'select' : 'text') as 'text' | 'select' | 'multiselect' | 'number' | 'radio' | 'checkbox',
+              required: latestVersion.schema.required?.includes(key) || false,
+              options: field.enum || undefined,
+              placeholder: field.placeholder,
+              helpText: field.description
+            }));
+            setQuestions(loadedQuestions);
+          }
+          if (latestVersion.scoring) {
+            setScoringConfig(latestVersion.scoring);
+          }
         }
       } else {
-        // Create default assessment if none exists
         await createDefaultAssessment(token);
       }
     } catch (error: any) {
@@ -181,16 +234,16 @@ export default function AssessmentForms() {
     try {
       const api = createAuthenticatedApi(token);
       
-      // Create the form
       const formResponse = await api.post('/api/assessments/forms', {
         name: assessmentName,
-        description: assessmentDescription,
         is_active: isActive
       });
 
       const newForm = formResponse.data.form;
       
-      // Create the first version
+      const schema = questionsToSchema(questions);
+      const scoring = generateScoringConfig(questions);
+      
       const versionResponse = await api.post(`/api/assessments/forms/${newForm.id}/versions`, {
         schema,
         scoring
@@ -198,12 +251,10 @@ export default function AssessmentForms() {
 
       const newVersion = versionResponse.data.version;
       
-      // Set as default
       await api.post('/api/assessments/users/default', {
         formId: newForm.id
       });
 
-      // Update state
       const assessmentWithVersion = {
         ...newForm,
         versions: [newVersion]
@@ -217,7 +268,6 @@ export default function AssessmentForms() {
         description: "Default assessment created successfully!",
       });
 
-      // Generate referral link
       if (user?.referral_link) {
         setPreviewUrl(`${window.location.origin}${user.referral_link}`);
       }
@@ -229,6 +279,84 @@ export default function AssessmentForms() {
         variant: "destructive",
       });
     }
+  };
+
+  const questionsToSchema = (questions: Question[]) => {
+    const properties: any = {};
+    const required: string[] = [];
+
+    questions.forEach(question => {
+      if (question.required) {
+        required.push(question.id);
+      }
+
+      if (question.type === 'select' || question.type === 'radio') {
+        properties[question.id] = {
+          type: 'string',
+          title: question.title,
+          description: question.helpText,
+          enum: question.options || [],
+          default: question.options?.[0] || ''
+        };
+      } else if (question.type === 'multiselect' || question.type === 'checkbox') {
+        properties[question.id] = {
+          type: 'array',
+          title: question.title,
+          description: question.helpText,
+          items: {
+            type: 'string',
+            enum: question.options || []
+          },
+          default: []
+        };
+      } else if (question.type === 'number') {
+        properties[question.id] = {
+          type: 'number',
+          title: question.title,
+          description: question.helpText,
+          minimum: 0
+        };
+      } else {
+        properties[question.id] = {
+          type: 'string',
+          title: question.title,
+          description: question.helpText
+        };
+      }
+    });
+
+    return {
+      type: 'object',
+      properties,
+      required
+    };
+  };
+
+  const generateScoringConfig = (questions: Question[]) => {
+    const weights: any = {};
+    const scoring: any = {};
+    
+    questions.forEach((question, index) => {
+      const weight = 1 / questions.length;
+      weights[question.id] = weight;
+      
+      if (question.options) {
+        scoring[question.id] = {};
+        question.options.forEach((option, optionIndex) => {
+          scoring[question.id][option] = optionIndex + 1;
+        });
+      }
+    });
+
+    return {
+      weights,
+      scoring,
+      thresholds: {
+        low: { min: 0, max: Math.floor(questions.length * 1.5) },
+        medium: { min: Math.floor(questions.length * 1.5) + 1, max: Math.floor(questions.length * 2.5) },
+        high: { min: Math.floor(questions.length * 2.5) + 1, max: questions.length * 3 }
+      }
+    };
   };
 
   const saveAssessment = async () => {
@@ -249,14 +377,14 @@ export default function AssessmentForms() {
 
       const api = createAuthenticatedApi(token);
       
-      // Update form details
       await api.put(`/api/assessments/forms/${currentAssessment.id}`, {
         name: assessmentName,
-        description: assessmentDescription,
         is_active: isActive
       });
 
-      // Create new version with updated schema and scoring
+      const schema = questionsToSchema(questions);
+      const scoring = aiScoringEnabled ? scoringConfig : generateScoringConfig(questions);
+
       const versionResponse = await api.post(`/api/assessments/forms/${currentAssessment.id}/versions`, {
         schema,
         scoring
@@ -264,11 +392,9 @@ export default function AssessmentForms() {
 
       const newVersion = versionResponse.data.version;
       
-      // Update current assessment with new version
       const updatedAssessment = {
         ...currentAssessment,
         name: assessmentName,
-        description: assessmentDescription,
         is_active: isActive,
         versions: [newVersion, ...(currentAssessment.versions || [])]
       };
@@ -294,6 +420,48 @@ export default function AssessmentForms() {
     }
   };
 
+  const addQuestion = () => {
+    const newQuestion: Question = {
+      id: `question_${Date.now()}`,
+      title: 'New Question',
+      type: 'text',
+      required: false,
+      helpText: 'Add helpful text to guide users'
+    };
+    setQuestions([...questions, newQuestion]);
+  };
+
+  const updateQuestion = (index: number, field: keyof Question, value: any) => {
+    const updatedQuestions = [...questions];
+    updatedQuestions[index] = { ...updatedQuestions[index], [field]: value };
+    setQuestions(updatedQuestions);
+  };
+
+  const removeQuestion = (index: number) => {
+    setQuestions(questions.filter((_, i) => i !== index));
+  };
+
+  const addOption = (questionIndex: number) => {
+    const updatedQuestions = [...questions];
+    if (!updatedQuestions[questionIndex].options) {
+      updatedQuestions[questionIndex].options = [];
+    }
+    updatedQuestions[questionIndex].options!.push('New Option');
+    setQuestions(updatedQuestions);
+  };
+
+  const updateOption = (questionIndex: number, optionIndex: number, value: string) => {
+    const updatedQuestions = [...questions];
+    updatedQuestions[questionIndex].options![optionIndex] = value;
+    setQuestions(updatedQuestions);
+  };
+
+  const removeOption = (questionIndex: number, optionIndex: number) => {
+    const updatedQuestions = [...questions];
+    updatedQuestions[questionIndex].options!.splice(optionIndex, 1);
+    setQuestions(updatedQuestions);
+  };
+
   const copyReferralLink = async () => {
     if (user?.referral_link) {
       const fullUrl = `${window.location.origin}${user.referral_link}`;
@@ -307,25 +475,47 @@ export default function AssessmentForms() {
     }
   };
 
-  const resetToDefaults = () => {
-    setSchema(defaultSchema);
-    setScoring(defaultScoring);
-    setAssessmentName("Default Risk Assessment");
-    setAssessmentDescription("Comprehensive risk assessment for mutual fund investments");
-    setIsActive(true);
-    
-    toast({
-      title: "Reset",
-      description: "Assessment reset to default values",
-    });
+  const generateAIScoring = async () => {
+    try {
+      setIsGeneratingAI(true);
+      const token = await getToken();
+      if (!token) return;
+
+      const api = createAuthenticatedApi(token);
+      
+      // Call AI service to generate intelligent scoring
+      const response = await api.post('/api/ai/generate-scoring', {
+        questions: questions.map(q => ({
+          title: q.title,
+          type: q.type,
+          options: q.options
+        }))
+      });
+
+      if (response.data.scoring) {
+        setScoringConfig(response.data.scoring);
+        toast({
+          title: "AI Scoring Generated",
+          description: "Intelligent scoring configuration created based on your questions!",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "AI Scoring Failed",
+        description: "Could not generate AI scoring. Using default configuration.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingAI(false);
+    }
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-lg">Loading assessments...</p>
+          <p className="mt-4 text-lg text-gray-600">Loading your assessment forms...</p>
         </div>
       </div>
     );
@@ -334,298 +524,582 @@ export default function AssessmentForms() {
   return (
     <>
       <Helmet>
-        <title>Assessment Forms - OneMFin</title>
+        <title>Assessment Form Builder - OneMFin</title>
       </Helmet>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Assessment Forms</h1>
-            <p className="text-gray-600 mt-2">Design and manage your risk assessment forms</p>
+      {/* Full-screen layout without sidebar */}
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button 
+                onClick={() => navigate('/app/assessments')} 
+                variant="ghost" 
+                size="sm"
+                className="text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Assessments
+              </Button>
+              <div className="h-6 w-px bg-gray-300" />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Assessment Form Builder</h1>
+                <p className="text-sm text-gray-500">Create and customize your risk assessment forms</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <Button 
+                onClick={() => {
+                  if (user?.referral_link) {
+                    window.open(`${window.location.origin}${user.referral_link}`, '_blank');
+                  } else {
+                    toast({
+                      title: "No Referral Link",
+                      description: "Please complete your profile setup to get a referral link.",
+                      variant: "destructive",
+                    });
+                  }
+                }} 
+                variant="outline"
+                className="flex items-center gap-2 hover:bg-gray-50"
+                disabled={!user?.referral_link}
+              >
+                <ExternalLink className="w-4 h-4" />
+                View Live Form
+              </Button>
+              <Button 
+                onClick={saveAssessment} 
+                disabled={isSaving}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg"
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Assessment
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-          <Button onClick={() => navigate('/app/assessments')} variant="outline">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Assessments
-          </Button>
         </div>
 
-        {currentAssessment && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column - Form Builder */}
-            <div className="lg:col-span-2 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="w-5 h-5" />
-                    Form Builder
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Assessment Name
-                    </label>
-                    <Input
-                      value={assessmentName}
-                      onChange={(e) => setAssessmentName(e.target.value)}
-                      placeholder="Enter assessment name"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Description
-                    </label>
-                    <Textarea
-                      value={assessmentDescription}
-                      onChange={(e) => setAssessmentDescription(e.target.value)}
-                      placeholder="Enter assessment description"
-                      rows={3}
-                    />
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={isActive}
-                      onCheckedChange={setIsActive}
-                    />
-                    <label className="text-sm font-medium text-gray-700">
-                      Active
-                    </label>
-                  </div>
-                </CardContent>
-              </Card>
+        <div className="flex-1 p-6">
+          {currentAssessment && (
+            <div className="max-w-7xl mx-auto space-y-6">
+              {/* Assessment Info Card */}
+              <Card className="bg-white border-0 shadow-lg">
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700">
+                        Assessment Name
+                      </label>
+                      <Input
+                        value={assessmentName}
+                        onChange={(e) => setAssessmentName(e.target.value)}
+                        placeholder="Enter assessment name"
+                        className="text-lg font-medium border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    </div>
+                    
+                    <div className="flex items-center space-x-3">
+                      <Switch
+                        checked={isActive}
+                        onCheckedChange={setIsActive}
+                        className="data-[state=checked]:bg-blue-600"
+                      />
+                      <div>
+                        <label className="text-sm font-semibold text-gray-700">Status</label>
+                        <p className="text-xs text-gray-500">Always active in this version</p>
+                      </div>
+                    </div>
 
-              {/* Schema Editor */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Code className="w-5 h-5" />
-                    Form Schema (JSON)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Textarea
-                    value={JSON.stringify(schema, null, 2)}
-                    onChange={(e) => {
-                      try {
-                        const newSchema = JSON.parse(e.target.value);
-                        setSchema(newSchema);
-                      } catch (error) {
-                        // Invalid JSON, don't update
-                      }
-                    }}
-                    placeholder="Enter JSON schema"
-                    rows={15}
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-xs text-gray-500 mt-2">
-                    Edit the JSON schema to define your form structure. Use JSON Schema format.
-                  </p>
-                </CardContent>
-              </Card>
-
-              {/* Scoring Configuration */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Settings className="w-5 h-5" />
-                    Scoring Configuration
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Textarea
-                    value={JSON.stringify(scoring, null, 2)}
-                    onChange={(e) => {
-                      try {
-                        const newScoring = JSON.parse(e.target.value);
-                        setScoring(newScoring);
-                      } catch (error) {
-                        // Invalid JSON, don't update
-                      }
-                    }}
-                    placeholder="Enter scoring configuration"
-                    rows={15}
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-xs text-gray-500 mt-2">
-                    Define weights, scoring rules, and risk category thresholds.
-                  </p>
-                </CardContent>
-              </Card>
-
-              {/* Action Buttons */}
-              <div className="flex gap-4">
-                <Button onClick={saveAssessment} disabled={isSaving} className="flex-1">
-                  {isSaving ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Assessment
-                    </>
-                  )}
-                </Button>
-                
-                <Button onClick={resetToDefaults} variant="outline">
-                  Reset to Defaults
-                </Button>
-              </div>
-            </div>
-
-            {/* Right Column - Preview & Actions */}
-            <div className="space-y-6">
-              {/* Assessment Info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Assessment Info</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Current Version
-                    </label>
-                    <p className="text-sm text-gray-600">
-                      {currentAssessment.versions?.[0]?.version || 'No versions'}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Created
-                    </label>
-                    <p className="text-sm text-gray-600">
-                      {new Date(currentAssessment.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Status
-                    </label>
                     <div className="flex items-center gap-2">
-                      {currentAssessment.is_active ? (
-                        <>
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                          <span className="text-sm text-green-600">Active</span>
-                        </>
+                      <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                        Version {currentAssessment.versions?.[0]?.version || 1}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {new Date(currentAssessment.created_at).toLocaleDateString()}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Main Content Tabs */}
+              <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                <div className="border-b border-gray-200 bg-gray-50">
+                  <nav className="flex space-x-8 px-6">
+                    <button
+                      onClick={() => setActiveTab('form')}
+                      className={cn(
+                        "py-4 px-1 border-b-2 font-medium text-sm transition-colors",
+                        activeTab === 'form'
+                          ? "border-blue-600 text-blue-600 bg-white"
+                          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                      )}
+                    >
+                      <FileText className="w-4 h-4 inline mr-2" />
+                      Form Builder
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('scoring')}
+                      className={cn(
+                        "py-4 px-1 border-b-2 font-medium text-sm transition-colors",
+                        activeTab === 'form'
+                          ? "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                          : "border-blue-600 text-blue-600 bg-white"
+                      )}
+                    >
+                      <Brain className="w-4 h-4 inline mr-2" />
+                      AI Scoring Configuration
+                    </button>
+                  </nav>
+                </div>
+
+                <div className="p-6">
+                  {activeTab === 'form' && (
+                    <div className="space-y-6">
+                      {/* Questions List */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">Assessment Questions</h3>
+                            <p className="text-sm text-gray-600">Build your risk assessment form with custom questions</p>
+                          </div>
+                          <Button 
+                            onClick={addQuestion} 
+                            size="sm" 
+                            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-md"
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Question
+                          </Button>
+                        </div>
+
+                        <div className="space-y-4">
+                          {questions.map((question, index) => (
+                            <Card key={question.id} className="border border-gray-200 hover:border-blue-300 transition-all duration-200 shadow-sm hover:shadow-md">
+                              <CardContent className="p-6">
+                                <div className="flex items-start gap-4">
+                                  <div className="flex-shrink-0 mt-2">
+                                    <GripVertical className="w-5 h-5 text-gray-400" />
+                                  </div>
+                                  
+                                  <div className="flex-1 space-y-4">
+                                    {/* Question Header */}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                      <div className="md:col-span-2 space-y-2">
+                                        <Input
+                                          value={question.title}
+                                          onChange={(e) => updateQuestion(index, 'title', e.target.value)}
+                                          placeholder="Enter question text"
+                                          className="font-medium border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                        />
+                                        <Textarea
+                                          value={question.helpText || ''}
+                                          onChange={(e) => updateQuestion(index, 'helpText', e.target.value)}
+                                          placeholder="Add helpful text to guide users (optional)"
+                                          className="text-sm border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                          rows={2}
+                                        />
+                                      </div>
+                                      
+                                      <div className="space-y-3">
+                                        <Select
+                                          value={question.type}
+                                          onValueChange={(value: any) => updateQuestion(index, 'type', value)}
+                                        >
+                                          <SelectTrigger className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {questionTypes.map(type => (
+                                              <SelectItem key={type.value} value={type.value}>
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-lg">{type.icon}</span>
+                                                  <div>
+                                                    <div className="font-medium">{type.label}</div>
+                                                    <div className="text-xs text-gray-500">{type.description}</div>
+                                                  </div>
+                                                </div>
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                        
+                                        <div className="flex items-center space-x-2">
+                                          <Switch
+                                            checked={question.required}
+                                            onCheckedChange={(checked) => updateQuestion(index, 'required', checked)}
+                                            className="data-[state=checked]:bg-blue-600"
+                                          />
+                                          <span className="text-sm text-gray-700">Required</span>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Options for select/multiselect questions */}
+                                    {(question.type === 'select' || question.type === 'multiselect' || question.type === 'radio' || question.type === 'checkbox') && (
+                                      <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                          <label className="text-sm font-medium text-gray-700">Answer Options</label>
+                                          <Button 
+                                            onClick={() => addOption(index)} 
+                                            size="sm" 
+                                            variant="outline"
+                                            className="border-gray-300 hover:border-blue-500 hover:bg-blue-50"
+                                          >
+                                            <Plus className="w-3 h-3 mr-1" />
+                                            Add Option
+                                          </Button>
+                                        </div>
+                                        
+                                        <div className="space-y-2">
+                                          {question.options?.map((option, optionIndex) => (
+                                            <div key={optionIndex} className="flex items-center gap-2">
+                                              <Input
+                                                value={option}
+                                                onChange={(e) => updateOption(index, optionIndex, e.target.value)}
+                                                placeholder="Option text"
+                                                className="text-sm border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                              />
+                                              <Button
+                                                onClick={() => removeOption(index, optionIndex)}
+                                                size="sm"
+                                                variant="ghost"
+                                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                              >
+                                                <X className="w-3 h-3" />
+                                              </Button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Placeholder for text/number questions */}
+                                    {(question.type === 'text' || question.type === 'number') && (
+                                      <div>
+                                        <Input
+                                          value={question.placeholder || ''}
+                                          onChange={(e) => updateQuestion(index, 'placeholder', e.target.value)}
+                                          placeholder="Placeholder text (optional)"
+                                          className="text-sm border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  <Button
+                                    onClick={() => removeQuestion(index)}
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === 'scoring' && (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">AI-Powered Scoring Configuration</h3>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Configure intelligent scoring based on question responses and risk assessment best practices
+                          </p>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            checked={aiScoringEnabled}
+                            onCheckedChange={setAiScoringEnabled}
+                            className="data-[state=checked]:bg-blue-600"
+                          />
+                          <span className="text-sm font-medium text-gray-700">AI Scoring</span>
+                          
+                          {aiScoringEnabled && (
+                            <Button 
+                              onClick={generateAIScoring} 
+                              disabled={isGeneratingAI}
+                              size="sm" 
+                              variant="outline"
+                              className="bg-gradient-to-r from-purple-500 to-blue-500 text-white border-0 hover:from-purple-600 hover:to-blue-600 shadow-md"
+                            >
+                              {isGeneratingAI ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
+                                  Generating...
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="w-4 h-4 mr-2" />
+                                  Generate AI Scoring
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {aiScoringEnabled ? (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          {/* Weights Configuration */}
+                          <Card className="border-gray-200 shadow-sm">
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-base flex items-center gap-2">
+                                <Target className="w-4 h-4 text-blue-600" />
+                                Question Weights
+                              </CardTitle>
+                              <p className="text-sm text-gray-600">Importance of each question in scoring</p>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              {questions.map((question, index) => (
+                                <div key={question.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                                  <span className="text-sm text-gray-700 truncate flex-1 mr-2">
+                                    {question.title}
+                                  </span>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="1"
+                                    step="0.1"
+                                    value={scoringConfig.weights[question.id] || 0}
+                                    onChange={(e) => setScoringConfig({
+                                      ...scoringConfig,
+                                      weights: {
+                                        ...scoringConfig.weights,
+                                        [question.id]: parseFloat(e.target.value) || 0
+                                      }
+                                    })}
+                                    className="w-20 text-sm border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                  />
+                                </div>
+                              ))}
+                            </CardContent>
+                          </Card>
+
+                          {/* Thresholds Configuration */}
+                          <Card className="border-gray-200 shadow-sm">
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-base flex items-center gap-2">
+                                <BarChart3 className="w-4 h-4 text-green-600" />
+                                Risk Categories
+                              </CardTitle>
+                              <p className="text-sm text-gray-600">Score ranges for risk classification</p>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              {Object.entries(scoringConfig.thresholds).map(([category, range]) => (
+                                <div key={category} className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium text-gray-700 capitalize flex items-center gap-2">
+                                      {category === 'low' && <CheckCircle2 className="w-4 h-4 text-green-600" />}
+                                      {category === 'medium' && <AlertCircle className="w-4 h-4 text-yellow-600" />}
+                                      {category === 'high' && <AlertCircle className="w-4 h-4 text-red-600" />}
+                                      {category} Risk
+                                    </span>
+                                    <Badge 
+                                      variant={category === 'low' ? 'default' : category === 'medium' ? 'secondary' : 'destructive'}
+                                      className="text-xs"
+                                    >
+                                      {range.min} - {range.max}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      type="number"
+                                      value={range.min}
+                                      onChange={(e) => setScoringConfig({
+                                        ...scoringConfig,
+                                        thresholds: {
+                                          ...scoringConfig.thresholds,
+                                          [category]: { ...range, min: parseInt(e.target.value) || 0 }
+                                        }
+                                      })}
+                                      className="text-sm border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                      placeholder="Min"
+                                    />
+                                    <span className="text-gray-400">to</span>
+                                    <Input
+                                      type="number"
+                                      value={range.max}
+                                      onChange={(e) => setScoringConfig({
+                                        ...scoringConfig,
+                                        thresholds: {
+                                          ...scoringConfig.thresholds,
+                                          [category]: { ...range, max: parseInt(e.target.value) || 0 }
+                                        }
+                                      })}
+                                      className="text-sm border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                      placeholder="Max"
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </CardContent>
+                          </Card>
+                        </div>
                       ) : (
-                        <>
-                          <div className="w-4 h-4 rounded-full bg-gray-300"></div>
-                          <span className="text-sm text-gray-600">Inactive</span>
-                        </>
+                        <div className="text-center py-12">
+                          <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                          <h4 className="text-lg font-medium text-gray-900 mb-2">AI Scoring Disabled</h4>
+                          <p className="text-gray-600 mb-4">
+                            Enable AI scoring to automatically generate intelligent scoring configurations
+                          </p>
+                          <Button 
+                            onClick={() => setAiScoringEnabled(true)}
+                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                          >
+                            Enable AI Scoring
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* AI Reasoning Display */}
+                      {aiScoringEnabled && scoringConfig.reasoning && (
+                        <Card className="border-gray-200 shadow-sm">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <Lightbulb className="w-4 h-4 text-yellow-600" />
+                              AI Scoring Logic
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-gray-700 bg-blue-50 p-3 rounded-lg border border-blue-200">
+                              {scoringConfig.reasoning}
+                            </p>
+                          </CardContent>
+                        </Card>
                       )}
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Referral Link */}
-              {user?.referral_link && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Referral Link</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Input
-                        value={`${window.location.origin}${user.referral_link}`}
-                        readOnly
-                        className="text-sm"
-                      />
-                      <Button onClick={copyReferralLink} size="sm" variant="outline">
-                        {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      </Button>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      Share this link with potential clients to complete your assessment.
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Quick Actions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button 
-                    onClick={() => setShowPreview(!showPreview)} 
-                    variant="outline" 
-                    className="w-full"
-                  >
-                    <Eye className="w-4 h-4 mr-2" />
-                    {showPreview ? 'Hide' : 'Show'} Preview
-                  </Button>
-                  
-                  <Button 
-                    onClick={() => navigate('/app/assessments')} 
-                    variant="outline" 
-                    className="w-full"
-                  >
-                    View All Forms
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
-
-        {/* Preview Modal */}
-        {showPreview && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Form Preview</h3>
-                <Button onClick={() => setShowPreview(false)} variant="outline" size="sm">
-                  Close
-                </Button>
-              </div>
-              
-              <div className="space-y-4">
-                <h4 className="font-medium">{assessmentName}</h4>
-                {assessmentDescription && (
-                  <p className="text-gray-600">{assessmentDescription}</p>
-                )}
-                
-                <div className="border rounded-lg p-4 bg-gray-50">
-                  <h5 className="font-medium mb-3">Form Fields:</h5>
-                  <div className="space-y-3">
-                    {Object.entries(schema.properties || {}).map(([key, field]: [string, any]) => (
-                      <div key={key} className="border-b pb-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          {field.title || key}
-                          {schema.required?.includes(key) && <span className="text-red-500 ml-1">*</span>}
-                        </label>
-                        {field.type === 'string' && field.enum ? (
-                          <Select>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select option" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {field.enum.map((option: string) => (
-                                <SelectItem key={option} value={option}>
-                                  {option}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Input placeholder={`Enter ${field.title || key}`} />
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  )}
                 </div>
               </div>
+
+              {/* Preview & Referral Link Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Live Form Preview Card */}
+                <Card className="bg-white border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <ExternalLink className="w-5 h-5 text-blue-600" />
+                      Live Form Preview
+                    </CardTitle>
+                    <p className="text-sm text-gray-600">This is how leads will see your form at {user?.referral_link}</p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="border rounded-lg p-4 bg-gray-50 min-h-[200px]">
+                      <h4 className="font-medium mb-3 text-gray-900">{assessmentName}</h4>
+                      <div className="space-y-3">
+                        {questions.slice(0, 3).map((question, index) => (
+                          <div key={index} className="border-b pb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              {question.title}
+                              {question.required && <span className="text-red-500 ml-1">*</span>}
+                            </label>
+                            {question.helpText && (
+                              <p className="text-xs text-gray-500 mb-2">{question.helpText}</p>
+                            )}
+                            {question.type === 'select' && question.options ? (
+                              <Select>
+                                <SelectTrigger className="border-gray-300">
+                                  <SelectValue placeholder="Select option" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {question.options.map((option) => (
+                                    <SelectItem key={option} value={option}>
+                                      {option}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Input placeholder={`Enter ${question.title.toLowerCase()}`} className="border-gray-300" />
+                            )}
+                          </div>
+                        ))}
+                        {questions.length > 3 && (
+                          <div className="text-center text-sm text-gray-500">
+                            +{questions.length - 3} more questions
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-xs text-blue-800">
+                          <strong>Data Flow:</strong> When leads fill this form, their responses will be automatically saved to your database and appear in your Leads section.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Referral Link Card */}
+                {user?.referral_link && (
+                  <Card className="bg-white border-0 shadow-lg">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Link className="w-5 h-5 text-green-600" />
+                        Your Public Assessment Link
+                      </CardTitle>
+                      <p className="text-sm text-gray-600">Share this link with potential clients to capture leads</p>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={`${window.location.origin}${user.referral_link}`}
+                          readOnly
+                          className="text-sm border-gray-300 bg-gray-50"
+                        />
+                        <Button onClick={copyReferralLink} size="sm" variant="outline" className="border-gray-300 hover:border-green-500 hover:bg-green-50">
+                          {copied ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          onClick={() => window.open(`${window.location.origin}${user.referral_link}`, '_blank')}
+                          size="sm" 
+                          variant="outline"
+                          className="border-gray-300 hover:border-blue-500 hover:bg-blue-50"
+                        >
+                          <ExternalLink className="w-3 h-3 mr-1" />
+                          Test Link
+                        </Button>
+                        <p className="text-xs text-gray-500">
+                          Share this link with potential clients to complete your assessment.
+                        </p>
+                        
+                        <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded-lg">
+                          <p className="text-xs text-green-800">
+                            <strong>Complete Flow:</strong> Lead visits link → Fills form → Data saved to database → Appears in your Leads → AI scoring applied → Ready for follow-up
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
+
     </>
   );
 }

@@ -49,4 +49,28 @@ router.post('/suggest-products', authenticateUser, [
   }
 });
 
+// POST /api/ai/generate-scoring
+router.post('/generate-scoring', authenticateUser, [
+  body('questions').isArray().withMessage('Questions must be an array'),
+  body('questions.*.title').isString().withMessage('Question title must be a string'),
+  body('questions.*.type').isString().withMessage('Question type must be a string'),
+  body('questions.*.options').optional().isArray().withMessage('Question options must be an array')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { questions } = req.body;
+
+    const scoringConfig = await AIService.generateScoringConfig(questions);
+
+    return res.json({ scoring: scoringConfig });
+  } catch (error) {
+    console.error('AI scoring generation error:', error);
+    return res.status(500).json({ error: 'AI scoring generation failed' });
+  }
+});
+
 export default router;

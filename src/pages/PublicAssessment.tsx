@@ -14,6 +14,7 @@ interface Assessment {
   description?: string;
   schema: any;
   ui?: any;
+  user_id: string; // Include user_id for lead creation
   branding?: {
     mfd_name: string;
   };
@@ -150,10 +151,27 @@ export default function PublicAssessment() {
     if (!assessment || !referralCode) return;
     
     // Validate required fields
+    console.log('🔍 Form validation - leadData:', leadData);
+    console.log('🔍 Form validation - responses:', responses);
+    
     if (!leadData.full_name || !leadData.phone) {
       setError("Name and phone number are required");
       return;
     }
+    
+    // Ensure age is a valid number
+    if (leadData.age < 18 || leadData.age > 100) {
+      setError("Age must be between 18 and 100");
+      return;
+    }
+    
+    // Ensure email is valid if provided
+    if (leadData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadData.email)) {
+      setError("Please enter a valid email address");
+      return;
+    }
+    
+    console.log('🔍 Form validation passed!');
 
     // Validate assessment responses against schema
     if (assessment.schema?.required) {
@@ -169,23 +187,65 @@ export default function PublicAssessment() {
     setError(null);
 
     try {
-      // First, create a lead
-      const leadResponse = await leadsAPI.createLead('', {
-        full_name: leadData.full_name,
-        email: leadData.email,
-        phone: leadData.phone,
-        age: leadData.age
+      // Get the API base URL from environment or use default
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      
+      // First, create a lead using the public endpoint
+      const leadPayload = {
+        full_name: leadData.full_name.trim(),
+        email: leadData.email.trim() || undefined, // Send undefined if empty
+        phone: leadData.phone.trim(),
+        age: leadData.age,
+        user_id: assessment.user_id, // Use the user_id from the assessment
+        source_link: `/r/${referralCode}` // Track the referral link used
+      };
+      
+      console.log('🔍 Sending lead data:', leadPayload);
+      console.log('🔍 Data types:', {
+        full_name: typeof leadPayload.full_name,
+        email: typeof leadPayload.email,
+        phone: typeof leadPayload.phone,
+        age: typeof leadPayload.age,
+        user_id: typeof leadPayload.user_id
+      });
+      
+      const leadResponse = await fetch(`${API_BASE_URL}/api/leads/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(leadPayload)
       });
 
-      const lead = leadResponse;
-      
-      // Submit assessment responses
-      const assessmentData = {
-        leadId: lead.id,
-        answers: responses
-      };
+      if (!leadResponse.ok) {
+        const errorData = await leadResponse.json();
+        console.error('❌ Lead creation failed:', errorData);
+        throw new Error(errorData.error || 'Failed to create lead');
+      }
 
-      await assessmentsAPI.submitAssessment(assessmentData);
+      const leadResponseData = await leadResponse.json();
+      const lead = leadResponseData.lead;
+      
+      // Submit assessment responses using the public endpoint
+      const assessmentResponse = await fetch(`${API_BASE_URL}/api/assessments/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          lead_id: lead.id,
+          assessment_id: assessment.id,
+          responses: Object.entries(responses).map(([question_id, answer_value]) => ({
+            question_id,
+            answer_value
+          }))
+        })
+      });
+
+      if (!assessmentResponse.ok) {
+        const errorData = await assessmentResponse.json();
+        throw new Error(errorData.error || 'Failed to submit assessment');
+      }
       
       setSuccess(true);
       
@@ -294,9 +354,12 @@ export default function PublicAssessment() {
                 <Input
                   value={leadData.phone}
                   onChange={(e) => setLeadData(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="Enter your phone number"
+                  placeholder="e.g., 9876543210 or +91 98765 43210"
                   required
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Enter your 10-digit mobile number (starts with 6, 7, 8, or 9)
+                </p>
               </div>
               
               <div>
