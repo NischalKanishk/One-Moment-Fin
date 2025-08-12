@@ -75,9 +75,7 @@ export default function AppLayout() {
   const shouldShowTrialBar = () => {
     const currentPath = location.pathname;
     return currentPath === '/app/profile' || 
-           currentPath === '/app/dashboard' || 
-           currentPath === '/app/leads' ||
-           currentPath.startsWith('/app/leads/'); // Include lead detail pages
+           currentPath === '/app/dashboard';
   };
 
   const markAsRead = (id: number) => {
