@@ -121,6 +121,61 @@ router.get('/forms/:formId', authenticateUser, async (req: express.Request, res:
   }
 });
 
+// PUT /api/assessments/forms/:formId - Update assessment form
+router.put('/forms/:formId', authenticateUser, [
+  body('name').optional().isString().withMessage('Name must be a string'),
+  body('is_active').optional().isBoolean().withMessage('is_active must be a boolean')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const { formId } = req.params;
+    const { name, is_active } = req.body;
+
+    // Verify form ownership and get current form data
+    const { data: form, error: formError } = await supabase
+      .from('assessment_forms')
+      .select('id, name, is_active')
+      .eq('id', formId)
+      .eq('user_id', req.user.supabase_user_id)
+      .single();
+
+    if (formError || !form) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+
+    // Update the form
+    const { data: updatedForm, error: updateError } = await supabase
+      .from('assessment_forms')
+      .update({ 
+        name: name || form.name,
+        is_active: is_active !== undefined ? is_active : form.is_active,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', formId)
+      .eq('user_id', req.user.supabase_user_id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Update form error:', updateError);
+      return res.status(500).json({ error: 'Failed to update form' });
+    }
+
+    return res.json({ form: updatedForm });
+  } catch (error) {
+    console.error('Update form error:', error);
+    return res.status(500).json({ error: 'Failed to update assessment form' });
+  }
+});
+
 // POST /api/assessments/users/default - Set default assessment form
 router.post('/users/default', authenticateUser, [
   body('formId').isUUID().withMessage('Valid form ID is required')
@@ -156,6 +211,8 @@ router.post('/users/default', authenticateUser, [
     return res.status(500).json({ error: 'Failed to set default form' });
   }
 });
+
+
 
 // POST /api/assessments/assign - Assign form to a lead
 router.post('/assign', authenticateUser, [

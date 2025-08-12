@@ -12,6 +12,31 @@ export class SeedAssessmentDataService {
     version: any;
   }> {
     try {
+      // Check if default form already exists for this user
+      const { data: existingForm, error: checkError } = await supabase
+        .from('assessment_forms')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('name', 'Default Risk Assessment')
+        .single();
+
+      if (existingForm) {
+        console.log('Default assessment form already exists for user:', userId);
+        // Get the latest version
+        const { data: latestVersion } = await supabase
+          .from('assessment_form_versions')
+          .select('id, version, schema, ui, scoring, created_at')
+          .eq('form_id', existingForm.id)
+          .order('version', { ascending: false })
+          .limit(1)
+          .single();
+
+        return {
+          form: existingForm,
+          version: latestVersion || undefined
+        };
+      }
+
       // Create the default form
       const form = await AssessmentFormService.createForm(userId, {
         name: 'Default Risk Assessment',

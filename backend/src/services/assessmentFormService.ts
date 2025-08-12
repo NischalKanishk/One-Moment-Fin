@@ -8,11 +8,39 @@ export class AssessmentFormService {
   /**
    * Create a new assessment form
    */
-    static async createForm(userId: string, data: {
+  static async createForm(userId: string, data: {
     name: string;
     description?: string;
     is_active?: boolean;
   }): Promise<AssessmentForm> {
+    // Check if form with same name already exists for this user
+    const { data: existingForm, error: checkError } = await supabase
+      .from('assessment_forms')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('name', data.name)
+      .single();
+
+    if (existingForm) {
+      // Update existing form instead of creating new one
+      const { data: updatedForm, error: updateError } = await supabase
+        .from('assessment_forms')
+        .update({
+          description: data.description,
+          is_active: data.is_active ?? true
+        })
+        .eq('id', existingForm.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        throw new Error(`Failed to update existing assessment form: ${updateError.message}`);
+      }
+
+      return updatedForm;
+    }
+
+    // Create new form if none exists
     const { data: form, error } = await supabase
       .from('assessment_forms')
       .insert({
@@ -139,6 +167,12 @@ export class AssessmentFormService {
       versions: versions || []
     };
   }
+
+
+
+
+
+
 
   /**
    * Get the effective form and version for a lead
