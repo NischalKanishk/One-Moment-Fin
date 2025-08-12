@@ -68,7 +68,7 @@ export default function Leads(){
   });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [riskFilter, setRiskFilter] = useState('all');
+
   const [statusFilter, setStatusFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
@@ -131,7 +131,7 @@ export default function Leads(){
 
   useEffect(() => {
     loadLeads();
-  }, [pagination.page, statusFilter, searchTerm, riskFilter, sourceFilter]);
+  }, [pagination.page, statusFilter, searchTerm, sourceFilter]);
 
   // Debounce search term changes
   useEffect(() => {
@@ -163,7 +163,7 @@ export default function Leads(){
         sort_order: 'desc' as const,
         ...(statusFilter !== 'all' && { status: statusFilter }),
         ...(searchTerm.trim() && { search: searchTerm.trim() }),
-        ...(riskFilter !== 'all' && { risk_category: riskFilter }),
+
         ...(sourceFilter !== 'all' && { source_link: sourceFilter })
       };
 
@@ -276,13 +276,7 @@ export default function Leads(){
 
 
   // Server-side filtering handles search and status filters
-  // Client-side filtering only for risk (since it's a related table field)
-  const filteredLeads = leads.filter(lead => {
-    const matchesRisk = riskFilter === 'all' || 
-                       lead.assessment_submissions?.[0]?.risk_category === riskFilter;
-    
-    return matchesRisk;
-  });
+  const filteredLeads = leads;
 
   return (
     <div className="space-y-6">
@@ -318,23 +312,7 @@ export default function Leads(){
             <SelectItem value="dropped">Dropped</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={riskFilter} onValueChange={setRiskFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Risk" />
-          </SelectTrigger>
-          <SelectContent 
-            position="popper" 
-            side="bottom" 
-            align="start"
-            sideOffset={4}
-            className="max-h-[200px] overflow-y-auto"
-          >
-            <SelectItem value="all">All Risk</SelectItem>
-            <SelectItem value="low">Conservative</SelectItem>
-            <SelectItem value="medium">Balanced</SelectItem>
-            <SelectItem value="high">Aggressive</SelectItem>
-          </SelectContent>
-        </Select>
+
         <Select value={sourceFilter} onValueChange={setSourceFilter}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Source" />
@@ -464,7 +442,7 @@ export default function Leads(){
         <Table>
           <TableHeader>
             <TableRow>
-              {['Name','Contact','Age','Source','Risk','Meeting','Actions'].map(h => (
+              {['Name','Contact','Age','Source','Status','Meeting','Actions'].map(h => (
                 <TableHead key={h}>{h}</TableHead>
               ))}
             </TableRow>
@@ -499,7 +477,7 @@ export default function Leads(){
                   </TableCell>
                   <TableCell>
                     <span className="px-2 py-0.5 text-xs rounded bg-secondary">
-                      {lead.assessment_submissions?.[0]?.risk_category || 'Not assessed'}
+                      {lead.status || 'New'}
                     </span>
                   </TableCell>
                   <TableCell>
