@@ -23,6 +23,7 @@ import assessmentsRoutes from './routes/assessments';
 import aiRoutes from './routes/ai';
 import productsRoutes from './routes/products';
 import meetingsRoutes from './routes/meetings';
+import onboardingRoutes from './routes/onboarding';
 
 import subscriptionRoutes from './routes/subscriptions';
 import webhookRoutes from './routes/webhooks';
@@ -88,6 +89,7 @@ app.use('/api/assessments', assessmentsRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/meetings', meetingsRoutes);
+app.use('/api/onboarding', onboardingRoutes);
 
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/settings', settingsRoutes);

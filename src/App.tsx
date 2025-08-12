@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AuthRedirectHandler } from "./components/AuthRedirectHandler";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AppLayout from "./layouts/AppLayout";
@@ -37,7 +38,8 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-                           <Routes>
+          <AuthRedirectHandler />
+          <Routes>
                    <Route path="/" element={<Index />} />
 
                    {/* Auth routes */}

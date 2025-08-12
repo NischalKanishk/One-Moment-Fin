@@ -107,7 +107,7 @@ export const authAPI = {
     return response.data;
   },
 
-  updateProfileWithToken: async (token: string, data: { full_name?: string; phone?: string; settings?: any }) => {
+  updateProfileWithToken: async (token: string, data: { full_name?: string; phone?: string; mfd_registration_number?: string; settings?: any }) => {
     console.log('🔍 API: updateProfileWithToken called with:', { tokenLength: token.length, data });
     
     // Validate token format
@@ -356,5 +356,35 @@ export const subscriptionsAPI = {
     return response.data;
   },
 };
+
+// Onboarding API
+export const completeOnboarding = async (token: string, data: {
+  phoneNumber?: string
+  mfdRegistrationNumber?: string
+  calendlyUrl?: string
+  calendlyApiKey?: string
+}) => {
+  const authApi = createAuthenticatedApi(token)
+  
+  try {
+    const response = await authApi.post('/api/onboarding/complete', data)
+    return response.data
+  } catch (error) {
+    console.error('Onboarding completion failed:', error)
+    throw new Error('Failed to complete onboarding')
+  }
+}
+
+export const getOnboardingStatus = async (token: string) => {
+  const authApi = createAuthenticatedApi(token)
+  
+  try {
+    const response = await authApi.get('/api/onboarding/status')
+    return response.data
+  } catch (error) {
+    console.error('Failed to get onboarding status:', error)
+    throw new Error('Failed to get onboarding status')
+  }
+}
 
 export default api;

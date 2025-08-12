@@ -12,6 +12,7 @@ CREATE TABLE users (
     full_name TEXT NOT NULL,
     email TEXT UNIQUE,
     phone TEXT, -- Unique constraint handled via partial index to allow NULL values
+    mfd_registration_number TEXT, -- MFD registration number from SEBI
     auth_provider TEXT NOT NULL DEFAULT 'clerk',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

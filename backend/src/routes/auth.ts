@@ -132,8 +132,9 @@ router.put('/profile', authenticateUser, [
     }
     return true;
   }),
+  body('mfd_registration_number').optional().isString().trim().isLength({ max: 50 }),
   body('settings').optional().isObject()
-], async (req: express.Request, res: express.Response) => {
+], async (req:express.Request, res: express.Response) => {
   try {
     console.log('🔍 Profile update request received');
     console.log('Request body:', req.body);
@@ -149,8 +150,8 @@ router.put('/profile', authenticateUser, [
       });
     }
 
-    const { full_name, phone, settings } = req.body;
-    console.log('🔍 Extracted data:', { full_name, phone, settings });
+    const { full_name, phone, mfd_registration_number, settings } = req.body;
+    console.log('🔍 Extracted data:', { full_name, phone, mfd_registration_number, settings });
     
     // Get the actual Clerk ID from the authenticated user
     const clerkId = req.user!.clerk_id;
@@ -179,6 +180,7 @@ router.put('/profile', authenticateUser, [
           full_name: full_name || req.user!.email?.split('@')[0] || 'New User',
           email: req.user!.email || null,
           phone: phoneValue || req.user!.phone || null,
+          mfd_registration_number: mfd_registration_number || null,
           auth_provider: 'clerk',
           role: 'mfd',
           referral_link: `ref_${clerkId.slice(-8)}`,
@@ -208,6 +210,7 @@ router.put('/profile', authenticateUser, [
     
     if (full_name !== undefined) updateData.full_name = full_name;
     if (phoneValue !== undefined) updateData.phone = phoneValue;
+    if (mfd_registration_number !== undefined) updateData.mfd_registration_number = mfd_registration_number;
     if (settings !== undefined) updateData.settings = settings;
 
     console.log('🔍 Update data prepared:', updateData);

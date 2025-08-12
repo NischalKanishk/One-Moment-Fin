@@ -18,11 +18,13 @@ export default function Profile() {
     full_name: '',
     email: '',
     phone: '',
+    mfd_registration_number: '',
     referral_link: ''
   });
   const [originalData, setOriginalData] = useState({
     full_name: '',
-    phone: ''
+    phone: '',
+    mfd_registration_number: ''
   });
   const [countryCode, setCountryCode] = useState('+91');
   const [isSaving, setIsSaving] = useState(false);
@@ -73,13 +75,15 @@ export default function Profile() {
           full_name: dbUser.full_name || '',
           email: dbUser.email || '',
           phone: phoneNumber,
+          mfd_registration_number: dbUser.mfd_registration_number || '',
           referral_link: dbUser.referral_link || ''
         };
         
         setProfileData(newProfileData);
         setOriginalData({
           full_name: dbUser.full_name || '',
-          phone: phoneNumber
+          phone: phoneNumber,
+          mfd_registration_number: dbUser.mfd_registration_number || ''
         });
         
         console.log('🔍 Profile data loaded from database:', newProfileData);
@@ -102,7 +106,8 @@ export default function Profile() {
   // Check if form has changes
   const hasChanges = () => {
     return profileData.full_name !== originalData.full_name || 
-           profileData.phone !== originalData.phone;
+           profileData.phone !== originalData.phone ||
+           profileData.mfd_registration_number !== originalData.mfd_registration_number;
   };
 
 
@@ -160,7 +165,8 @@ export default function Profile() {
       // Call the API to update the profile
       const result = await authAPI.updateProfileWithToken(token, {
         full_name: profileData.full_name.trim(),
-        phone: fullPhoneNumber
+        phone: fullPhoneNumber,
+        mfd_registration_number: profileData.mfd_registration_number.trim()
       });
       
       console.log('✅ Profile update API call successful');
@@ -190,7 +196,8 @@ export default function Profile() {
       const newProfileData = {
         ...profileData,
         full_name: updatedUser.full_name || '',
-        phone: displayPhone
+        phone: displayPhone,
+        mfd_registration_number: updatedUser.mfd_registration_number || ''
       };
       
       // Update profileData with the response from backend
@@ -381,6 +388,20 @@ export default function Profile() {
               </p>
             </div>
             <p className="text-sm text-muted-foreground">Enter 10-digit phone number without country code</p>
+          </div>
+
+          {/* MFD Registration Number */}
+          <div className="space-y-2">
+            <Label htmlFor="mfd_registration_number" className="text-base font-medium">MFD Registration Number</Label>
+            <Input 
+              id="mfd_registration_number"
+              placeholder="Enter your SEBI MFD registration number" 
+              value={profileData.mfd_registration_number}
+              onChange={(e) => setProfileData(prev => ({ ...prev, mfd_registration_number: e.target.value }))}
+              className="h-11 text-base"
+              maxLength={50}
+            />
+            <p className="text-sm text-muted-foreground">Your SEBI MFD registration number for compliance and verification</p>
           </div>
 
           {/* Referral Link */}
