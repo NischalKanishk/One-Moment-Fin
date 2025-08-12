@@ -482,11 +482,13 @@ export default function Leads(){
               </TableRow>
             ) : (
               filteredLeads.map((lead) => (
-                <TableRow key={lead.id} className="hover:bg-secondary/60">
+                <TableRow 
+                  key={lead.id} 
+                  className="hover:bg-secondary/60 cursor-pointer"
+                  onClick={() => window.location.href = `/app/leads/${lead.id}`}
+                >
                   <TableCell className="font-medium">
-                    <Link to={`/app/leads/${lead.id}`} className="underline">
-                      {lead.full_name}
-                    </Link>
+                    {lead.full_name}
                   </TableCell>
                   <TableCell>{lead.phone || lead.email || 'N/A'}</TableCell>
                   <TableCell>{lead.age || 'N/A'}</TableCell>
@@ -504,7 +506,7 @@ export default function Leads(){
                     {lead.meetings?.[0]?.status || 'Not scheduled'}
                   </TableCell>
 
-                  <TableCell className="space-x-2">
+                  <TableCell className="space-x-2" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" size="sm" className="h-8 px-3">
