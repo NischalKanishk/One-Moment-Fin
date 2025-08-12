@@ -67,9 +67,21 @@ export default {
 				sans: ["Instrument Sans", "ui-sans-serif", "system-ui", "sans-serif"],
 			},
 			borderRadius: {
-				lg: 'var(--radius)',
-				md: 'calc(var(--radius) - 2px)',
-				sm: 'calc(var(--radius) - 4px)'
+				lg: 'var(--radius-lg)', // 20px
+				md: 'var(--radius-md)', // 12px
+				sm: 'var(--radius-sm)', // 8px
+				xl: 'var(--radius-xl)'  // 28px
+			},
+			boxShadow: {
+				'sm': 'var(--shadow-sm)',
+				'DEFAULT': 'var(--shadow)',
+				'lg': 'var(--shadow-lg)'
+			},
+			transitionDuration: {
+				'200': 'var(--duration)'
+			},
+			transitionTimingFunction: {
+				'ease': 'var(--ease)'
 			},
 			keyframes: {
 				'accordion-down': {

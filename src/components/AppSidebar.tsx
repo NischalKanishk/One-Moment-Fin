@@ -4,7 +4,7 @@ import { Home, Users, ClipboardList, Boxes, Calendar, Settings, User, Target } f
 
 const nav = [
   { title: "Action Dashboard", url: "/app/action-dashboard", icon: Target },
-  { title: "Home", url: "/app/dashboard", icon: Home },
+  { title: "Dashboard", url: "/app/dashboard", icon: Home },
   { title: "Leads", url: "/app/leads", icon: Users },
   { title: "Assessments", url: "/app/assessments", icon: ClipboardList },
   { title: "Meetings", url: "/app/meetings", icon: Calendar },

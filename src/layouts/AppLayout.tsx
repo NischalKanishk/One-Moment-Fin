@@ -24,7 +24,7 @@ const mockNotifications = [
     description: 'John Doe has been added to your leads',
     time: '2 minutes ago',
     read: false,
-    icon: <TrendingUp className="h-4 w-4 text-blue-500" />
+    icon: <TrendingUp className="h-4 w-4 text-primary" />
   },
   {
     id: 2,
@@ -141,13 +141,13 @@ export default function AppLayout() {
             <div className="border-b bg-muted/50 p-3 text-sm flex items-center justify-between">
               <div><strong>Trial plan</strong> — 8 days left</div>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="cta">Upgrade Plan</Button>
+                <Button size="sm" variant="primary">Upgrade Plan</Button>
                 <Button size="sm" variant="outline">View Usage</Button>
               </div>
             </div>
           )}
           
-          <main className="p-4">
+          <main className="py-8 md:py-10 px-4">
             <Outlet />
           </main>
         </SidebarInset>
@@ -188,7 +188,7 @@ export default function AppLayout() {
                     className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                       notification.read 
                         ? 'bg-background hover:bg-muted/50' 
-                        : 'bg-blue-50 border-blue-200 hover:bg-blue-100'
+                        : 'bg-primary/5 border-primary/20 hover:bg-primary/10'
                     }`}
                     onClick={() => markAsRead(notification.id)}
                   >
@@ -198,7 +198,7 @@ export default function AppLayout() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between">
                         <p className={`text-sm font-medium ${
-                          notification.read ? 'text-foreground' : 'text-blue-900'
+                          notification.read ? 'text-foreground' : 'text-primary-foreground'
                         }`}>
                           {notification.title}
                         </p>
@@ -207,13 +207,13 @@ export default function AppLayout() {
                         </span>
                       </div>
                       <p className={`text-sm mt-1 ${
-                        notification.read ? 'text-muted-foreground' : 'text-blue-700'
+                        notification.read ? 'text-muted-foreground' : 'text-primary-foreground/80'
                       }`}>
                         {notification.description}
                       </p>
                     </div>
                     {!notification.read && (
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                      <div className="w-2 h-2 bg-primary rounded-full mt-2"></div>
                     )}
                   </div>
                 ))

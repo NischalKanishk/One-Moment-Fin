@@ -27,7 +27,7 @@ const Index = () => {
   const { user, isAuthenticated } = useAuth();
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <Helmet>
         <title>OneMFin – AI for Mutual Fund Distributors</title>
         <meta name="description" content="AI-powered lead to investor platform: capture, assess risk, schedule meetings, suggest products, and report — fast." />
@@ -35,24 +35,24 @@ const Index = () => {
       </Helmet>
 
       {/* Header */}
-      <header className="border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-[#FF8A4A] rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">1M</span>
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <span className="text-primary-foreground font-bold text-sm">1M</span>
               </div>
-              <span className="text-xl font-semibold text-black">OneMFin</span>
+              <span className="text-xl font-semibold text-foreground">OneMFin</span>
             </div>
 
             <nav className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-gray-600 hover:text-black transition-colors">
+              <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">
                 Features
               </a>
-              <a href="#pricing" className="text-gray-600 hover:text-black transition-colors">
+              <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
                 Pricing
               </a>
-              <a href="#contact" className="text-gray-600 hover:text-black transition-colors">
+              <a href="#contact" className="text-muted-foreground hover:text-foreground transition-colors">
                 Contact
               </a>
             </nav>
@@ -63,13 +63,13 @@ const Index = () => {
                   <Button variant="outline">Sign In</Button>
                 </SignInButton>
                 <SignUpButton mode="modal">
-                  <Button className="bg-[#FF8A4A] hover:bg-[#FF8A4A]/90 text-white">Get Started</Button>
+                  <Button variant="primary">Get Started</Button>
                 </SignUpButton>
               </SignedOut>
               <SignedIn>
                 <UserButton afterSignOutUrl="/" />
                 <Link to="/app/dashboard">
-                  <Button className="bg-[#FF8A4A] hover:bg-[#FF8A4A]/90 text-white">Open Dashboard</Button>
+                  <Button variant="primary">Open Dashboard</Button>
                 </Link>
               </SignedIn>
             </div>
@@ -78,13 +78,13 @@ const Index = () => {
       </header>
 
       {/* Hero Section */}
-      <section className="pt-20 pb-24 bg-gradient-to-b from-gray-50/50 to-white">
+      <section className="pt-20 pb-24 bg-gradient-to-b from-muted/50 to-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-8">
               <div className="space-y-6">
-                <h1 className="text-5xl lg:text-6xl font-bold text-black leading-tight">Your Smart MFD Assistant.</h1>
-                <p className="text-xl text-gray-600 leading-relaxed max-w-lg">
+                <h1 className="text-5xl lg:text-6xl font-bold text-foreground leading-tight">Your Smart MFD Assistant.</h1>
+                <p className="text-xl text-muted-foreground leading-relaxed max-w-lg">
                   Transform your mutual fund distribution business with AI-powered lead management, automated risk
                   profiling, and intelligent product recommendations.
                 </p>
@@ -93,7 +93,7 @@ const Index = () => {
               <div className="flex flex-col sm:flex-row gap-4">
                 <SignedOut>
                   <SignUpButton mode="modal">
-                    <Button size="lg" className="bg-[#FF8A4A] hover:bg-[#FF8A4A]/90 text-white px-8 py-4 text-lg">
+                    <Button size="lg" variant="primary" className="px-8 py-4 text-lg">
                       Get Started Free
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
@@ -101,20 +101,20 @@ const Index = () => {
                 </SignedOut>
                 <SignedIn>
                   <Link to="/app/dashboard">
-                    <Button size="lg" className="bg-[#FF8A4A] hover:bg-[#FF8A4A]/90 text-white px-8 py-4 text-lg">
+                    <Button size="lg" variant="primary" className="px-8 py-4 text-lg">
                       Open Dashboard
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
                 </SignedIn>
-                <Button size="lg" variant="ghost" className="text-black border-gray-200 px-8 py-4 text-lg">
+                <Button size="lg" variant="ghost" className="text-foreground border-border px-8 py-4 text-lg">
                   Learn More
                 </Button>
               </div>
             </div>
 
             <div className="relative">
-              <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl p-8 shadow-2xl">
+              <div className="bg-gradient-to-br from-muted to-muted/50 rounded-2xl p-8 shadow-lg">
                 <img
                   src="/financial-dashboard-interface.png"
                   alt="OneMFin Dashboard Preview"
@@ -127,18 +127,18 @@ const Index = () => {
       </section>
 
       {/* Problem → Solution Section */}
-      <section className="py-24 bg-white">
+      <section className="py-24 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-black mb-4">From Chaos to Control</h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <h2 className="text-4xl font-bold text-foreground mb-4">From Chaos to Control</h2>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               See how OneMFin transforms common MFD challenges into streamlined solutions
             </p>
           </div>
 
           {/* Problems */}
           <div className="mb-12">
-            <h3 className="text-2xl font-semibold text-black mb-8 text-center">Common MFD Pain Points</h3>
+            <h3 className="text-2xl font-semibold text-foreground mb-8 text-center">Common MFD Pain Points</h3>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
                 {
@@ -150,11 +150,11 @@ const Index = () => {
                 { icon: FileText, title: "No Central Tracking", desc: "Client data scattered across platforms" },
                 { icon: Target, title: "Slow Follow-ups", desc: "Delayed responses hurt conversion rates" },
               ].map((problem, index) => (
-                <Card key={index} className="border-red-100 bg-red-50/30">
+                <Card key={index} className="border-destructive/20 bg-destructive/5 hover:shadow-lg transition-all duration-200">
                   <CardContent className="p-6 text-center">
-                    <problem.icon className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                    <h4 className="font-semibold text-black mb-2">{problem.title}</h4>
-                    <p className="text-gray-600 text-sm">{problem.desc}</p>
+                    <problem.icon className="h-12 w-12 text-destructive mx-auto mb-4" />
+                    <h4 className="font-semibold text-foreground mb-2">{problem.title}</h4>
+                    <p className="text-muted-foreground text-sm">{problem.desc}</p>
                   </CardContent>
                 </Card>
               ))}
@@ -163,7 +163,7 @@ const Index = () => {
 
           {/* Solutions */}
           <div>
-            <h3 className="text-2xl font-semibold text-black mb-8 text-center">OneMFin Solutions</h3>
+            <h3 className="text-2xl font-semibold text-foreground mb-8 text-center">OneMFin Solutions</h3>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
                 {
@@ -175,11 +175,11 @@ const Index = () => {
                 { icon: BarChart3, title: "Unified Dashboard", desc: "All client data in one powerful interface" },
                 { icon: TrendingUp, title: "Automated Follow-ups", desc: "Smart reminders and engagement tools" },
               ].map((solution, index) => (
-                <Card key={index} className="border-green-100 bg-green-50/30">
+                <Card key={index} className="border-primary/20 bg-primary/5 hover:shadow-lg transition-all duration-200">
                   <CardContent className="p-6 text-center">
-                    <solution.icon className="h-12 w-12 text-green-600 mx-auto mb-4" />
-                    <h4 className="font-semibold text-black mb-2">{solution.title}</h4>
-                    <p className="text-gray-600 text-sm">{solution.desc}</p>
+                    <solution.icon className="h-12 w-12 text-primary mx-auto mb-4" />
+                    <h4 className="font-semibold text-foreground mb-2">{solution.title}</h4>
+                    <p className="text-muted-foreground text-sm">{solution.desc}</p>
                   </CardContent>
                 </Card>
               ))}
@@ -189,11 +189,11 @@ const Index = () => {
       </section>
 
       {/* Feature Deep Dives */}
-      <section id="features" className="py-24 bg-gray-50/50">
+      <section id="features" className="py-24 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-black mb-4">Powerful Features for Modern MFDs</h2>
-            <p className="text-xl text-gray-600">Everything you need to scale your mutual fund distribution business</p>
+            <h2 className="text-4xl font-bold text-foreground mb-4">Powerful Features for Modern MFDs</h2>
+            <p className="text-xl text-muted-foreground">Everything you need to scale your mutual fund distribution business</p>
           </div>
 
           <div className="space-y-24">
@@ -201,31 +201,31 @@ const Index = () => {
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div className="space-y-6">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-[#FF8A4A] rounded-lg flex items-center justify-center">
-                    <Target className="h-6 w-6 text-white" />
+                  <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+                    <Target className="h-6 w-6 text-primary-foreground" />
                   </div>
-                  <h3 className="text-3xl font-bold text-black">Lead Capture & Risk Profiling</h3>
+                  <h3 className="text-3xl font-bold text-foreground">Lead Capture & Risk Profiling</h3>
                 </div>
-                <p className="text-lg text-gray-600 leading-relaxed">
+                <p className="text-lg text-muted-foreground leading-relaxed">
                   Create public forms that automatically capture leads and use AI to assess risk profiles. Get detailed
                   insights about each prospect before your first meeting.
                 </p>
                 <ul className="space-y-3">
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Customizable lead capture forms</span>
+                    <span className="text-foreground">Customizable lead capture forms</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">AI-powered risk assessment</span>
+                    <span className="text-foreground">AI-powered risk assessment</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Automated lead scoring</span>
+                    <span className="text-foreground">Automated lead scoring</span>
                   </li>
                 </ul>
               </div>
-              <div className="bg-white rounded-2xl p-8 shadow-lg">
+              <div className="bg-card rounded-2xl p-8 shadow-lg">
                 <img
                   src="/lead-capture-risk-form.png"
                   alt="Lead Capture Interface"
@@ -236,7 +236,7 @@ const Index = () => {
 
             {/* Feature 2 */}
             <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div className="bg-white rounded-2xl p-8 shadow-lg lg:order-1">
+              <div className="bg-card rounded-2xl p-8 shadow-lg lg:order-1">
                 <img
                   src="/mutual-fund-recommendation-dashboard.png"
                   alt="Product Recommendations"
@@ -245,27 +245,27 @@ const Index = () => {
               </div>
               <div className="space-y-6 lg:order-2">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-[#FF8A4A] rounded-lg flex items-center justify-center">
-                    <TrendingUp className="h-6 w-6 text-white" />
+                  <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+                    <TrendingUp className="h-6 w-6 text-primary-foreground" />
                   </div>
-                  <h3 className="text-3xl font-bold text-black">Smart Product Recommendations</h3>
+                  <h3 className="text-3xl font-bold text-foreground">Smart Product Recommendations</h3>
                 </div>
-                <p className="text-lg text-gray-600 leading-relaxed">
+                <p className="text-lg text-muted-foreground leading-relaxed">
                   Get personalized mutual fund recommendations based on each client's risk profile, investment goals,
                   and market conditions. Increase conversion with relevant suggestions.
                 </p>
                 <ul className="space-y-3">
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Risk-matched fund suggestions</span>
+                    <span className="text-foreground">Risk-matched fund suggestions</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Goal-based recommendations</span>
+                    <span className="text-foreground">Goal-based recommendations</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Performance analytics</span>
+                    <span className="text-foreground">Performance analytics</span>
                   </li>
                 </ul>
               </div>
@@ -275,63 +275,63 @@ const Index = () => {
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div className="space-y-6">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-[#FF8A4A] rounded-lg flex items-center justify-center">
-                    <Calendar className="h-6 w-5 text-white" />
+                  <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+                    <Calendar className="h-6 w-5 text-primary-foreground" />
                   </div>
-                  <h3 className="text-3xl font-bold text-black">Meeting Scheduler</h3>
+                  <h3 className="text-3xl font-bold text-foreground">Meeting Scheduler</h3>
                 </div>
-                <p className="text-lg text-gray-600 leading-relaxed">
+                <p className="text-lg text-muted-foreground leading-relaxed">
                   Seamlessly integrate with Google Calendar and Calendly to let prospects book meetings directly.
                   Automated reminders ensure no meetings are missed.
                 </p>
                 <ul className="space-y-3">
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Calendar integration</span>
+                    <span className="text-foreground">Calendar integration</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Automated reminders</span>
+                    <span className="text-foreground">Automated reminders</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Meeting preparation notes</span>
+                    <span className="text-foreground">Meeting preparation notes</span>
                   </li>
                 </ul>
               </div>
-              <div className="bg-white rounded-2xl p-8 shadow-lg">
+              <div className="bg-card rounded-2xl p-8 shadow-lg">
                 <img src="/calendar-scheduling-interface.png" alt="Meeting Scheduler" className="w-full h-auto rounded-lg" />
               </div>
             </div>
 
             {/* Feature 4 */}
             <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div className="bg-white rounded-2xl p-8 shadow-lg lg:order-1">
+              <div className="bg-card rounded-2xl p-8 shadow-lg lg:order-1">
                 <img src="/meeting-scheduler-dashboard.png" alt="Meeting Scheduler" className="w-full h-auto rounded-lg" />
               </div>
               <div className="space-y-6 lg:order-2">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-[#FF8A4A] rounded-lg flex items-center justify-center">
-                    <Shield className="h-6 w-5 text-white" />
+                  <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+                    <Shield className="h-6 w-5 text-primary-foreground" />
                   </div>
-                  <h3 className="text-3xl font-bold text-black">Meeting Scheduler</h3>
+                  <h3 className="text-3xl font-bold text-foreground">Meeting Scheduler</h3>
                 </div>
-                <p className="text-lg text-gray-600 leading-relaxed">
+                <p className="text-lg text-muted-foreground leading-relaxed">
                   Streamlined meeting scheduling with calendar integration. Automated reminders and follow-ups ensure
                   smooth client communication.
                 </p>
                 <ul className="space-y-3">
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Visual progress tracking</span>
+                    <span className="text-foreground">Visual progress tracking</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Document management</span>
+                    <span className="text-foreground">Document management</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Compliance alerts</span>
+                    <span className="text-foreground">Compliance alerts</span>
                   </li>
                 </ul>
               </div>
@@ -341,46 +341,46 @@ const Index = () => {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-24 bg-white">
+      <section id="pricing" className="py-24 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-black mb-4">Simple, Transparent Pricing</h2>
-            <p className="text-xl text-gray-600">Start free, scale as you grow</p>
+            <h2 className="text-4xl font-bold text-foreground mb-4">Simple, Transparent Pricing</h2>
+            <p className="text-xl text-muted-foreground">Start free, scale as you grow</p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {/* Free Trial */}
-            <Card className="border-2 border-gray-200 relative">
+            <Card className="border-2 border-border hover:shadow-lg transition-all duration-200">
               <CardContent className="p-8">
                 <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold text-black mb-2">Free Trial</h3>
-                  <div className="text-4xl font-bold text-black mb-2">₹0</div>
-                  <p className="text-gray-600">30 days free</p>
+                  <h3 className="text-2xl font-bold text-foreground mb-2">Free Trial</h3>
+                  <div className="text-4xl font-bold text-foreground mb-2">₹0</div>
+                  <p className="text-muted-foreground">30 days free</p>
                 </div>
 
                 <ul className="space-y-4 mb-8">
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Up to 50 leads</span>
+                    <span className="text-foreground">Up to 50 leads</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Basic risk profiling</span>
+                    <span className="text-foreground">Basic risk profiling</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Email support</span>
+                    <span className="text-foreground">Email support</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Basic dashboard</span>
+                    <span className="text-foreground">Basic dashboard</span>
                   </li>
                 </ul>
 
                 <SignedOut>
                   <SignUpButton mode="modal">
                     <Button
-                      className="w-full border-[#FF8A4A] text-[#FF8A4A] hover:bg-[#FF8A4A] hover:text-white bg-transparent"
+                      className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground bg-transparent"
                       variant="outline"
                     >
                       Start Free Trial
@@ -390,7 +390,7 @@ const Index = () => {
                 <SignedIn>
                   <Link to="/app/dashboard">
                     <Button
-                      className="w-full border-[#FF8A4A] text-[#FF8A4A] hover:bg-[#FF8A4A] hover:text-white bg-transparent"
+                      className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground bg-transparent"
                       variant="outline"
                     >
                       Open Dashboard
@@ -401,48 +401,48 @@ const Index = () => {
             </Card>
 
             {/* Pro Plan */}
-            <Card className="border-2 border-[#FF8A4A] relative">
+            <Card className="border-2 border-primary hover:shadow-lg transition-all duration-200 relative">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <span className="bg-[#FF8A4A] text-white px-4 py-2 rounded-full text-sm font-medium">Most Popular</span>
+                <span className="bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-medium">Most Popular</span>
               </div>
               <CardContent className="p-8">
                 <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold text-black mb-2">Pro Plan</h3>
-                  <div className="text-4xl font-bold text-black mb-2">₹2,999</div>
-                  <p className="text-gray-600">per month</p>
+                  <h3 className="text-2xl font-bold text-foreground mb-2">Pro Plan</h3>
+                  <div className="text-4xl font-bold text-foreground mb-2">₹2,999</div>
+                  <p className="text-muted-foreground">per month</p>
                 </div>
 
                 <ul className="space-y-4 mb-8">
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Unlimited leads</span>
+                    <span className="text-foreground">Unlimited leads</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Advanced AI recommendations</span>
+                    <span className="text-foreground">Advanced AI recommendations</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Calendar integrations</span>
+                    <span className="text-foreground">Calendar integrations</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Priority support</span>
+                    <span className="text-foreground">Priority support</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-gray-700">Custom branding</span>
+                    <span className="text-foreground">Custom branding</span>
                   </li>
                 </ul>
 
                 <SignedOut>
                   <SignUpButton mode="modal">
-                    <Button className="w-full bg-[#FF8A4A] hover:bg-[#FF8A4A]/90 text-white">Get Started</Button>
+                    <Button className="w-full" variant="primary">Get Started</Button>
                   </SignUpButton>
                 </SignedOut>
                 <SignedIn>
                   <Link to="/app/dashboard">
-                    <Button className="w-full bg-[#FF8A4A] hover:bg-[#FF8A4A]/90 text-white">Open Dashboard</Button>
+                    <Button className="w-full" variant="primary">Open Dashboard</Button>
                   </Link>
                 </SignedIn>
               </CardContent>
@@ -452,73 +452,73 @@ const Index = () => {
       </section>
 
       {/* Social Proof */}
-      <section className="py-16 bg-gray-50/50">
+      <section className="py-16 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <div className="inline-flex items-center space-x-2 bg-white px-6 py-3 rounded-full shadow-sm border">
-              <Star className="h-5 w-5 text-[#FF8A4A]" />
-              <span className="text-black font-medium">Built specifically for Indian MFDs</span>
+            <div className="inline-flex items-center space-x-2 bg-card px-6 py-3 rounded-full shadow-sm border border-border">
+              <Star className="h-5 w-5 text-primary" />
+              <span className="text-foreground font-medium">Built specifically for Indian MFDs</span>
             </div>
-            <p className="text-gray-600 mt-4">Trusted by forward-thinking mutual fund distributors across India</p>
+            <p className="text-muted-foreground mt-4">Trusted by forward-thinking mutual fund distributors across India</p>
           </div>
         </div>
       </section>
 
       {/* Early Access CTA Banner */}
-      <section className="py-24 bg-black">
+      <section className="py-24 bg-foreground">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-bold text-white mb-4">Get 2 Months Free as an Early User</h2>
-          <p className="text-xl text-gray-300 mb-8">
+          <h2 className="text-4xl font-bold text-background mb-4">Get 2 Months Free as an Early User</h2>
+          <p className="text-xl text-muted-foreground mb-8">
             Join the waitlist and be among the first to transform your MFD business
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
-            <Input type="email" placeholder="Enter your email" className="flex-1 bg-white border-0 text-black" />
+            <Input type="email" placeholder="Enter your email" className="flex-1 bg-background border-0 text-foreground" />
             <SignedOut>
               <SignUpButton mode="modal">
-                <Button className="bg-[#FF8A4A] hover:bg-[#FF8A4A]/90 text-white px-8">Get Early Access</Button>
+                <Button variant="primary" className="px-8">Get Early Access</Button>
               </SignUpButton>
             </SignedOut>
             <SignedIn>
               <Link to="/app/dashboard">
-                <Button className="bg-[#FF8A4A] hover:bg-[#FF8A4A]/90 text-white px-8">Open Dashboard</Button>
+                <Button variant="primary" className="px-8">Open Dashboard</Button>
               </Link>
             </SignedIn>
           </div>
 
-          <p className="text-gray-400 text-sm mt-4">No spam. Unsubscribe anytime.</p>
+          <p className="text-muted-foreground text-sm mt-4">No spam. Unsubscribe anytime.</p>
         </div>
       </section>
 
       {/* Footer */}
-      <footer id="contact" className="bg-white border-t border-gray-100">
+      <footer id="contact" className="bg-background border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="grid md:grid-cols-4 gap-8">
             <div className="space-y-4">
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-[#FF8A4A] rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">1M</span>
+                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                  <span className="text-primary-foreground font-bold text-sm">1M</span>
                 </div>
-                <span className="text-xl font-semibold text-black">OneMFin</span>
+                <span className="text-xl font-semibold text-foreground">OneMFin</span>
               </div>
-              <p className="text-gray-600">Empowering MFDs with AI-powered productivity tools.</p>
+              <p className="text-muted-foreground">Empowering MFDs with AI-powered productivity tools.</p>
             </div>
 
             <div>
-              <h4 className="font-semibold text-black mb-4">Company</h4>
+              <h4 className="font-semibold text-foreground mb-4">Company</h4>
               <ul className="space-y-2">
                 <li>
-                  <a href="#" className="text-gray-600 hover:text-black transition-colors">
+                  <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
                     About
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="text-gray-600 hover:text-black transition-colors">
+                  <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
                     Privacy Policy
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="text-gray-600 hover:text-black transition-colors">
+                  <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
                     Terms of Service
                   </a>
                 </li>
@@ -526,20 +526,20 @@ const Index = () => {
             </div>
 
             <div>
-              <h4 className="font-semibold text-black mb-4">Support</h4>
+              <h4 className="font-semibold text-foreground mb-4">Support</h4>
               <ul className="space-y-2">
                 <li>
-                  <a href="#" className="text-gray-600 hover:text-black transition-colors">
+                  <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
                     Help Center
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="text-gray-600 hover:text-black transition-colors">
+                  <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
                     Contact Us
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="text-gray-600 hover:text-black transition-colors">
+                  <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
                     Documentation
                   </a>
                 </li>
@@ -547,23 +547,23 @@ const Index = () => {
             </div>
 
             <div>
-              <h4 className="font-semibold text-black mb-4">Connect</h4>
+              <h4 className="font-semibold text-foreground mb-4">Connect</h4>
               <div className="flex space-x-4">
-                <a href="#" className="text-gray-600 hover:text-[#FF8A4A] transition-colors">
+                <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
                   <Mail className="h-5 w-5" />
                 </a>
-                <a href="#" className="text-gray-600 hover:text-[#FF8A4A] transition-colors">
+                <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
                   <Phone className="h-5 w-5" />
                 </a>
-                <a href="#" className="text-gray-600 hover:text-[#FF8A4A] transition-colors">
+                <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
                   <MapPin className="h-5 w-5" />
                 </a>
               </div>
             </div>
           </div>
 
-          <div className="border-t border-gray-100 mt-12 pt-8 text-center">
-            <p className="text-gray-600">© {new Date().getFullYear()} OneMFin. All rights reserved.</p>
+          <div className="border-t border-border mt-12 pt-8 text-center">
+            <p className="text-muted-foreground">© {new Date().getFullYear()} OneMFin. All rights reserved.</p>
           </div>
         </div>
       </footer>
