@@ -288,8 +288,6 @@ export default function Settings(){
           <TabsTrigger value="calendly">Calendly</TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
           <TabsTrigger value="subscription">Subscription</TabsTrigger>
-          <TabsTrigger value="team">Team</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
 
         <TabsContent value="preferences" className="space-y-4">
@@ -469,21 +467,6 @@ export default function Settings(){
               <Progress value={75} />
             </div>
           </div>
-        </TabsContent>
-
-        <TabsContent value="team" className="space-y-4">
-          <div className="text-sm text-muted-foreground">Team management coming soon.</div>
-          <Button variant="outline">Invite teammate</Button>
-        </TabsContent>
-
-        <TabsContent value="security" className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <Input placeholder="New password" type="password" />
-            <Input placeholder="Confirm password" type="password" />
-          </div>
-          <div className="flex items-center gap-3"><Switch id="twofa" /><label htmlFor="twofa">Enable 2FA</label></div>
-          <Button variant="cta">Save security</Button>
-          <div className="text-sm text-muted-foreground">Recent logins will appear here.</div>
         </TabsContent>
       </Tabs>
     </div>
