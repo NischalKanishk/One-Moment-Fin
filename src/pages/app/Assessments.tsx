@@ -3,7 +3,16 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, FileText, Settings, Users, BarChart3, ArrowRight, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { 
+  Plus, 
+  FileText, 
+  Clock, 
+  Calendar,
+  Brain,
+  Play,
+  Pencil,
+  HelpCircle
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -32,11 +41,7 @@ export default function Assessments() {
   
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [stats, setStats] = useState({
-    totalForms: 0,
-    activeForms: 0,
-    totalSubmissions: 0
-  });
+
 
   useEffect(() => {
     loadAssessments();
@@ -46,7 +51,6 @@ export default function Assessments() {
     try {
       setIsLoading(true);
       const token = await getToken();
-      console.log('🔍 Assessments: Token received, length:', token?.length);
       
       if (!token) {
         toast({
@@ -57,39 +61,23 @@ export default function Assessments() {
         return;
       }
 
-      // Use the configured API client
       const api = createAuthenticatedApi(token);
-      console.log('🔍 Assessments: Making API request to /api/assessments/forms');
-      
       const response = await api.get('/api/assessments/forms');
-      console.log('🔍 Assessments: API response received:', response.data);
       
       const data = response.data;
       
-      // Handle case where user has no assessments yet
       if (!data.forms || data.forms.length === 0) {
         setAssessments([]);
-        setStats({
-          totalForms: 0,
-          activeForms: 0,
-          totalSubmissions: 0
-        });
         return;
       }
       
       setAssessments(data.forms);
-      setStats({
-        totalForms: data.forms.length,
-        activeForms: data.forms.filter((a: Assessment) => a.is_active).length,
-        totalSubmissions: data.totalSubmissions || 0
-      });
     } catch (error: any) {
       console.error("Failed to load assessments:", error);
       
       let errorMessage = "Failed to load assessments. Please try again.";
       
       if (error.response) {
-        // API error response
         if (error.response.status === 401) {
           errorMessage = "Authentication failed. Please sign in again.";
         } else if (error.response.status === 403) {
@@ -98,10 +86,8 @@ export default function Assessments() {
           errorMessage = error.response.data.error;
         }
       } else if (error.request) {
-        // Network error
         errorMessage = "Network error. Please check your connection and try again.";
       } else if (error.message) {
-        // Other error
         errorMessage = error.message;
       }
       
@@ -115,232 +101,261 @@ export default function Assessments() {
     }
   };
 
-  const handleManageForms = () => {
+  const handleEditForm = (assessment: Assessment) => {
+    navigate('/app/assessment/forms', { state: { assessmentId: assessment.id } });
+  };
+
+  const handleViewLive = (assessment: Assessment) => {
+    if (user?.referral_link) {
+      window.open(`${window.location.origin}${user.referral_link}`, '_blank');
+    } else {
+      toast({
+        title: "No Referral Link",
+        description: "Please complete your profile setup to get a referral link.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCreateNew = () => {
     navigate('/app/assessment/forms');
   };
 
-  const handleViewAnalytics = () => {
-    navigate('/app/assessment/analytics');
+
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getQuestionCount = (assessment: Assessment) => {
+    if (assessment.latest_version?.schema?.properties) {
+      return Object.keys(assessment.latest_version.schema.properties).length;
+    }
+    return 0;
+  };
+
+  const getAIStatus = (assessment: Assessment) => {
+    if (assessment.latest_version?.scoring?.reasoning) {
+      return 'AI Generated';
+    } else if (assessment.latest_version?.scoring) {
+      return 'Manual';
+    }
+    return 'Not Configured';
+  };
+
+  const getAIStatusColor = (status: string) => {
+    switch (status) {
+      case 'AI Generated':
+        return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'Manual':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p>Loading assessments...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading assessments...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <>
       <Helmet>
         <title>Assessment Management – OneMFin</title>
         <meta name="description" content="Manage your risk assessment forms and track lead submissions." />
         <link rel="canonical" href="/app/assessments" />
       </Helmet>
 
-      <header className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Assessment Management</h1>
-            <p className="text-muted-foreground text-lg">
-              Create, manage, and track your risk assessment forms
-            </p>
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-6 py-6">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Assessment Management</h1>
+                <p className="text-gray-600 mt-2">
+                  Create, manage, and track your risk assessment forms
+                </p>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={() => navigate('/help/assessments')}
+                  variant="outline"
+                  size="sm"
+                  className="border-gray-300"
+                >
+                  <HelpCircle className="w-4 h-4 mr-2" />
+                  Help
+                </Button>
+                
+                <Button
+                  disabled
+                  size="sm"
+                  className="bg-gray-400 hover:bg-gray-400 cursor-not-allowed"
+                  title="Coming soon. Stay updated"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create New Assessment
+                </Button>
+              </div>
+            </div>
           </div>
-          <Button 
-            variant="outline" 
-            onClick={loadAssessments}
-            disabled={isLoading}
-            className="flex items-center space-x-2"
-          >
-            {isLoading ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
-            ) : (
-              <FileText className="h-4 w-4" />
-            )}
-            <span>Refresh</span>
-          </Button>
         </div>
-      </header>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-600">Total Forms</p>
-                <p className="text-2xl font-bold text-blue-900">{stats.totalForms}</p>
-              </div>
-              <FileText className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-600">Active Forms</p>
-                <p className="text-2xl font-bold text-green-900">{stats.activeForms}</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-600">Total Submissions</p>
-                <p className="text-2xl font-bold text-purple-900">{stats.totalSubmissions}</p>
-              </div>
-              <Users className="h-8 w-8 text-purple-600" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* No Assessments Message */}
-      {assessments.length === 0 && (
-        <Card className="bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200">
-          <CardContent className="p-6 text-center">
-            <div className="mx-auto w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
-              <FileText className="w-8 h-8 text-yellow-600" />
-            </div>
-            <h3 className="text-xl font-semibold text-yellow-900 mb-2">No Assessment Forms Yet</h3>
-            <p className="text-yellow-800 mb-4">
-              You don't have any assessment forms yet. This usually means you're a new user and your default assessment is being created.
-            </p>
-            <div className="bg-yellow-100 p-3 rounded-lg border border-yellow-300">
-              <p className="text-sm text-yellow-800 font-medium">What happens next?</p>
-              <p className="text-xs text-yellow-700 mt-1">
-                Your default risk assessment form should be created automatically. If you don't see it within a few minutes, please contact support.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Main Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Manage Existing Forms */}
-        <Card className="group hover:shadow-lg transition-all duration-200 cursor-pointer border-2 hover:border-gray-400 hover:bg-gray-50/50" onClick={handleManageForms}>
-          <CardContent className="p-8">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-gray-200 transition-colors">
-                <Settings className="w-6 h-6 text-gray-600" />
-              </div>
-              <Badge variant="secondary" className="group-hover:bg-gray-200">
-                {assessments.length} Forms
-              </Badge>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Manage Forms</h3>
-            <p className="text-gray-600 mb-4">
-              Edit existing forms, update questions, and manage form settings
-            </p>
-            <Button variant="outline" className="group-hover:bg-gray-100 transition-colors">
-              Manage Forms
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Create New Form */}
-        <Card className="group hover:shadow-lg transition-all duration-200 cursor-pointer border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50/50">
-          <CardContent className="p-8 text-center">
-            <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-blue-200 transition-colors">
-              <Plus className="w-8 h-8 text-blue-600" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Create New Assessment</h3>
-            <p className="text-gray-600 mb-4">
-              Build a custom risk assessment form with your own questions and branding
-            </p>
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <p className="text-sm text-blue-800 font-medium">Coming Soon</p>
-              <p className="text-xs text-blue-700 mt-1">
-                This functionality will be available soon
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={handleViewAnalytics}>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <BarChart3 className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <h4 className="font-medium">View Analytics</h4>
-                <p className="text-sm text-muted-foreground">Track form performance</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow cursor-pointer">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Users className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <h4 className="font-medium">View Submissions</h4>
-                <p className="text-sm text-muted-foreground">See lead responses</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow cursor-pointer">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                <FileText className="w-5 h-5 text-orange-600" />
-              </div>
-              <div>
-                <h4 className="font-medium">Templates</h4>
-                <p className="text-sm text-muted-foreground">Use pre-built forms</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        {/* Main Content */}
+        <div className="max-w-7xl mx-auto px-6 py-8">
 
 
-
-      {/* Help Section */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-        <CardContent className="p-6">
-          <div className="flex items-start space-x-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <AlertCircle className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-blue-900 mb-2">Need Help?</h3>
-              <p className="text-blue-800 mb-3">
-                Learn how to create effective risk assessment forms and maximize lead generation.
-              </p>
-              <div className="flex space-x-2">
-                <Button variant="outline" size="sm" className="border-blue-300 text-blue-700 hover:bg-blue-100">
-                  View Documentation
+          {/* No Assessments Message */}
+          {assessments.length === 0 ? (
+            <Card className="bg-white border-0 shadow-sm">
+              <CardContent className="p-12 text-center">
+                <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                  <FileText className="w-8 h-8 text-gray-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Assessment Forms Yet</h3>
+                <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                  Create your first assessment form to start collecting client information and generating leads
+                </p>
+                <Button
+                  onClick={handleCreateNew}
+                  size="lg"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  Create Your First Assessment
                 </Button>
-                <Button variant="outline" size="sm" className="border-blue-300 text-blue-700 hover:bg-blue-100">
-                  Watch Tutorial
-                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {/* Assessment Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                 {assessments.map((assessment) => (
+                   <Card 
+                     key={assessment.id} 
+                     className="bg-white border-0 shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200 cursor-pointer group"
+                     onClick={() => handleEditForm(assessment)}
+                   >
+                    <CardHeader className="pb-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                                                     <CardTitle className="text-lg text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+                             {assessment.name}
+                           </CardTitle>
+                          
+                          <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              {formatDate(assessment.created_at)}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              {formatTime(assessment.created_at)}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 mb-3">
+                            <Badge 
+                              variant={assessment.is_active ? "default" : "secondary"}
+                              className={assessment.is_active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}
+                            >
+                              {assessment.is_active ? "Active" : "Inactive"}
+                            </Badge>
+                            
+                            {assessment.latest_version && (
+                              <Badge variant="outline" className="border-blue-200 text-blue-700">
+                                v{assessment.latest_version.version}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    
+                    <CardContent className="space-y-4">
+                      {/* Stats Row */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center p-3 bg-gray-50 rounded-lg">
+                          <div className="text-lg font-semibold text-gray-900">
+                            {getQuestionCount(assessment)}
+                          </div>
+                          <div className="text-xs text-gray-600">Questions</div>
+                        </div>
+                        
+                        <div className="text-center p-3 bg-gray-50 rounded-lg">
+                          <div className="text-lg font-semibold text-gray-900">
+                            {getAIStatus(assessment)}
+                          </div>
+                          <div className="text-xs text-gray-600">AI Scoring</div>
+                        </div>
+                      </div>
+                      
+                      {/* Last Updated */}
+                      {assessment.latest_version && (
+                        <div className="text-xs text-gray-500 text-center">
+                          Last updated: {formatDate(assessment.latest_version.created_at)}
+                        </div>
+                      )}
+                      
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2">
+                                                 <Button
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             handleViewLive(assessment);
+                           }}
+                           variant="outline"
+                           size="sm"
+                           className="flex-1 border-gray-300 hover:border-blue-500 hover:bg-blue-50"
+                         >
+                           <Play className="w-4 h-4 mr-2" />
+                           View Live
+                         </Button>
+                        
+                                                 <Button
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             handleEditForm(assessment);
+                           }}
+                           size="sm"
+                           className="flex-1 bg-blue-600 hover:bg-blue-700 text-white border-0"
+                         >
+                           <Pencil className="w-4 h-4 mr-2" />
+                           Edit Form
+                         </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
+              
+              
             </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          )}
+
+
+        </div>
+      </div>
+    </>
   );
 }

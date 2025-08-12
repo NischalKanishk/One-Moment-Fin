@@ -49,6 +49,13 @@ const App = () => (
                    <Route path="/r/:referralCode" element={<PublicAssessment />} />
                    <Route path="/assessment-complete" element={<AssessmentComplete />} />
 
+                   {/* Full screen assessment forms route */}
+                   <Route path="/app/assessment/forms" element={
+                     <ProtectedRoute>
+                       <AssessmentForms />
+                     </ProtectedRoute>
+                   } />
+
             {/* Protected app routes */}
             <Route path="/app" element={
               <ProtectedRoute>
@@ -62,7 +69,6 @@ const App = () => (
               <Route path="leads/:id" element={<LeadDetail />} />
               <Route path="form-builder" element={<FormBuilder />} />
               <Route path="assessments" element={<Assessments />} />
-              <Route path="assessment/forms" element={<AssessmentForms />} />
               <Route path="products" element={<Products />} />
               <Route path="meetings" element={<Meetings />} />
               <Route path="profile" element={<Profile />} />
