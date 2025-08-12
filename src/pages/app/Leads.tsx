@@ -353,7 +353,7 @@ export default function Leads(){
         </Select>
         <Dialog key="add-lead-dialog" open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
-            <Button variant="cta">Add Lead</Button>
+            <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg">Add Lead</Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-visible">
             <DialogHeader className="pb-4">
@@ -448,7 +448,7 @@ export default function Leads(){
                       />
                     </div>
                     <DialogFooter className="pt-6">
-                      <Button type="submit" variant="cta">Create Lead</Button>
+                      <Button type="submit" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg">Create Lead</Button>
                       <DialogClose asChild>
                         <Button type="button" variant="outline">Cancel</Button>
                       </DialogClose>
