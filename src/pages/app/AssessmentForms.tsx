@@ -143,7 +143,7 @@ export default function AssessmentForms() {
   const [isSaving, setIsSaving] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<'form' | 'scoring'>('form');
+  const [activeTab, setActiveTab] = useState<'form' | 'scoring' | 'public'>('form');
   const [aiScoringEnabled, setAiScoringEnabled] = useState(true);
   const [scoringConfig, setScoringConfig] = useState<ScoringConfig>({
     weights: {},
@@ -155,6 +155,7 @@ export default function AssessmentForms() {
     }
   });
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
 
   useEffect(() => {
     loadAssessments();
@@ -404,6 +405,7 @@ export default function AssessmentForms() {
         a.id === currentAssessment.id ? updatedAssessment : a
       ));
 
+      setShowSaveSuccess(true);
       toast({
         title: "Success",
         description: "Assessment saved successfully! New version created.",
@@ -593,82 +595,69 @@ export default function AssessmentForms() {
         <div className="flex-1 p-6">
           {currentAssessment && (
             <div className="max-w-7xl mx-auto space-y-6">
-              {/* Top two cards in a side-by-side layout */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Assessment Info Card */}
-                <Card className="bg-white border-0 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700">
-                          Assessment Name
-                        </label>
-                        <Input
-                          value={assessmentName}
-                          onChange={(e) => setAssessmentName(e.target.value)}
-                          placeholder="Enter assessment name"
-                          className="text-lg font-medium border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                        />
+              {/* Assessment Info Card */}
+              <div className="w-full">
+                <Card className="bg-white border-0 shadow-xl">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-3 text-xl text-gray-900">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                        <FileText className="w-5 h-5 text-white" />
                       </div>
-                      
-                      <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        <Switch
-                          checked={isActive}
-                          onCheckedChange={setIsActive}
-                          disabled={true}
-                          className="data-[state=checked]:bg-blue-600 data-[disabled]:opacity-50"
-                        />
-                        <div>
-                          <label className="text-sm font-semibold text-gray-700">Status</label>
-                          <p className="text-xs text-gray-500">Always active - single form mode</p>
+                      Assessment Configuration
+                    </CardTitle>
+                    <p className="text-gray-600">Configure your risk assessment form settings and basic information</p>
+                  </CardHeader>
+                  <CardContent className="p-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      {/* Assessment Name Section */}
+                      <div className="space-y-4">
+                        <div className="space-y-3">
+                          <label className="block text-base font-semibold text-gray-700 flex items-center gap-2">
+                            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                            Assessment Name
+                          </label>
+                          <Input
+                            value={assessmentName}
+                            onChange={(e) => setAssessmentName(e.target.value)}
+                            placeholder="Enter a descriptive name for your assessment"
+                            className="text-lg font-medium border-gray-300 focus:border-blue-500 focus:ring-blue-500 h-12 px-4"
+                          />
+                          <p className="text-sm text-gray-500">
+                            Choose a name that clearly describes what this assessment is for
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Right Side - Status Only */}
+                      <div className="space-y-4">
+                        {/* Status Section */}
+                        <div className="space-y-3">
+                          <label className="block text-base font-semibold text-gray-700 flex items-center gap-2">
+                            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                            Assessment Status
+                          </label>
+                          <div className="flex items-center space-x-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                              <CheckCircle2 className="w-6 h-6 text-green-600" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Switch
+                                  checked={isActive}
+                                  onCheckedChange={setIsActive}
+                                  disabled={true}
+                                  className="data-[state=checked]:bg-green-600 data-[disabled]:opacity-50"
+                                />
+                                <span className="text-sm font-semibold text-green-800">Active</span>
+                              </div>
+                              <p className="text-sm text-green-700">This assessment is currently live and accepting responses</p>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-
-                {/* Public Assessment Link Section */}
-                {user?.referral_link && (
-                  <Card className="bg-white border-0 shadow-lg">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-sm">
-                        <Link className="w-4 h-4 text-green-600" />
-                        Public Assessment
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <Input
-                          value={`${window.location.origin}${user.referral_link}`}
-                          readOnly
-                          className="text-xs border-gray-300 bg-gray-50"
-                        />
-                        <Button onClick={copyReferralLink} size="sm" variant="outline" className="border-gray-300 hover:border-green-500 hover:bg-green-50">
-                          {copied ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                        </Button>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
-                            Version {currentAssessment.versions?.[0]?.version || 1}
-                          </Badge>
-                          <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
-                            {isActive ? "Active" : "Inactive"}
-                          </Badge>
-                        </div>
-                        <Button 
-                          onClick={() => window.open(`${window.location.origin}${user.referral_link}`, '_blank')}
-                          size="sm" 
-                          variant="outline"
-                          className="border-gray-300 hover:border-blue-500 hover:bg-blue-50"
-                        >
-                          <ExternalLink className="w-3 h-3 mr-1" />
-                          Test
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
               </div>
 
               {/* Main Content Tabs */}
@@ -691,13 +680,25 @@ export default function AssessmentForms() {
                       onClick={() => setActiveTab('scoring')}
                       className={cn(
                         "py-4 px-1 border-b-2 font-medium text-sm transition-colors",
-                        activeTab === 'form'
-                          ? "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                          : "border-blue-600 text-blue-600 bg-white"
+                        activeTab === 'scoring'
+                          ? "border-blue-600 text-blue-600 bg-white"
+                          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                       )}
                     >
                       <Brain className="w-4 h-4 inline mr-2" />
                       AI Scoring Configuration
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('public')}
+                      className={cn(
+                        "py-4 px-1 border-b-2 font-medium text-sm transition-colors",
+                        activeTab === 'public'
+                          ? "border-blue-600 text-blue-600 bg-white"
+                          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                      )}
+                    >
+                      <Link className="w-4 h-4 inline mr-2" />
+                      Public Assessment Link
                     </button>
                   </nav>
                 </div>
@@ -1025,6 +1026,135 @@ export default function AssessmentForms() {
                       )}
                     </div>
                   )}
+
+                  {activeTab === 'public' && (
+                    <div className="space-y-6">
+                      <div className="text-center py-8">
+                        <Link className="w-16 h-16 text-blue-600 mx-auto mb-4" />
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">Public Assessment Link</h3>
+                        <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                          Share this link with potential clients to let them complete your risk assessment form
+                        </p>
+                      </div>
+
+                      {user?.referral_link ? (
+                        <div className="max-w-2xl mx-auto space-y-6">
+                          {/* Link Display Card */}
+                          <Card className="border-gray-200 shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-base flex items-center gap-2">
+                                <Link className="w-4 h-4 text-green-600" />
+                                Your Public Assessment Link
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  value={`${window.location.origin}${user.referral_link}`}
+                                  readOnly
+                                  className="text-sm border-gray-300 bg-gray-50 font-mono"
+                                />
+                                <Button 
+                                  onClick={copyReferralLink} 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="border-gray-300 hover:border-green-500 hover:bg-green-50"
+                                >
+                                  {copied ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                                </Button>
+                              </div>
+                              
+                              <div className="flex items-center justify-between text-sm">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                                    Version {currentAssessment.versions?.[0]?.version || 1}
+                                  </Badge>
+                                  <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
+                                    {isActive ? "Active" : "Inactive"}
+                                  </Badge>
+                                </div>
+                                <Button 
+                                  onClick={() => window.open(`${window.location.origin}${user.referral_link}`, '_blank')}
+                                  size="sm" 
+                                  variant="outline"
+                                  className="border-gray-300 hover:border-blue-500 hover:bg-blue-50"
+                                >
+                                  <ExternalLink className="w-3 h-3 mr-1" />
+                                  Test Form
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          {/* Instructions Card */}
+                          <Card className="border-gray-200 shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-base flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-blue-600" />
+                                How to Use
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div className="space-y-2 text-sm text-gray-700">
+                                <div className="flex items-start gap-2">
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                                  <p>Share this link with potential clients via email, WhatsApp, or social media</p>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                                  <p>Clients can complete the assessment without creating an account</p>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                                  <p>All responses are automatically saved and linked to your account</p>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                                  <p>You'll receive notifications when new assessments are completed</p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          {/* Stats Card */}
+                          <Card className="border-gray-200 shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-base flex items-center gap-2">
+                                <BarChart3 className="w-4 h-4 text-purple-600" />
+                                Link Performance
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="grid grid-cols-2 gap-4 text-center">
+                                <div className="p-3 bg-blue-50 rounded-lg">
+                                  <div className="text-2xl font-bold text-blue-600">0</div>
+                                  <div className="text-xs text-blue-600">Total Views</div>
+                                </div>
+                                <div className="p-3 bg-green-50 rounded-lg">
+                                  <div className="text-2xl font-bold text-green-600">0</div>
+                                  <div className="text-xs text-green-600">Completed</div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <AlertCircle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+                          <h4 className="text-lg font-medium text-gray-900 mb-2">Referral Link Not Available</h4>
+                          <p className="text-gray-600 mb-4">
+                            Please complete your profile setup to get your referral link
+                          </p>
+                          <Button 
+                            onClick={() => navigate('/app/profile')}
+                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                          >
+                            Complete Profile
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1033,6 +1163,46 @@ export default function AssessmentForms() {
           )}
         </div>
       </div>
+
+      {/* Save Success Popup */}
+      {showSaveSuccess && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md mx-4">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Assessment Saved!</h3>
+              <p className="text-gray-600 mb-6">
+                Your assessment has been saved successfully. A new version has been created.
+              </p>
+              
+              <div className="space-y-3">
+                <Button 
+                  onClick={() => {
+                    if (user?.referral_link) {
+                      window.open(`${window.location.origin}${user.referral_link}`, '_blank');
+                    }
+                  }}
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                  disabled={!user?.referral_link}
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  View Live Form
+                </Button>
+                
+                <Button 
+                  onClick={() => setShowSaveSuccess(false)}
+                  variant="outline"
+                  className="w-full border-gray-300 hover:border-blue-500 hover:bg-blue-50"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
