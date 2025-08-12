@@ -48,7 +48,8 @@ describe('Leads API', () => {
     // Mock successful authentication by default
     mockAuthenticateUser.mockImplementation(async (req, res, next) => {
       req.user = {
-        id: 'test-user-id',
+        clerk_id: 'test-user-id',
+        supabase_user_id: 'test-user-id',
         email: 'test@example.com',
         phone: '+91 99999 99999',
         role: 'mfd'
