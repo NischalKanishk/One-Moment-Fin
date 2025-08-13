@@ -551,7 +551,81 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
       return res.status(404).json({ error: 'Lead not found' });
     }
 
-    return res.json({ lead });
+    // If lead has a risk profile, fetch the assessment submission details
+    let assessmentData = null;
+    if (lead.risk_profile_id) {
+      try {
+        const { data: submission, error: submissionError } = await supabase
+          .from('assessment_submissions')
+          .select(`
+            id,
+            assessment_id,
+            framework_version_id,
+            answers,
+            result,
+            submitted_at
+          `)
+          .eq('id', lead.risk_profile_id)
+          .single();
+
+        if (!submissionError && submission) {
+          // Get the assessment details to understand the framework
+          const { data: assessment, error: assessmentError } = await supabase
+            .from('assessments')
+            .select(`
+              id,
+              title,
+              framework_version_id
+            `)
+            .eq('id', submission.assessment_id)
+            .single();
+
+          if (!assessmentError && assessment) {
+            // Get the framework questions to map answers
+            const { data: frameworkQuestions, error: questionsError } = await supabase
+              .from('framework_question_map')
+              .select(`
+                qkey,
+                required,
+                order_index,
+                question_bank!inner (
+                  label,
+                  qtype,
+                  options,
+                  module
+                )
+              `)
+              .eq('framework_version_id', assessment.framework_version_id)
+              .order('order_index', { ascending: true });
+
+            if (!questionsError && frameworkQuestions) {
+              assessmentData = {
+                submission,
+                assessment,
+                questions: frameworkQuestions,
+                mappedAnswers: frameworkQuestions.map((q: any) => ({
+                  question: q.question_bank?.label || q.qkey,
+                  answer: submission.answers[q.qkey] || 'Not answered',
+                  type: q.question_bank?.qtype,
+                  options: q.question_bank?.options,
+                  module: q.question_bank?.module
+                }))
+              };
+            }
+          }
+        }
+      } catch (assessmentError) {
+        console.log('Could not fetch assessment data:', assessmentError);
+        // Continue without assessment data
+      }
+    }
+
+    return res.json({ 
+      lead: {
+        ...lead,
+        assessment: assessmentData
+      }
+    });
   } catch (error) {
     console.error('Lead fetch error:', error);
     return res.status(500).json({ error: 'Failed to fetch lead' });

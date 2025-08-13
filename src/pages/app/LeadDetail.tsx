@@ -57,6 +57,21 @@ interface Lead {
   status: string;
   source_link?: string;
   created_at: string;
+  risk_profile_id?: string;
+  risk_bucket?: string;
+  risk_score?: number;
+  assessment?: {
+    submission: any;
+    assessment: any;
+    questions: any[];
+    mappedAnswers: Array<{
+      question: string;
+      answer: string;
+      type: string;
+      options: any;
+      module: string;
+    }>;
+  };
   assessment_submissions?: any[];
   meetings?: any[];
 }
@@ -511,6 +526,40 @@ export default function LeadDetail() {
         </TabsList>
         
         <TabsContent value="overview" className="space-y-4">
+          {/* Risk Profile Summary */}
+          {lead.assessment && (
+            <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-blue-800">
+                  <TrendingUp className="h-5 w-5" />
+                  Risk Profile Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-blue-600 mb-1">
+                      {lead.risk_score || 0}
+                    </div>
+                    <div className="text-sm text-blue-600 font-medium">Risk Score</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-800 mb-1">
+                      {lead.risk_bucket || 'N/A'}
+                    </div>
+                    <div className="text-sm text-blue-700">Risk Category</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600 mb-1">
+                      {lead.assessment.mappedAnswers.length}
+                    </div>
+                    <div className="text-sm text-blue-600">Questions Answered</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -548,6 +597,14 @@ export default function LeadDetail() {
                   <span className="text-sm text-muted-foreground">Source:</span>
                   <p className="font-medium capitalize">{lead.source_link || 'N/A'}</p>
                 </div>
+                {lead.assessment && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Assessment Date:</span>
+                    <p className="font-medium">
+                      {new Date(lead.assessment.submission.submitted_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -562,35 +619,103 @@ export default function LeadDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {lead.assessment_submissions && lead.assessment_submissions.length > 0 ? (
-                <>
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium">
-                      Assessment completed • Score {lead.assessment_submissions[0].score || 'N/A'}
+              {lead.assessment ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Left Side: Questions and Answers */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <h3 className="font-medium">Assessment Questions & Answers</h3>
                     </div>
-                    <Button size="sm" variant="outline">View Details</Button>
+                    <div className="space-y-3">
+                      {lead.assessment.mappedAnswers.map((qa, index) => (
+                        <div key={index} className="border rounded-lg p-3 bg-muted/30">
+                          <div className="font-medium text-sm mb-1">{qa.question}</div>
+                          <div className="text-sm text-muted-foreground">
+                            <span className="font-medium">Answer:</span> {qa.answer}
+                          </div>
+                          {qa.module && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Module: {qa.module}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <Separator />
-                  <div className="space-y-2">
-                    <p><strong>Risk Category:</strong> {lead.assessment_submissions[0].risk_category || 'N/A'}</p>
-                    <p><strong>Assessment Date:</strong> {new Date(lead.assessment_submissions[0].created_at).toLocaleDateString()}</p>
-                    <p><strong>Filled by:</strong> {lead.assessment_submissions[0].filled_by === 'lead' ? 'Client' : 'MFD'}</p>
-                    {lead.assessment_submissions[0].answers && (
-                      <div>
-                        <p className="font-medium mb-2">Assessment Answers:</p>
-                        <ul className="text-sm text-muted-foreground list-disc ml-5 space-y-1">
-                          {Object.entries(lead.assessment_submissions[0].answers).map(([key, value]: [string, any], index: number) => (
-                            <li key={index}>
-                              <strong>{key}:</strong> {value || 'N/A'}
-                            </li>
-                          ))}
-                        </ul>
+
+                  {/* Right Side: Risk Factors */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                      <h3 className="font-medium">Risk Profile</h3>
+                    </div>
+                    
+                    {/* Risk Score Card */}
+                    <div className="border rounded-lg p-4 bg-gradient-to-br from-blue-50 to-indigo-50">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600 mb-1">
+                          {lead.risk_score || 0}
+                        </div>
+                        <div className="text-sm text-blue-600 font-medium">Risk Score</div>
+                      </div>
+                    </div>
+
+                    {/* Risk Category Card */}
+                    <div className="border rounded-lg p-4">
+                      <div className="text-center">
+                        <div className="text-lg font-semibold mb-1">
+                          {lead.risk_bucket || 'N/A'}
+                        </div>
+                        <div className="text-sm text-muted-foreground">Risk Category</div>
+                      </div>
+                    </div>
+
+                    {/* Assessment Details */}
+                    <div className="border rounded-lg p-4 space-y-3">
+                      <div className="text-sm">
+                        <span className="font-medium">Assessment Date:</span>
+                        <div className="text-muted-foreground">
+                          {new Date(lead.assessment.submission.submitted_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-medium">Assessment Title:</span>
+                        <div className="text-muted-foreground">
+                          {lead.assessment.assessment.title}
+                        </div>
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-medium">Total Questions:</span>
+                        <div className="text-muted-foreground">
+                          {lead.assessment.mappedAnswers.length}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Risk Insights */}
+                    {lead.assessment.submission.result?.rubric && (
+                      <div className="border rounded-lg p-4 bg-amber-50">
+                        <div className="text-sm">
+                          <span className="font-medium text-amber-800">Risk Insights:</span>
+                          <div className="text-amber-700 mt-1">
+                            {lead.risk_bucket === 'Low' && 'Conservative approach recommended'}
+                            {lead.risk_bucket === 'Medium' && 'Balanced approach suitable'}
+                            {lead.risk_bucket === 'High' && 'Aggressive approach possible'}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
-                </>
+                </div>
               ) : (
-                <p className="text-muted-foreground">No risk assessment completed yet.</p>
+                <div className="text-center py-8">
+                  <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground mb-2">No risk assessment completed yet.</p>
+                  <p className="text-sm text-muted-foreground">
+                    This lead hasn't completed an assessment. Send them an assessment link to get started.
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
