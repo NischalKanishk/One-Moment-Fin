@@ -71,13 +71,6 @@ export default function AppLayout() {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  // Check if current page should show the Trial plan bar
-  const shouldShowTrialBar = () => {
-    const currentPath = location.pathname;
-    return currentPath === '/app/profile' || 
-           currentPath === '/app/dashboard';
-  };
-
   const markAsRead = (id: number) => {
     setNotifications(prev => 
       prev.map(n => n.id === id ? { ...n, read: true } : n)
@@ -137,15 +130,7 @@ export default function AppLayout() {
             </div>
           </header>
           
-          {shouldShowTrialBar() && (
-            <div className="border-b bg-muted/50 p-3 text-sm flex items-center justify-between">
-              <div><strong>Trial plan</strong> — 8 days left</div>
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="primary">Upgrade Plan</Button>
-                <Button size="sm" variant="outline">View Usage</Button>
-              </div>
-            </div>
-          )}
+
           
           <main className="py-8 md:py-10 px-4">
             <Outlet />

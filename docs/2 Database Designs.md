@@ -132,8 +132,8 @@ Store meeting details between the MFD (Rahul) and the lead — whether scheduled
 | id | UUID (PK) | Unique meeting ID (your internal ID) |
 | user_id | UUID (FK) | MFD (Rahul) who owns the meeting |
 | lead_id | UUID (FK) | Who the meeting is with |
-| external_event_id | Text | Google/Calendly event ID |
-| platform | Text | "google", "calendly" |
+| external_event_id | Text | Google Calendar event ID |
+| platform | Text | "google" |
 | meeting_link | Text | Google Meet / Zoom URL |
 | title | Text | Event title (from calendar) |
 | description | Text | Event body or agenda (from calendar) |

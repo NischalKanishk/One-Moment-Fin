@@ -112,7 +112,7 @@ export class ClerkSupabaseSync {
         auth_provider: 'clerk',
         referral_link: referralLink,
         profile_image_url: clerkUserData.imageUrl || '',
-        settings: {},
+
         role: 'mfd' as const
       }
 
@@ -126,26 +126,7 @@ export class ClerkSupabaseSync {
         throw new Error(error?.message || 'Failed to create user');
       }
 
-      // Create default user settings
-      try {
-        const { error: settingsError } = await supabaseClient
-          .from('user_settings')
-          .insert({
-            user_id: newUser.id,
-            calendly_url: null,
-            calendly_api_key: null,
-            google_calendar_id: null,
-            notification_preferences: {}
-          });
 
-        if (settingsError) {
-          console.error('Failed to create user settings:', settingsError);
-        } else {
-          console.log('User settings created successfully');
-        }
-      } catch (settingsError) {
-        console.error('Error creating user settings:', settingsError);
-      }
 
       return newUser
     } catch (error) {

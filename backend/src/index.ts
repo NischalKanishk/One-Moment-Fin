@@ -22,13 +22,13 @@ import leadsRoutes from './routes/leads';
 import assessmentsRoutes from './routes/assessments';
 import publicAssessmentsRoutes from './routes/publicAssessments';
 import aiRoutes from './routes/ai';
-import productsRoutes from './routes/products';
+
 import meetingsRoutes from './routes/meetings';
 import subscriptionRoutes from './routes/subscriptions';
 import webhookRoutes from './routes/webhooks';
 import clerkWebhookRoutes from './routes/clerkWebhooks';
 import adminRoutes from './routes/admin';
-import settingsRoutes from './routes/settings';
+
 
 
 const app = express();
@@ -107,13 +107,13 @@ app.use('/api/leads', leadsRoutes);
 app.use('/api/assessments', assessmentsRoutes);
 app.use('/api/public-assessments', publicAssessmentsRoutes);
 app.use('/api/ai', aiRoutes);
-app.use('/api/products', productsRoutes);
+
 app.use('/api/meetings', meetingsRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/webhooks/clerk', clerkWebhookRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/settings', settingsRoutes);
+
 
 // Public assessment routes
 app.use('/a', publicAssessmentsRoutes);

@@ -11,7 +11,7 @@ OneMFin transforms how MFDs operate by providing:
 - **AI-Powered Risk Assessment** for personalized investment recommendations
 - **Smart Product Suggestions** based on client risk profiles
 - **Streamlined KYC Processes** for faster client onboarding
-- **Integrated Meeting Scheduling** with Calendly
+- **Integrated Meeting Scheduling** with Google Calendar
 - **Comprehensive Portfolio Tracking** and analytics
 - **Professional Assessment Forms** that generate leads automatically
 
@@ -57,7 +57,7 @@ OneMFin transforms how MFDs operate by providing:
 - **Leads Management**: Comprehensive lead tracking with filtering and sorting
 - **Assessment Forms**: Professional risk assessment builder and public forms
 - **Portfolio Tracking**: Client portfolio monitoring and performance analytics
-- **Meetings**: Integrated scheduling with Calendly
+- **Meetings**: Integrated scheduling with Google Calendar
 - **Settings**: User preferences and integration configuration
 
 ## 🔐 Security & Authentication
@@ -108,7 +108,7 @@ OneMFin transforms how MFDs operate by providing:
 
 ## 🔌 Third-Party Integrations
 
-### **Calendly Integration**
+### **Google Calendar Integration**
 - **Seamless Scheduling**: Direct meeting booking from the app
 - **Lead Pre-filling**: Automatic client information population
 - **Meeting Management**: Centralized calendar and appointment tracking

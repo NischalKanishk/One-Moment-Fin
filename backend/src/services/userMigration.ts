@@ -36,7 +36,7 @@ export class UserMigrationService {
           role: userData.role || 'mfd',
           referral_link: `r/${authUserId.slice(0, 8)}`,
           assessment_link: `/assessment/${authUserId.slice(0, 8)}`,
-          settings: {}
+
         })
         .select()
         .single();

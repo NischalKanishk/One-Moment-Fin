@@ -88,7 +88,7 @@ router.get('/users/:id', async (req: express.Request, res: express.Response) => 
       .from('users')
       .select(`
         *,
-        user_settings (*),
+
         leads (count),
         assessments (count),
         meetings (count),
@@ -204,7 +204,7 @@ router.get('/deprecated-users/:id', async (req: express.Request, res: express.Re
       },
       userData: {
         user_info: userData.user_info,
-        user_settings: userData.user_settings,
+
         leads: userData.leads,
         assessments: userData.assessments,
         assessment_questions: userData.assessment_questions,
@@ -230,7 +230,7 @@ router.get('/deprecated-users/:id/:dataType', async (req: express.Request, res: 
     const { id, dataType } = req.params;
 
     // Validate data type
-    const validDataTypes = ['leads', 'assessments', 'meetings', 'user_settings', 'user_subscriptions', 'product_recommendations', 'ai_feedback'];
+    const validDataTypes = ['leads', 'assessments', 'meetings', 'user_subscriptions', 'product_recommendations', 'ai_feedback'];
     
     if (!validDataTypes.includes(dataType)) {
       return res.status(400).json({ error: 'Invalid data type. Valid types: ' + validDataTypes.join(', ') });

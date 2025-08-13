@@ -147,7 +147,7 @@ const chartTheme = useChartTheme();
 - Consistent button heights (44px minimum)
 - Blue primary color scheme
 
-### Calendly
+
 - Wrapped in Card components
 - Neutral surface backgrounds
 - Propagates font and color schemes

@@ -3,42 +3,6 @@ import { supabase } from '../config/supabase';
 
 const router = express.Router();
 
-// POST /webhooks/calendly
-router.post('/calendly', async (req: express.Request, res: express.Response) => {
-  try {
-    // Verify webhook signature (implement based on Calendly docs)
-    const { event, payload } = req.body;
-
-    if (event === 'invitee.created') {
-      // Handle new meeting creation
-      const { data, error } = await supabase
-        .from('meetings')
-        .insert({
-          external_event_id: payload.event.uuid,
-          platform: 'calendly',
-          meeting_link: payload.event.location?.join_url,
-          title: payload.event.name,
-          description: payload.event.description,
-          start_time: payload.event.start_time,
-          end_time: payload.event.end_time,
-          status: 'scheduled',
-          is_synced: true
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Calendly webhook error:', error);
-      }
-    }
-
-    return res.json({ received: true });
-  } catch (error) {
-    console.error('Calendly webhook error:', error);
-    return res.status(500).json({ error: 'Webhook processing failed' });
-  }
-});
-
 // POST /webhooks/stripe
 router.post('/stripe', async (req: express.Request, res: express.Response) => {
   try {

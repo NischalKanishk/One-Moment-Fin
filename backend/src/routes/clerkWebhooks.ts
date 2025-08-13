@@ -236,7 +236,7 @@ async function handleUserCreated(data: any) {
         auth_provider: 'clerk',
         referral_link: referralLink,
         profile_image_url: profileImageUrl,
-        settings: {},
+
         role: 'mfd'
       })
       .select()
@@ -254,26 +254,7 @@ async function handleUserCreated(data: any) {
       fullName
     });
 
-    // Create default user settings
-    try {
-      const { error: settingsError } = await supabase
-        .from('user_settings')
-        .insert({
-          user_id: newUser.id,
-          calendly_url: null,
-          calendly_api_key: null,
-          google_calendar_id: null,
-          notification_preferences: {}
-        });
 
-      if (settingsError) {
-        logger.error('Failed to create user settings', { userId: newUser.id, error: settingsError });
-      } else {
-        logger.info('User settings created successfully', { userId: newUser.id });
-      }
-    } catch (settingsError) {
-      logger.error('Error creating user settings', { userId: newUser.id, error: settingsError });
-    }
 
     // Create default assessment for new user
     try {

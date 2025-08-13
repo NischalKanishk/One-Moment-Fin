@@ -98,7 +98,7 @@
 
 | **Method** | **Endpoint** | **Auth** | **Description** |
 | --- | --- | --- | --- |
-| POST | /webhooks/calendly | 🔐 | Handle new meeting event |
+
 | POST | /webhooks/stripe | 🔐 | Handle payment events |
 | POST | /webhooks/google | 🔐 | Handle calendar sync (future) |
 

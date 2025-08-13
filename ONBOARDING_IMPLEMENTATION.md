@@ -8,7 +8,7 @@ The onboarding flow ensures that new users complete their profile setup before a
 
 1. **Phone Number** (Optional)
 2. **MFD Registration Number** (Optional) 
-3. **Calendly Integration** (Required: URL, Optional: API Key)
+3. **Google Calendar Integration** (Optional)
 
 ## 🏗️ Architecture
 
@@ -36,7 +36,7 @@ The onboarding flow ensures that new users complete their profile setup before a
 -- Add MFD registration number to users table
 ALTER TABLE users ADD COLUMN mfd_registration_number TEXT;
 
--- Update user_settings table for Calendly integration
+-- Update user_settings table for Google Calendar integration
 -- (Already exists in current schema)
 ```
 
@@ -58,8 +58,7 @@ interface CustomJwtSessionClaims {
     onboardingComplete?: boolean
     phoneNumber?: string
     mfdRegistrationNumber?: string
-    calendlyUrl?: string
-    calendlyApiKey?: string
+    googleCalendarId?: string
   }
 }
 ```
@@ -72,8 +71,7 @@ POST /api/onboarding/complete
 {
   "phoneNumber": "string",
   "mfdRegistrationNumber": "string", 
-  "calendlyUrl": "string",
-  "calendlyApiKey": "string"
+  "googleCalendarId": "string"
 }
 ```
 
@@ -92,7 +90,7 @@ PUT /api/auth/profile
 #### Multi-Step Onboarding Form
 - **Step 1**: Basic Information (Phone Number)
 - **Step 2**: MFD Registration Number
-- **Step 3**: Calendly Integration
+- **Step 3**: Google Calendar Integration
 - **Step 4**: Review & Complete
 
 #### Route Protection
@@ -105,12 +103,12 @@ PUT /api/auth/profile
 ### Row Level Security (RLS)
 - Users can only access their own data
 - MFD registration numbers are isolated per user
-- Calendly API keys are encrypted and stored securely
+- Google Calendar integration is optional
 
 ### Input Validation
 - Phone number format validation (10-15 characters)
 - MFD registration number length limit (50 characters)
-- Calendly URL format validation
+- Google Calendar ID format validation
 - Required field enforcement
 
 ### Authentication Flow
@@ -280,6 +278,6 @@ The OneMFin onboarding flow provides a secure, user-friendly experience that ens
 **Key Benefits:**
 - ✅ Secure user onboarding with Clerk authentication
 - ✅ Comprehensive data collection for MFD compliance
-- ✅ Seamless Calendly integration setup
+- ✅ Seamless Google Calendar integration setup
 - ✅ Robust route protection and validation
 - ✅ Scalable architecture for future enhancements

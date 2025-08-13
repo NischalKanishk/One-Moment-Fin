@@ -24,9 +24,9 @@ This document summarizes the complete removal of the onboarding functionality an
 
 #### Settings.tsx
 - ✅ Removed redundant profile tab (dedicated Profile page exists)
-- ✅ Maintained existing Calendly, Preferences, and Subscription tabs
+- ✅ Maintained existing Preferences and Subscription tabs
 - ✅ Cleaned up unused profile-related code and state
-- ✅ Calendly tab is now the default tab
+- ✅ Preferences tab is now the default tab
 
 #### Profile.tsx (Existing)
 - ✅ Already has complete profile management functionality
@@ -149,7 +149,7 @@ This document summarizes the complete removal of the onboarding functionality an
 - [ ] MFD registration number field works in Profile page
 - [ ] Phone number with country code works in Profile page
 - [ ] Referral link is generated and copyable in Profile page
-- [ ] Settings page shows Calendly, Preferences, and Subscription tabs
+- [ ] Settings page shows Preferences and Subscription tabs
 - [ ] No duplicate profile functionality between Settings and Profile pages
 
 ### Backend Testing

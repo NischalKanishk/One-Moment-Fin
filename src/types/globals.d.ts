@@ -6,8 +6,7 @@ declare global {
       onboardingComplete?: boolean
       phoneNumber?: string
       mfdRegistrationNumber?: string
-      calendlyUrl?: string
-      calendlyApiKey?: string
+      googleCalendarId?: string
     }
   }
 }

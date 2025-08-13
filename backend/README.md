@@ -76,7 +76,7 @@ The server will start on `http://localhost:3001`
 - `POST /api/subscription/start` - Start subscription
 
 ### Webhooks
-- `POST /webhooks/calendly` - Calendly webhook
+
 - `POST /webhooks/stripe` - Stripe webhook
 - `POST /webhooks/google` - Google Calendar webhook
 
@@ -141,7 +141,7 @@ src/
 2. **Set up environment variables** in `.env`
 3. **Test the API** with tools like Postman or curl
 4. **Connect frontend** to the backend APIs
-5. **Add external integrations** (Calendly, Stripe, etc.)
+5. **Add external integrations** (Stripe, etc.)
 
 ## Testing
 

@@ -100,14 +100,14 @@ export const authAPI = {
     }
   },
 
-  updateProfile: async (data: { full_name?: string; phone?: string; settings?: any }) => {
+  updateProfile: async (data: { full_name?: string; phone?: string }) => {
     // This function needs to be called with a token, so we'll use the base api
     // The frontend should pass the token in the Authorization header
     const response = await api.put('/api/auth/profile', data);
     return response.data;
   },
 
-  updateProfileWithToken: async (token: string, data: { full_name?: string; phone?: string; mfd_registration_number?: string; settings?: any }) => {
+  updateProfileWithToken: async (token: string, data: { full_name?: string; phone?: string; mfd_registration_number?: string }) => {
     console.log('🔍 API: updateProfileWithToken called with:', { tokenLength: token.length, data });
     
     // Validate token format
@@ -361,8 +361,7 @@ export const subscriptionsAPI = {
 export const completeOnboarding = async (token: string, data: {
   phoneNumber?: string
   mfdRegistrationNumber?: string
-  calendlyUrl?: string
-  calendlyApiKey?: string
+  googleCalendarId?: string
 }) => {
   const authApi = createAuthenticatedApi(token)
   

@@ -40,7 +40,7 @@ The MVP is designed to validate user needs and prove ROI through automation. It 
 - Public smart form link (customizable)
 - Lead capture + risk profiling
 - AI-generated product suggestions
-- Meeting scheduling (Calendly or Google integration)
+- Meeting scheduling (Google Calendar integration)
 - Basic KYC tracking
 - Dashboard view with filters and lead insights
 - Manual status management
@@ -57,7 +57,7 @@ The MVP is designed to validate user needs and prove ROI through automation. It 
 | Database | Supabase (PostgreSQL + Auth + Storage) |
 | AI Layer | OpenAI API / Langchain for custom logic |
 | Hosting | Render (Frontend)/ Railway / Supabase Edge (Backend)/ Netlify |
-| 3rd Party | Calendly, Google Calendar, Razorpay (future), WhatsApp API (future) |
+| 3rd Party | Google Calendar, Razorpay (future), WhatsApp API (future) |
 
 ## **Vision**
 

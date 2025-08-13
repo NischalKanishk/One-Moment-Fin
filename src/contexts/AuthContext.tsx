@@ -109,7 +109,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           role: 'mfd',
           created_at: new Date(clerkUser.createdAt).toISOString(),
           updated_at: new Date().toISOString(),
-          settings: {},
+
           referral_link: undefined
         }
 

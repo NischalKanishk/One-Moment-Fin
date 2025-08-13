@@ -19,10 +19,10 @@ import Signup from "./pages/Signup";
 import FormBuilder from "./pages/app/FormBuilder";
 import Assessments from "./pages/app/Assessments";
 import AssessmentsV2 from "./pages/app/AssessmentsV2";
-import Products from "./pages/app/Products";
+
 import Meetings from "./pages/app/Meetings";
 import Profile from "./pages/app/Profile";
-import Settings from "./pages/app/Settings";
+
 import PublicAssessment from "./pages/PublicAssessment";
 import AssessmentComplete from "./pages/AssessmentComplete";
 import AssessmentForms from "./pages/app/AssessmentForms";
@@ -75,10 +75,10 @@ const App = () => (
                 <Route path="form-builder" element={<FormBuilder />} />
                 <Route path="assessments" element={<AssessmentsV2 />} />
                 <Route path="assessments-legacy" element={<Assessments />} />
-                <Route path="products" element={<Products />} />
+        
                 <Route path="meetings" element={<Meetings />} />
                 <Route path="profile" element={<Profile />} />
-                <Route path="settings" element={<Settings />} />
+
               </Route>
 
               <Route path="*" element={<NotFound />} />

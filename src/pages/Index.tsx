@@ -281,7 +281,7 @@ const Index = () => {
                   <h3 className="text-3xl font-bold text-foreground">Meeting Scheduler</h3>
                 </div>
                 <p className="text-lg text-muted-foreground leading-relaxed">
-                  Seamlessly integrate with Google Calendar and Calendly to let prospects book meetings directly.
+                  Seamlessly integrate with Google Calendar to let prospects book meetings directly.
                   Automated reminders ensure no meetings are missed.
                 </p>
                 <ul className="space-y-3">

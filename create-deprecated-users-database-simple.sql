@@ -65,8 +65,7 @@ BEGIN
             SELECT jsonb_agg(
                 jsonb_build_object(
                     'id', us.id,
-                    'calendly_url', us.calendly_url,
-                    'calendly_api_key', us.calendly_api_key,
+                    
                     'google_calendar_id', us.google_calendar_id,
                     'notification_preferences', us.notification_preferences,
                     'created_at', us.created_at

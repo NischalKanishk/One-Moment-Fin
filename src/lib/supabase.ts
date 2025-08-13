@@ -39,7 +39,7 @@ export interface User {
   role: 'mfd' | 'admin'
   created_at: string
   updated_at: string
-  settings: Record<string, any>
+
   referral_link?: string
   assessment_link?: string
 }
@@ -167,7 +167,7 @@ export interface Meeting {
   user_id: string
   lead_id: string
   external_event_id?: string
-  platform?: 'google' | 'calendly'
+  platform?: 'google'
   meeting_link?: string
   title?: string
   description?: string

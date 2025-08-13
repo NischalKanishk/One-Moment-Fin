@@ -1,6 +1,6 @@
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarSeparator } from "@/components/ui/sidebar";
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Users, ClipboardList, Boxes, Calendar, Settings, User, Target } from "lucide-react";
+import { Home, Users, ClipboardList, Boxes, Calendar, User, Target } from "lucide-react";
 
 const nav = [
   { title: "Action Dashboard", url: "/app/action-dashboard", icon: Target },
@@ -9,8 +9,8 @@ const nav = [
   { title: "Assessments", url: "/app/assessments", icon: ClipboardList },
   { title: "Meetings", url: "/app/meetings", icon: Calendar },
   { title: "Profile", url: "/app/profile", icon: User },
-  { title: "Settings", url: "/app/settings", icon: Settings },
-  { title: "Products", url: "/app/products", icon: Boxes, disabled: true, comingSoon: true },
+
+  
 ];
 
 export function AppSidebar() {

@@ -42,7 +42,7 @@ export interface User {
   created_at: string;
   referral_link?: string;
   profile_image_url?: string;
-  settings: Record<string, any>;
+
   role: 'mfd' | 'admin';
 }
 
@@ -169,7 +169,7 @@ export interface Meeting {
   user_id: string;
   lead_id: string;
   external_event_id?: string;
-  platform?: 'google' | 'calendly';
+  platform?: 'google';
   meeting_link?: string;
   title?: string;
   description?: string;

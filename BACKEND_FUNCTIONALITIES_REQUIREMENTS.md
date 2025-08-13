@@ -82,7 +82,7 @@
 
 ### Meeting Management
 - **Meeting Scheduling**: Create/update/cancel meetings
-- **Calendar Integration**: Sync with Google Calendar/Calendly
+- **Calendar Integration**: Sync with Google Calendar
 - **Meeting Reminders**: Automated reminder system
 - **Meeting Notes**: Store post-meeting notes and outcomes
 - **Availability Management**: MFD availability tracking
@@ -155,7 +155,7 @@
 ### Third-party Integrations
 - **Payment Gateways**: Razorpay/Stripe integration
 - **WhatsApp Business API**: Message automation
-- **Calendar Services**: Google Calendar, Calendly
+- **Calendar Services**: Google Calendar
 - **KYC Providers**: Third-party KYC verification services
 
 ### API Management

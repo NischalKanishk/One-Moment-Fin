@@ -18,44 +18,11 @@ CREATE TABLE users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     referral_link TEXT UNIQUE,
     profile_image_url TEXT,
-    settings JSONB DEFAULT '{}',
+
     role TEXT DEFAULT 'mfd' CHECK (role IN ('mfd', 'admin'))
 );
 
--- 1.1. User Settings table for storing user-specific configurations
-CREATE TABLE user_settings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    calendly_url TEXT,
-    calendly_api_key TEXT,
-    google_calendar_id TEXT,
-    notification_preferences JSONB DEFAULT '{}',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(user_id)
-);
 
--- Enable Row Level Security for user_settings
-ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
-
--- RLS Policies for user_settings table
-CREATE POLICY "Users can view own settings" ON user_settings
-    FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own settings" ON user_settings
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own settings" ON user_settings
-    FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own settings" ON user_settings
-    FOR DELETE USING (auth.uid() = user_id);
-
-CREATE POLICY "Service role can manage all settings" ON user_settings
-    FOR ALL USING (auth.role() = 'service_role');
-
--- Create index for user_settings
-CREATE INDEX idx_user_settings_user_id ON user_settings(user_id);
 
 -- Enable Row Level Security
 -- ALTER TABLE users ENABLE ROW LEVEL SECURITY; -- Temporarily disabled for development
@@ -349,7 +316,7 @@ CREATE TABLE meetings (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
     external_event_id TEXT,
-    platform TEXT CHECK (platform IN ('google', 'calendly')),
+    platform TEXT CHECK (platform IN ('google')),
     meeting_link TEXT,
     title TEXT,
     description TEXT,

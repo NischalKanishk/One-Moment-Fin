@@ -22,7 +22,7 @@ Handles:
 
 - Auth middleware and session checks
 - Business logic for risk analysis, KYC, leads, meetings, subscriptions
-- API integration with Google, Calendly, Razorpay, and AI
+- API integration with Google, Razorpay, and AI
 - Connecting to Supabase for all DB operations
 - Logging and error handling
 
@@ -58,7 +58,7 @@ Functions:
 
 | **Integration** | **Use** |
 | --- | --- |
-| **Calendly / Google Calendar** | Lead-to-User meeting setup and tracking |
+| **Google Calendar** | Lead-to-User meeting setup and tracking |
 | **WhatsApp API (future)** | Send booking confirmations, nudges, KYC links |
 | **Stripe / Razorpay (future)** | Paid plan subscription management |
 
