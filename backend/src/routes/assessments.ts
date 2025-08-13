@@ -5,12 +5,59 @@ import { authenticateUser } from '../middleware/auth';
 import { AssessmentFormService } from '../services/assessmentFormService';
 import { AIService } from '../services/ai';
 import { LeadStatusService } from '../services/leadStatusService';
+import { AssessmentService } from '../services/assessmentService';
 
 const router = express.Router();
 
 // ============================================================================
 // AUTHENTICATED ROUTES (MFD Dashboard)
 // ============================================================================
+
+// GET /api/assessments - List user assessments
+router.get('/', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const assessments = await AssessmentService.getUserAssessments(req.user.supabase_user_id);
+    return res.json({ assessments });
+  } catch (error) {
+    console.error('Get assessments error:', error);
+    return res.status(500).json({ error: 'Failed to fetch assessments' });
+  }
+});
+
+// POST /api/assessments - Create a new assessment
+router.post('/', authenticateUser, [
+  body('title').notEmpty().withMessage('Assessment title is required'),
+  body('framework_version_id').optional().isUUID().withMessage('Framework version ID must be a valid UUID'),
+  body('is_default').optional().isBoolean().withMessage('is_default must be a boolean')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const { title, framework_version_id, is_default } = req.body;
+
+    const assessment = await AssessmentService.createAssessment(req.user.supabase_user_id, {
+      title,
+      framework_version_id,
+      is_default
+    });
+
+    return res.status(201).json({ assessment });
+  } catch (error) {
+    console.error('Create assessment error:', error);
+    return res.status(500).json({ error: 'Failed to create assessment' });
+  }
+});
 
 // POST /api/assessments/forms - Create a new assessment form
 router.post('/forms', authenticateUser, [
@@ -87,17 +134,73 @@ router.post('/forms/:formId/versions', authenticateUser, [
   }
 });
 
-// GET /api/assessments/forms - List user forms with latest versions
+// GET /api/assessments/forms - List user assessments with questions
 router.get('/forms', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
+    console.log('🔍 Forms endpoint called');
+    console.log('User:', req.user);
+    console.log('User supabase_user_id:', req.user?.supabase_user_id);
+    
     if (!req.user?.supabase_user_id) {
+      console.error('❌ No supabase_user_id in request');
       return res.status(400).json({ error: 'User not properly authenticated' });
     }
 
-    const forms = await AssessmentFormService.getUserForms(req.user.supabase_user_id);
-    return res.json({ forms });
+    // Get user's assessments from the assessments table (show all, not just active ones)
+    console.log('🔍 Querying assessments for user:', req.user.supabase_user_id);
+    const { data: assessments, error: assessmentsError } = await supabase
+      .from('assessments')
+      .select('*')
+      .eq('user_id', req.user.supabase_user_id);
+
+    if (assessmentsError) {
+      console.error('❌ Get assessments error:', assessmentsError);
+      return res.status(500).json({ error: 'Failed to fetch assessments' });
+    }
+
+    console.log('✅ Assessments found:', assessments?.length || 0);
+
+    if (!assessments || assessments.length === 0) {
+      console.log('ℹ️ No assessments found, returning empty array');
+      return res.json({ forms: [] });
+    }
+
+    // For each assessment, get the questions
+    console.log('🔍 Fetching questions for assessments...');
+    const assessmentsWithQuestions = await Promise.all(
+      assessments.map(async (assessment) => {
+        console.log(`🔍 Fetching questions for assessment: ${assessment.id}`);
+        const { data: questions, error: questionsError } = await supabase
+          .from('assessment_questions')
+          .select('*')
+          .eq('assessment_id', assessment.id)
+          .order('created_at', { ascending: true });
+
+        if (questionsError) {
+          console.error('❌ Error fetching questions for assessment:', assessment.id, questionsError);
+          return {
+            ...assessment,
+            questions: []
+          };
+        }
+
+        console.log(`✅ Questions found for assessment ${assessment.id}:`, questions?.length || 0);
+
+        return {
+          id: assessment.id,
+          name: assessment.name,
+          description: assessment.description,
+          is_active: assessment.is_active,
+          created_at: assessment.created_at,
+          questions: questions || []
+        };
+      })
+    );
+
+    console.log('✅ Final result:', assessmentsWithQuestions.length, 'assessments with questions');
+    return res.json({ forms: assessmentsWithQuestions });
   } catch (error) {
-    console.error('Get forms error:', error);
+    console.error('❌ Get forms error:', error);
     return res.status(500).json({ error: 'Failed to fetch forms' });
   }
 });
@@ -719,16 +822,205 @@ router.post('/token/:token/submit', [
 });
 
 // ============================================================================
+// RISK ASSESSMENT SYSTEM ROUTES
+// ============================================================================
+
+// GET /api/assessments/frameworks - Get available risk frameworks
+router.get('/frameworks', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const frameworks = await AssessmentService.getFrameworks();
+    return res.json({ frameworks });
+  } catch (error) {
+    console.error('Get frameworks error:', error);
+    return res.status(500).json({ error: 'Failed to fetch frameworks' });
+  }
+});
+
+// POST /api/assessments - Create new assessment
+router.post('/', authenticateUser, [
+  body('title').notEmpty().withMessage('Title is required'),
+  body('framework_version_id').optional().isUUID().withMessage('Framework version ID must be valid UUID'),
+  body('is_default').optional().isBoolean().withMessage('is_default must be a boolean')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const { title, framework_version_id, is_default } = req.body;
+
+    const assessment = await AssessmentService.createAssessment(req.user.supabase_user_id, {
+      title,
+      framework_version_id,
+      is_default
+    });
+
+    return res.status(201).json({ assessment });
+  } catch (error) {
+    console.error('Create assessment error:', error);
+    return res.status(500).json({ error: 'Failed to create assessment' });
+  }
+});
+
+// PATCH /api/assessments/:id - Update assessment
+router.patch('/:id', authenticateUser, [
+  body('title').optional().notEmpty().withMessage('Title cannot be empty'),
+  body('framework_version_id').optional().isUUID().withMessage('Framework version ID must be valid UUID'),
+  body('is_published').optional().isBoolean().withMessage('is_published must be a boolean')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const assessment = await AssessmentService.updateAssessment(id, req.user.supabase_user_id, updateData);
+
+    return res.json({ assessment });
+  } catch (error) {
+    console.error('Update assessment error:', error);
+    return res.status(500).json({ error: 'Failed to update assessment' });
+  }
+});
+
+// GET /api/assessments/:id - Get assessment details (owner only)
+router.get('/:id', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const { id } = req.params;
+    const assessment = await AssessmentService.getAssessment(id, req.user.supabase_user_id);
+
+    if (!assessment) {
+      return res.status(404).json({ error: 'Assessment not found' });
+    }
+
+    return res.json({ assessment });
+  } catch (error) {
+    console.error('Get assessment error:', error);
+    return res.status(500).json({ error: 'Failed to fetch assessment' });
+  }
+});
+
+// GET /api/assessments/:id/submissions - Get assessment submissions
+router.get('/:id/submissions', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const { id } = req.params;
+    const submissions = await AssessmentService.getAssessmentSubmissions(id, req.user.supabase_user_id);
+
+    return res.json({ submissions });
+  } catch (error) {
+    console.error('Get submissions error:', error);
+    return res.status(500).json({ error: 'Failed to fetch submissions' });
+  }
+});
+
+// GET /api/submissions/:id - Get submission details
+router.get('/submissions/:id', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const { id } = req.params;
+    const submission = await AssessmentService.getSubmission(id, req.user.supabase_user_id);
+
+    if (!submission) {
+      return res.status(404).json({ error: 'Submission not found' });
+    }
+
+    return res.json({ submission });
+  } catch (error) {
+    console.error('Get submission error:', error);
+    return res.status(500).json({ error: 'Failed to fetch submission' });
+  }
+});
+
+// ============================================================================
 // LEGACY COMPATIBILITY ROUTES (for backward compatibility)
 // ============================================================================
 
-// GET /api/assessments/test - Test endpoint
-router.get('/test', async (req: express.Request, res: express.Response) => {
+// GET /api/assessments/health - Health check endpoint (no auth required)
+router.get('/health', async (req: express.Request, res: express.Response) => {
   try {
+    console.log('🔍 Health check endpoint called');
+    
+    // Test basic database connection
+    const { data: testData, error: testError } = await supabase
+      .from('assessments')
+      .select('count')
+      .limit(1);
+    
+    if (testError) {
+      console.error('❌ Health check database error:', testError);
+      return res.status(500).json({ 
+        status: 'unhealthy',
+        error: 'Database connection failed',
+        details: testError.message 
+      });
+    }
+    
     return res.json({ 
-      message: 'Assessments API v2 is working',
-      timestamp: new Date().toISOString(),
-      version: '2.0.0'
+      status: 'healthy',
+      message: 'Database connection successful',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Health check error:', error);
+    return res.status(500).json({ 
+      status: 'unhealthy',
+      error: 'Health check failed' 
+    });
+  }
+});
+
+// GET /api/assessments/test - Test endpoint to verify database connectivity
+router.get('/test', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    console.log('🔍 Test endpoint called');
+    console.log('User:', req.user);
+    console.log('User supabase_user_id:', req.user?.supabase_user_id);
+    
+    // Test basic database connection
+    const { data: testData, error: testError } = await supabase
+      .from('assessments')
+      .select('count')
+      .limit(1);
+    
+    if (testError) {
+      console.error('Database test error:', testError);
+      return res.status(500).json({ 
+        error: 'Database connection failed',
+        details: testError.message 
+      });
+    }
+    
+    return res.json({ 
+      message: 'Database connection successful',
+      user: req.user,
+      testData
     });
   } catch (error) {
     console.error('Test endpoint error:', error);

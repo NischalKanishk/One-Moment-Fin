@@ -203,9 +203,96 @@ async function handleUserCreated(data: any) {
 
     logger.info('Processing user creation from Clerk', { clerkUserId });
 
-    // This webhook is typically not needed since we create users
-    // when they first authenticate, but we can log it for monitoring
-    logger.info('User creation webhook received', { clerkUserId });
+    // Get user details from Clerk
+    let clerkUser;
+    try {
+      clerkUser = await clerkClient.users.getUser(clerkUserId);
+    } catch (clerkError) {
+      logger.error('Failed to get user details from Clerk', { clerkUserId, error: clerkError });
+      return;
+    }
+
+    // Extract user data from Clerk
+    const email = clerkUser.emailAddresses?.[0]?.emailAddress || '';
+    const phone = clerkUser.phoneNumbers?.[0]?.phoneNumber || null;
+    const firstName = clerkUser.firstName || '';
+    const lastName = clerkUser.lastName || '';
+    const fullName = [firstName, lastName].filter(Boolean).join(' ') || 'User';
+    const profileImageUrl = clerkUser.imageUrl || '';
+
+    // Generate unique referral link
+    const referralLink = `r/${clerkUserId.slice(0, 8)}`;
+    const assessmentLink = `/assessment/${clerkUserId.slice(0, 8)}`;
+
+    // Create user in Supabase with all required fields
+    const { data: newUser, error: userError } = await supabase
+      .from('users')
+      .insert({
+        clerk_id: clerkUserId,
+        full_name: fullName,
+        email: email,
+        phone: phone,
+        mfd_registration_number: null, // Will be updated later if provided
+        auth_provider: 'clerk',
+        referral_link: referralLink,
+        profile_image_url: profileImageUrl,
+        settings: {},
+        role: 'mfd'
+      })
+      .select()
+      .single();
+
+    if (userError) {
+      logger.error('Failed to create user in Supabase', { clerkUserId, error: userError });
+      return;
+    }
+
+    logger.info('User created successfully in Supabase', { 
+      clerkUserId, 
+      userId: newUser.id,
+      email,
+      fullName
+    });
+
+    // Create default user settings
+    try {
+      const { error: settingsError } = await supabase
+        .from('user_settings')
+        .insert({
+          user_id: newUser.id,
+          calendly_url: null,
+          calendly_api_key: null,
+          google_calendar_id: null,
+          notification_preferences: {}
+        });
+
+      if (settingsError) {
+        logger.error('Failed to create user settings', { userId: newUser.id, error: settingsError });
+      } else {
+        logger.info('User settings created successfully', { userId: newUser.id });
+      }
+    } catch (settingsError) {
+      logger.error('Error creating user settings', { userId: newUser.id, error: settingsError });
+    }
+
+    // Create default assessment for new user
+    try {
+      const { AssessmentService } = await import('../services/assessmentService');
+      const defaultAssessment = await AssessmentService.createDefaultAssessment(newUser.id);
+      
+      logger.info('Default assessment created for new user', {
+        clerkUserId,
+        userId: newUser.id,
+        assessmentId: defaultAssessment.id,
+        slug: defaultAssessment.slug
+      });
+    } catch (assessmentError) {
+      logger.error('Failed to create default assessment for new user', {
+        clerkUserId,
+        userId: newUser.id,
+        error: assessmentError
+      });
+    }
 
   } catch (error) {
     logger.error('Error handling user creation webhook', { error, data });

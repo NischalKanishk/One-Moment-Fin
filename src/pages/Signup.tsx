@@ -1,9 +1,21 @@
-import React from 'react'
-import { SignUp } from '@clerk/clerk-react'
+import React, { useEffect } from 'react'
+import { SignUp, useSignUp } from '@clerk/clerk-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function Signup() {
+  const { isSignedIn } = useSignUp()
+  const { user } = useAuth()
+  const navigate = useNavigate()
+
+  // Redirect to dashboard if user is already signed in
+  useEffect(() => {
+    if (isSignedIn && user) {
+      navigate('/app/dashboard')
+    }
+  }, [isSignedIn, user, navigate])
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="w-full max-w-md">

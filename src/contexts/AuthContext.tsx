@@ -30,7 +30,7 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const { user: clerkUser, isLoaded: clerkLoaded } = useUser()
-  const { isSignedIn, getToken } = useClerkAuth()
+  const { isSignedIn, getToken: getClerkToken } = useClerkAuth()
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [syncDisabled, setSyncDisabled] = useState(false)
@@ -49,7 +49,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       let clerkToken: string | null = null
       
       try {
-        clerkToken = await getToken({ template: 'supabase' })
+        clerkToken = await getClerkToken({ template: 'supabase' })
+        console.log('🔍 AuthContext: Got JWT token with supabase template')
       } catch (tokenError) {
         console.error('Failed to get Clerk JWT token:', tokenError)
         throw new Error('No Clerk JWT token available')
@@ -82,14 +83,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('🔍 AuthContext: Sync successful, setting user from Supabase:', supabaseUser)
         setUser(supabaseUser)
       } else {
-        // Fallback to Clerk data if sync fails
         console.log('🔍 AuthContext: Sync failed, using fallback Clerk data')
+        
+        // Fallback to Clerk data if sync fails
+        const firstName = clerkUser.firstName || clerkUser.fullName?.split(' ')[0] || '';
+        const lastName = clerkUser.lastName || clerkUser.fullName?.split(' ').slice(1).join(' ') || '';
+        const fullName = [firstName, lastName].filter(Boolean).join(' ') || 'User';
+        
+        const email = clerkUser.emailAddresses?.[0]?.emailAddress || 
+                     clerkUser.primaryEmailAddress?.emailAddress || 
+                     '';
+        
+        const phone = clerkUser.phoneNumbers?.[0]?.phoneNumber || 
+                     clerkUser.primaryPhoneNumber?.phoneNumber || 
+                     '';
+
         const fallbackUser: User = {
           id: clerkUser.id,
           clerk_id: clerkUser.id,
-          full_name: `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || 'User',
-          email: clerkUser.emailAddresses?.[0]?.emailAddress || '',
-          phone: clerkUser.phoneNumbers?.[0]?.phoneNumber || '',
+          full_name: fullName,
+          email: email,
+          phone: phone,
           profile_image_url: clerkUser.imageUrl || '',
           auth_provider: 'clerk',
           role: 'mfd',
@@ -98,20 +112,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           settings: {},
           referral_link: undefined
         }
+
+        console.log('🔍 AuthContext: Using fallback user data:', fallbackUser)
         setUser(fallbackUser)
       }
+
     } catch (error) {
       console.error('Error syncing user:', error)
-      
-      // Provide helpful error messages
-      if (error instanceof Error) {
-        if (error.message.includes('JWT token')) {
-          console.log('JWT Token Issue: Check your Clerk JWT template configuration')
-        } else if (error.message.includes('RLS')) {
-          console.log('RLS Issue: Check your Supabase RLS policies')
-        }
-      }
-      
       setUser(null)
     } finally {
       setIsLoading(false)
@@ -149,7 +156,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         if (!isSignedIn) return null;
         // Get a regular Clerk JWT token (not Supabase-specific)
-        return await getToken();
+        return await getClerkToken();
       } catch (error) {
         console.error('Error getting token:', error);
         return null;

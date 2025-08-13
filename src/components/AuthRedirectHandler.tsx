@@ -13,23 +13,8 @@ export const AuthRedirectHandler = () => {
     // If user is not signed in, don't redirect
     if (!user) return;
 
-    // Check if user has completed onboarding
-    const onboardingComplete = user.publicMetadata?.onboardingComplete === true;
-    
-    // If user just signed up and hasn't completed onboarding
-    if (!onboardingComplete && location.pathname !== '/onboarding') {
-      navigate('/onboarding');
-      return;
-    }
-
-    // If user has completed onboarding and is on onboarding page
-    if (onboardingComplete && location.pathname === '/onboarding') {
-      navigate('/app/dashboard');
-      return;
-    }
-
-    // If user is on auth pages but is already signed in and onboarded
-    if (onboardingComplete && (location.pathname === '/auth' || location.pathname === '/signup')) {
+    // If user is on auth pages but is already signed in, redirect to dashboard
+    if (location.pathname === '/auth' || location.pathname === '/signup') {
       navigate('/app/dashboard');
       return;
     }

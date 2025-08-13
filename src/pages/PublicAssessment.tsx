@@ -1,446 +1,558 @@
+import { Helmet } from "react-helmet-async";
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Loader2, CheckCircle, AlertCircle, FileText } from "lucide-react";
-import { assessmentsAPI, leadsAPI } from "@/lib/api";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { 
+  CheckCircle, 
+  AlertTriangle, 
+  BarChart3,
+  Users,
+  Target,
+  Calendar,
+  Phone,
+  Mail,
+  User,
+  Info
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface Assessment {
   id: string;
-  name: string;
-  description?: string;
-  schema: any;
-  ui?: any;
-  user_id: string; // Include user_id for lead creation
-  branding?: {
-    mfd_name: string;
+  title: string;
+  slug: string;
+  user_id?: string;
+  user_name?: string;
+}
+
+interface Question {
+  id: string;
+  qkey: string;
+  label: string;
+  qtype: string;
+  options: any;
+  required: boolean;
+  order_index: number;
+}
+
+interface AssessmentResult {
+  bucket: string;
+  score: number;
+  rubric: {
+    capacity?: number;
+    tolerance?: number;
+    need?: number;
+    warnings?: string[];
+    [key: string]: any;
   };
 }
 
-interface LeadData {
-  full_name: string;
-  email: string;
-  phone: string;
-  age: number;
-}
-
 export default function PublicAssessment() {
-  const { referralCode } = useParams<{ referralCode: string }>();
+  const { slug, referralCode, assessmentCode } = useParams<{ 
+    slug: string; 
+    referralCode: string; 
+    assessmentCode: string 
+  }>();
+  const location = useLocation();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   const [assessment, setAssessment] = useState<Assessment | null>(null);
-  const [leadData, setLeadData] = useState<LeadData>({
-    full_name: "",
-    email: "",
-    phone: "",
-    age: 25
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [submitterInfo, setSubmitterInfo] = useState({
+    full_name: '',
+    email: '',
+    phone: '+91',
+    age: ''
   });
-  const [responses, setResponses] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [result, setResult] = useState<AssessmentResult | null>(null);
+  const [currentStep, setCurrentStep] = useState<'form' | 'result'>('form');
+  const [assessmentType, setAssessmentType] = useState<'referral' | 'assessment' | 'public'>('public');
 
   useEffect(() => {
-    if (referralCode) {
-      loadAssessment(referralCode);
-    }
-  }, [referralCode]);
-
-  const loadAssessment = async (code: string) => {
-    try {
-      const data = await assessmentsAPI.getPublicAssessment(code);
-      setAssessment(data.assessment);
-      
-      // Initialize responses with default values from schema
-      if (data.assessment?.schema?.properties) {
-        const defaultResponses: Record<string, any> = {};
-        Object.entries(data.assessment.schema.properties).forEach(([key, field]: [string, any]) => {
-          if (field.default !== undefined) {
-            defaultResponses[key] = field.default;
-          }
-        });
-        setResponses(defaultResponses);
+    // Determine assessment type based on URL
+    if (location.pathname.startsWith('/assessment/')) {
+      setAssessmentType('assessment');
+      if (assessmentCode) {
+        loadAssessmentByCode(assessmentCode);
       }
-    } catch (err) {
-      setError("Assessment form not found or not published");
-      console.error("Assessment load error:", err);
+    } else if (location.pathname.startsWith('/r/')) {
+      setAssessmentType('referral');
+      if (referralCode) {
+        loadReferralAssessment(referralCode);
+      }
+    } else if (slug) {
+      setAssessmentType('public');
+      loadAssessment(slug);
+    }
+  }, [slug, referralCode, assessmentCode, location.pathname]);
+
+  const loadAssessmentByCode = async (assessmentCode: string) => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/assessment/${assessmentCode}`);
+      
+      if (!response.ok) {
+        throw new Error('Assessment not found');
+      }
+      
+      const data = await response.json();
+      setAssessment(data.assessment);
+      setQuestions(data.questions);
+    } catch (error) {
+      console.error('Failed to load assessment by code:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load assessment. Please check the link and try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleResponseChange = (fieldKey: string, value: any) => {
-    setResponses(prev => ({
+  const loadReferralAssessment = async (referralCode: string) => {
+    try {
+      setIsLoading(true);
+      // Get assessment ID from query params if available
+      const urlParams = new URLSearchParams(window.location.search);
+      const assessmentId = urlParams.get('assessment');
+      
+      let url = `/api/r/referral/${referralCode}`;
+      if (assessmentId) {
+        url += `?assessment=${assessmentId}`;
+      }
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error('Assessment not found');
+      }
+      
+      const data = await response.json();
+      setAssessment(data.assessment);
+      setQuestions(data.questions);
+    } catch (error) {
+      console.error('Failed to load referral assessment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load assessment. Please check the link and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadAssessment = async (assessmentSlug: string) => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/a/${assessmentSlug}`);
+      
+      if (!response.ok) {
+        throw new Error('Assessment not found');
+      }
+      
+      const data = await response.json();
+      setAssessment(data.assessment);
+      setQuestions(data.questions);
+    } catch (error) {
+      console.error('Failed to load assessment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load assessment. Please check the link and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAnswerChange = (qkey: string, value: any) => {
+    setAnswers(prev => ({
       ...prev,
-      [fieldKey]: value
+      [qkey]: value
     }));
   };
 
-  const renderField = (fieldKey: string, field: any) => {
-    const value = responses[fieldKey] || '';
-    const isRequired = assessment?.schema?.required?.includes(fieldKey);
-
-    switch (field.type) {
-      case 'string':
-        if (field.enum) {
-          return (
-            <Select value={value} onValueChange={(val) => handleResponseChange(fieldKey, val)}>
-              <SelectTrigger>
-                <SelectValue placeholder={`Select ${field.title || fieldKey}`} />
-              </SelectTrigger>
-              <SelectContent>
-                {field.enum.map((option: string) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          );
-        } else {
-          return (
-            <Input
-              value={value}
-              onChange={(e) => handleResponseChange(fieldKey, e.target.value)}
-              placeholder={`Enter ${field.title || fieldKey}`}
-            />
-          );
-        }
-      
-      case 'number':
-        return (
-          <Input
-            type="number"
-            value={value}
-            onChange={(e) => handleResponseChange(fieldKey, parseFloat(e.target.value) || 0)}
-            placeholder={`Enter ${field.title || fieldKey}`}
-          />
-        );
-      
-      case 'boolean':
-        return (
-          <Select value={value.toString()} onValueChange={(val) => handleResponseChange(fieldKey, val === 'true')}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="true">Yes</SelectItem>
-              <SelectItem value="false">No</SelectItem>
-            </SelectContent>
-          </Select>
-        );
-      
-      default:
-        return (
-          <Input
-            value={value}
-            onChange={(e) => handleResponseChange(fieldKey, e.target.value)}
-            placeholder={`Enter ${field.title || fieldKey}`}
-          />
-        );
+  const validateForm = () => {
+    const errors: string[] = [];
+    
+    // Check required submitter info
+    if (!submitterInfo.full_name.trim()) {
+      errors.push('Full name is required');
     }
+    
+    if (!submitterInfo.email.trim()) {
+      errors.push('Email is required');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(submitterInfo.email)) {
+      errors.push('Please enter a valid email address');
+    }
+    
+    // Check age if provided
+    if (submitterInfo.age && (parseInt(submitterInfo.age) < 18 || parseInt(submitterInfo.age) > 100)) {
+      errors.push('Age must be between 18 and 100');
+    }
+    
+    // Check phone if provided
+    if (submitterInfo.phone && submitterInfo.phone !== '+91') {
+      const phoneNumber = submitterInfo.phone.replace('+91', '').trim();
+      if (phoneNumber.length !== 10 || !/^\d{10}$/.test(phoneNumber)) {
+        errors.push('Phone number must be 10 digits');
+      }
+    }
+    
+    // Check required questions
+    questions.forEach(question => {
+      if (question.required && (!answers[question.qkey] || answers[question.qkey] === '')) {
+        errors.push(`${question.label} is required`);
+      }
+    });
+    
+    return errors;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!assessment || !referralCode) return;
-    
-    // Validate required fields
-    console.log('🔍 Form validation - leadData:', leadData);
-    console.log('🔍 Form validation - responses:', responses);
-    
-    if (!leadData.full_name || !leadData.phone) {
-      setError("Name and phone number are required");
+  const handleSubmit = async () => {
+    const errors = validateForm();
+    if (errors.length > 0) {
+      toast({
+        title: "Validation Error",
+        description: errors.join(', '),
+        variant: "destructive",
+      });
       return;
     }
-    
-    // Ensure age is a valid number
-    if (leadData.age < 18 || leadData.age > 100) {
-      setError("Age must be between 18 and 100");
-      return;
-    }
-    
-    // Ensure email is valid if provided
-    if (leadData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadData.email)) {
-      setError("Please enter a valid email address");
-      return;
-    }
-    
-    console.log('🔍 Form validation passed!');
-
-    // Validate assessment responses against schema
-    if (assessment.schema?.required) {
-      for (const requiredField of assessment.schema.required) {
-        if (!responses[requiredField]) {
-          setError(`${assessment.schema.properties[requiredField]?.title || requiredField} is required`);
-          return;
-        }
-      }
-    }
-
-    setIsSubmitting(true);
-    setError(null);
 
     try {
-      // Get the API base URL from environment or use default
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      setIsSubmitting(true);
       
-      // First, create a lead using the public endpoint
-      const leadPayload = {
-        full_name: leadData.full_name.trim(),
-        email: leadData.email.trim() || undefined, // Send undefined if empty
-        phone: leadData.phone.trim(),
-        age: leadData.age,
-        user_id: assessment.user_id, // Use the user_id from the assessment
-        source_link: `/r/${referralCode}` // Track the referral link used
+      let submitUrl: string;
+      let submitData: any = {
+        answers,
+        submitterInfo: {
+          full_name: submitterInfo.full_name,
+          email: submitterInfo.email,
+          phone: submitterInfo.phone === '+91' ? '' : submitterInfo.phone,
+          age: submitterInfo.age ? parseInt(submitterInfo.age) : undefined
+        }
       };
-      
-      console.log('🔍 Sending lead data:', leadPayload);
-      console.log('🔍 Data types:', {
-        full_name: typeof leadPayload.full_name,
-        email: typeof leadPayload.email,
-        phone: typeof leadPayload.phone,
-        age: typeof leadPayload.age,
-        user_id: typeof leadPayload.user_id
-      });
-      
-      const leadResponse = await fetch(`${API_BASE_URL}/api/leads/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(leadPayload)
-      });
 
-      if (!leadResponse.ok) {
-        const errorData = await leadResponse.json();
-        console.error('❌ Lead creation failed:', errorData);
-        throw new Error(errorData.error || 'Failed to create lead');
+      if (assessmentType === 'assessment' && assessmentCode) {
+        submitUrl = `/api/assessment/${assessmentCode}/submit`;
+      } else if (assessmentType === 'referral' && referralCode) {
+        submitUrl = `/api/r/referral/${referralCode}/submit`;
+        if (assessment?.id) {
+          submitData.assessmentId = assessment.id;
+        }
+      } else if (assessmentType === 'public' && slug) {
+        submitUrl = `/api/a/${slug}/submit`;
+      } else {
+        throw new Error('Invalid assessment configuration');
       }
-
-      const leadResponseData = await leadResponse.json();
-      const lead = leadResponseData.lead;
       
-      // Submit assessment responses using the public endpoint
-      const assessmentResponse = await fetch(`${API_BASE_URL}/api/assessments/submit`, {
+      const response = await fetch(submitUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          lead_id: lead.id,
-          assessment_id: assessment.id,
-          responses: Object.entries(responses).map(([question_id, answer_value]) => ({
-            question_id,
-            answer_value
-          }))
-        })
+        body: JSON.stringify(submitData)
       });
 
-      if (!assessmentResponse.ok) {
-        const errorData = await assessmentResponse.json();
+      if (!response.ok) {
+        const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to submit assessment');
       }
+
+      const data = await response.json();
+      setResult(data.result);
+      setCurrentStep('result');
       
-      setSuccess(true);
-      
-      // Redirect to success page after a delay
-      setTimeout(() => {
-        navigate('/assessment-complete');
-      }, 2000);
-      
-    } catch (err: any) {
-      console.error("Submission error:", err);
-      setError(err.message || "Failed to submit assessment. Please try again.");
+      toast({
+        title: "Success",
+        description: "Assessment submitted successfully!",
+        variant: "default",
+      });
+    } catch (error: any) {
+      console.error('Failed to submit assessment:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit assessment. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handlePhoneChange = (value: string) => {
+    if (value.startsWith('+91')) {
+      setSubmitterInfo(prev => ({ ...prev, phone: value }));
+    } else if (value.startsWith('+')) {
+      setSubmitterInfo(prev => ({ ...prev, phone: value }));
+    } else {
+      setSubmitterInfo(prev => ({ ...prev, phone: `+91${value}` }));
+    }
+  };
+
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading assessment...</p>
         </div>
       </div>
     );
   }
 
-  if (error && !assessment) {
+  if (currentStep === 'result') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center max-w-md mx-auto p-6">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">Assessment Not Found</h1>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <Button onClick={() => navigate('/')} variant="outline">
-            Return Home
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center max-w-md mx-auto p-6">
-          <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">Assessment Submitted!</h1>
-          <p className="text-gray-600 mb-4">
-            Thank you for completing the assessment. We'll be in touch soon with your personalized recommendations.
-          </p>
-          <div className="animate-pulse">
-            <p className="text-sm text-gray-500">Redirecting...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!assessment) {
-    return null;
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-2xl mx-auto px-4">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <FileText className="h-8 w-8 text-primary mr-2" />
-            <h1 className="text-3xl font-bold text-gray-900">{assessment.name}</h1>
-          </div>
-          {assessment.description && (
-            <p className="text-lg text-gray-600 mb-2">{assessment.description}</p>
-          )}
-          {assessment.branding?.mfd_name && (
-            <p className="text-sm text-gray-500">
-              Assessment by {assessment.branding.mfd_name}
-            </p>
-          )}
-        </div>
-
-        {/* Assessment Form */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Personal Information</CardTitle>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="max-w-2xl w-full">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+            <CardTitle className="text-2xl text-gray-900">Assessment Complete!</CardTitle>
+            <p className="text-gray-600">Thank you for completing the risk assessment.</p>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name *
-                </label>
-                <Input
-                  value={leadData.full_name}
-                  onChange={(e) => setLeadData(prev => ({ ...prev, full_name: e.target.value }))}
-                  placeholder="Enter your full name"
-                  required
-                />
+          <CardContent className="space-y-6">
+            {result && (
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-blue-900 mb-2">Your Risk Profile</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-blue-700">Risk Score:</span>
+                    <span className="ml-2 font-medium">{result.score}</span>
+                  </div>
+                  <div>
+                    <span className="text-blue-700">Risk Category:</span>
+                    <span className="ml-2 font-medium capitalize">{result.bucket}</span>
+                  </div>
+                </div>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number *
-                </label>
-                <Input
-                  value={leadData.phone}
-                  onChange={(e) => setLeadData(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="e.g., 9876543210 or +91 98765 43210"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Enter your 10-digit mobile number (starts with 6, 7, 8, or 9)
-                </p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address
-                </label>
-                <Input
-                  type="email"
-                  value={leadData.email}
-                  onChange={(e) => setLeadData(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="Enter your email address"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Age
-                </label>
-                <Input
-                  type="number"
-                  value={leadData.age}
-                  onChange={(e) => setLeadData(prev => ({ ...prev, age: parseInt(e.target.value) || 25 }))}
-                  placeholder="Enter your age"
-                  min="18"
-                  max="100"
-                />
-              </div>
+            )}
+            
+            <div className="text-center">
+              <p className="text-gray-600 mb-4">
+                Our team will review your assessment and contact you soon with personalized recommendations.
+              </p>
+              <Button
+                onClick={() => window.close()}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Close
+              </Button>
             </div>
           </CardContent>
         </Card>
-
-        {/* Assessment Questions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Risk Assessment Questions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {assessment.schema?.properties && Object.entries(assessment.schema.properties).map(([fieldKey, field]: [string, any]) => (
-                <div key={fieldKey} className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    {field.title || fieldKey}
-                    {assessment.schema?.required?.includes(fieldKey) && (
-                      <span className="text-red-500 ml-1">*</span>
-                    )}
-                  </label>
-                  
-                  {field.description && (
-                    <p className="text-sm text-gray-500 mb-2">{field.description}</p>
-                  )}
-                  
-                  {renderField(fieldKey, field)}
-                </div>
-              ))}
-              
-              {error && (
-                <div className="text-red-600 text-sm flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  {error}
-                </div>
-              )}
-              
-              <Button 
-                type="submit" 
-                disabled={isSubmitting} 
-                className="w-full"
-                size="lg"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Submitting...
-                  </>
-                ) : (
-                  'Submit Assessment'
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
       </div>
-    </div>
+    );
+  }
+
+  return (
+    <>
+      <Helmet>
+        <title>Risk Assessment – OneMFin</title>
+        <meta name="description" content="Complete your risk assessment to get personalized investment recommendations." />
+      </Helmet>
+
+      <div className="min-h-screen bg-gray-50 py-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Risk Assessment</h1>
+            <p className="text-gray-600">
+              {assessment?.user_name ? `by ${assessment.user_name}` : 'Complete the form below to get started'}
+            </p>
+          </div>
+
+          <Card className="w-full">
+            <CardContent className="p-6">
+              {/* Progress */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">Progress</span>
+                  <span className="text-sm text-gray-500">
+                    {questions.length > 0 ? '1' : '0'} of {questions.length + 1}
+                  </span>
+                </div>
+                <Progress value={questions.length > 0 ? 25 : 0} className="h-2" />
+              </div>
+
+              {/* Personal Information Section */}
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <User className="w-5 h-5" />
+                  Personal Information
+                </h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="full_name" className="text-sm font-medium">
+                      Full Name <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="full_name"
+                      value={submitterInfo.full_name}
+                      onChange={(e) => setSubmitterInfo(prev => ({ ...prev, full_name: e.target.value }))}
+                      placeholder="Enter your full name"
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="email" className="text-sm font-medium">
+                      Email Address <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={submitterInfo.email}
+                      onChange={(e) => setSubmitterInfo(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="Enter your email"
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="phone" className="text-sm font-medium">
+                      Phone Number
+                    </Label>
+                    <div className="mt-1 relative">
+                      <Input
+                        id="phone"
+                        value={submitterInfo.phone}
+                        onChange={(e) => handlePhoneChange(e.target.value)}
+                        placeholder="Enter 10-digit phone number"
+                        className="pl-12"
+                      />
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
+                        +91
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">10 digits, optional</p>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="age" className="text-sm font-medium">
+                      Age
+                    </Label>
+                    <Input
+                      id="age"
+                      type="number"
+                      min="18"
+                      max="100"
+                      value={submitterInfo.age}
+                      onChange={(e) => setSubmitterInfo(prev => ({ ...prev, age: e.target.value }))}
+                      placeholder="Enter your age"
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Minimum 18 years, optional</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Assessment Questions */}
+              {questions.length > 0 && (
+                <>
+                  <Separator className="my-8" />
+                  
+                  <div className="mb-8">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5" />
+                      Risk Assessment Questions
+                    </h2>
+                    
+                    <div className="space-y-6">
+                      {questions.map((question, index) => (
+                        <div key={question.id} className="space-y-3">
+                          <Label className="text-sm font-medium">
+                            {index + 1}. {question.label}
+                            {question.required && <span className="text-red-500 ml-1">*</span>}
+                          </Label>
+                          
+                          {question.qtype === 'mcq' && question.options && question.options.length > 0 ? (
+                            <RadioGroup
+                              value={answers[question.qkey] || ''}
+                              onValueChange={(value) => handleAnswerChange(question.qkey, value)}
+                            >
+                              {question.options.map((option: string, optionIndex: number) => (
+                                <div key={optionIndex} className="flex items-center space-x-2">
+                                  <RadioGroupItem value={option} id={`${question.qkey}-${optionIndex}`} />
+                                  <Label htmlFor={`${question.qkey}-${optionIndex}`} className="text-sm">
+                                    {option}
+                                  </Label>
+                                </div>
+                              ))}
+                            </RadioGroup>
+                          ) : question.qtype === 'scale' ? (
+                            <div className="flex items-center gap-4">
+                              <span className="text-sm text-gray-500">Low</span>
+                              <RadioGroup
+                                value={answers[question.qkey] || ''}
+                                onValueChange={(value) => handleAnswerChange(question.qkey, value)}
+                                className="flex items-center space-x-2"
+                              >
+                                {[1, 2, 3, 4, 5].map((value) => (
+                                  <div key={value} className="flex items-center space-x-2">
+                                    <RadioGroupItem value={value.toString()} id={`${question.qkey}-${value}`} />
+                                    <Label htmlFor={`${question.qkey}-${value}`} className="text-sm">
+                                      {value}
+                                    </Label>
+                                  </div>
+                                ))}
+                              </RadioGroup>
+                              <span className="text-sm text-gray-500">High</span>
+                            </div>
+                          ) : (
+                            <Textarea
+                              value={answers[question.qkey] || ''}
+                              onChange={(e) => handleAnswerChange(question.qkey, e.target.value)}
+                              placeholder="Enter your answer"
+                              rows={3}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Submit Button */}
+              <div className="flex justify-center pt-6">
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  size="lg"
+                  className="bg-blue-600 hover:bg-blue-700 px-8"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Assessment'
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </>
   );
 }

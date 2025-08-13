@@ -2,10 +2,13 @@ import { SupabaseClient } from '@supabase/supabase-js'
 
 export interface ClerkUserData {
   id: string
-  emailAddresses: any[]
-  phoneNumbers: any[]
+  emailAddresses?: any[]
+  phoneNumbers?: any[]
   firstName?: string
   lastName?: string
+  fullName?: string
+  email?: string
+  phone?: string
   imageUrl?: string
   createdAt: Date
 }
@@ -73,11 +76,29 @@ export class ClerkSupabaseSync {
    */
   private static async createUserInSupabase(clerkUserData: ClerkUserData, supabaseClient: SupabaseClient) {
     try {
-      const email = clerkUserData.emailAddresses?.[0]?.emailAddress || ''
-      const phone = clerkUserData.phoneNumbers?.[0]?.phoneNumber || null // Use null instead of empty string
+      // More flexible data extraction
+      const email = clerkUserData.emailAddresses?.[0]?.emailAddress || 
+                   clerkUserData.email || 
+                   '';
+      
+      const phone = clerkUserData.phoneNumbers?.[0]?.phoneNumber || 
+                   clerkUserData.phone || 
+                   null;
+      
       const fullName = [clerkUserData.firstName, clerkUserData.lastName]
         .filter(Boolean)
-        .join(' ') || 'User'
+        .join(' ') || 
+        clerkUserData.fullName || 
+        'User';
+
+      console.log('🔍 ClerkSupabaseSync: Creating user with data:', {
+        email,
+        phone,
+        fullName,
+        firstName: clerkUserData.firstName,
+        lastName: clerkUserData.lastName,
+        fullNameFromData: clerkUserData.fullName
+      });
 
       // Generate unique referral link locally to avoid frontend database calls
       const referralLink = this.generateReferralLinkLocally(clerkUserData.firstName || 'user', clerkUserData.id)
@@ -87,9 +108,11 @@ export class ClerkSupabaseSync {
         full_name: fullName,
         email: email,
         phone: phone,
+        mfd_registration_number: null, // Will be updated later if provided
         auth_provider: 'clerk',
-        profile_image_url: clerkUserData.imageUrl || '',
         referral_link: referralLink,
+        profile_image_url: clerkUserData.imageUrl || '',
+        settings: {},
         role: 'mfd' as const
       }
 
@@ -99,16 +122,36 @@ export class ClerkSupabaseSync {
         .select()
         .single()
 
-      if (error) {
-        console.error('Error creating user in Supabase:', error)
-        console.error('Error details:', error)
-        console.error('User data being inserted:', newUserData)
-        return null
+      if (error || !newUser) {
+        throw new Error(error?.message || 'Failed to create user');
+      }
+
+      // Create default user settings
+      try {
+        const { error: settingsError } = await supabaseClient
+          .from('user_settings')
+          .insert({
+            user_id: newUser.id,
+            calendly_url: null,
+            calendly_api_key: null,
+            google_calendar_id: null,
+            notification_preferences: {}
+          });
+
+        if (settingsError) {
+          console.error('Failed to create user settings:', settingsError);
+        } else {
+          console.log('User settings created successfully');
+        }
+      } catch (settingsError) {
+        console.error('Error creating user settings:', settingsError);
       }
 
       return newUser
     } catch (error) {
-      console.error('Error in createUserInSupabase:', error)
+      console.error('Error creating user in Supabase:', error)
+      console.error('Error details:', error)
+      console.error('User data being inserted:', clerkUserData)
       return null
     }
   }
@@ -142,7 +185,9 @@ export class ClerkSupabaseSync {
       if (!existingUser.full_name || existingUser.full_name.trim() === '') {
         const fullName = [clerkUserData.firstName, clerkUserData.lastName]
           .filter(Boolean)
-          .join(' ') || 'User'
+          .join(' ') || 
+          clerkUserData.fullName || 
+          'User'
         if (fullName && fullName !== 'User') {
           updateData.full_name = fullName
           console.log('🔍 ClerkSupabaseSync: Updating missing full_name:', fullName)
@@ -151,7 +196,9 @@ export class ClerkSupabaseSync {
 
       // Only update email if it's completely missing
       if (!existingUser.email || existingUser.email.trim() === '') {
-        const email = clerkUserData.emailAddresses?.[0]?.emailAddress || ''
+        const email = clerkUserData.emailAddresses?.[0]?.emailAddress || 
+                     clerkUserData.email || 
+                     ''
         if (email) {
           updateData.email = email
           console.log('🔍 ClerkSupabaseSync: Updating missing email:', email)
@@ -160,7 +207,9 @@ export class ClerkSupabaseSync {
 
       // Only update phone if it's completely missing
       if (!existingUser.phone || existingUser.phone.trim() === '') {
-        const phone = clerkUserData.phoneNumbers?.[0]?.phoneNumber || null
+        const phone = clerkUserData.phoneNumbers?.[0]?.phoneNumber || 
+                     clerkUserData.phone || 
+                     null
         if (phone) {
           updateData.phone = phone
           console.log('🔍 ClerkSupabaseSync: Updating missing phone:', phone)

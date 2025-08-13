@@ -16,9 +16,9 @@ import Leads from "./pages/app/Leads";
 import LeadDetail from "./pages/app/LeadDetail";
 import Auth from "./pages/Auth";
 import Signup from "./pages/Signup";
-import Onboarding from "./pages/Onboarding";
 import FormBuilder from "./pages/app/FormBuilder";
 import Assessments from "./pages/app/Assessments";
+import AssessmentsV2 from "./pages/app/AssessmentsV2";
 import Products from "./pages/app/Products";
 import Meetings from "./pages/app/Meetings";
 import Profile from "./pages/app/Profile";
@@ -47,10 +47,11 @@ const App = () => (
                      {/* Auth routes */}
                      <Route path="/auth" element={<Auth />} />
                      <Route path="/signup" element={<Signup />} />
-                     <Route path="/onboarding" element={<Onboarding />} />
 
-                     {/* Public assessment route */}
+                     {/* Public assessment routes */}
                      <Route path="/r/:referralCode" element={<PublicAssessment />} />
+                     <Route path="/a/:slug" element={<PublicAssessment />} />
+                     <Route path="/assessment/:assessmentCode" element={<PublicAssessment />} />
                      <Route path="/assessment-complete" element={<AssessmentComplete />} />
 
                      {/* Full screen assessment forms route */}
@@ -72,7 +73,8 @@ const App = () => (
                 <Route path="leads" element={<Leads />} />
                 <Route path="leads/:id" element={<LeadDetail />} />
                 <Route path="form-builder" element={<FormBuilder />} />
-                <Route path="assessments" element={<Assessments />} />
+                <Route path="assessments" element={<AssessmentsV2 />} />
+                <Route path="assessments-legacy" element={<Assessments />} />
                 <Route path="products" element={<Products />} />
                 <Route path="meetings" element={<Meetings />} />
                 <Route path="profile" element={<Profile />} />

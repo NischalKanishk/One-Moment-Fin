@@ -41,6 +41,7 @@ export interface User {
   updated_at: string
   settings: Record<string, any>
   referral_link?: string
+  assessment_link?: string
 }
 
 export interface Lead {
