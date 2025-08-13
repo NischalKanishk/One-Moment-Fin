@@ -26,3 +26,22 @@ export function generateReferralLink(firstName: string): string {
   
   return `/${cleanName}${randomNumbers}`;
 }
+
+/**
+ * Generates a unique assessment link in the format: 5 random digits + userid + 5 random letters
+ * @param userId - The user's ID
+ * @returns A unique assessment link string
+ */
+export function generateAssessmentLink(userId: string): string {
+  // Generate 5 random digits
+  const randomDigits = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
+  
+  // Generate 5 random letters
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const randomLetters = Array.from({ length: 5 }, () => 
+    letters.charAt(Math.floor(Math.random() * letters.length))
+  ).join('');
+  
+  // Combine: 5 digits + userid + 5 letters
+  return `${randomDigits}${userId}${randomLetters}`;
+}

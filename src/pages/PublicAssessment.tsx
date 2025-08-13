@@ -77,24 +77,50 @@ export default function PublicAssessment() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<AssessmentResult | null>(null);
-  const [currentStep, setCurrentStep] = useState<'form' | 'result'>('form');
+  const [currentStep, setCurrentStep] = useState<'intro' | 'questions' | 'review' | 'result'>('intro');
   const [assessmentType, setAssessmentType] = useState<'referral' | 'assessment' | 'public'>('public');
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   useEffect(() => {
+    console.log('🔍 useEffect triggered with:', {
+      pathname: location.pathname,
+      slug,
+      referralCode,
+      assessmentCode
+    });
+    
     // Determine assessment type based on URL
     if (location.pathname.startsWith('/assessment/')) {
+      console.log('🔍 Assessment type: assessment');
       setAssessmentType('assessment');
       if (assessmentCode) {
         loadAssessmentByCode(assessmentCode);
       }
     } else if (location.pathname.startsWith('/r/')) {
+      console.log('🔍 Assessment type: referral');
       setAssessmentType('referral');
       if (referralCode) {
         loadReferralAssessment(referralCode);
       }
+    } else if (location.pathname.startsWith('/a/')) {
+      console.log('🔍 Assessment type: public (user assessment link)');
+      setAssessmentType('public');
+      // Extract the slug from the pathname since it's the user assessment link
+      const pathSlug = location.pathname.split('/')[2]; // /a/slug -> ['', 'a', 'slug']
+      console.log('🔍 Extracted slug from pathname:', pathSlug);
+      if (pathSlug && pathSlug.trim() !== '') {
+        console.log('🔍 Calling loadAssessment with:', pathSlug);
+        loadAssessment(pathSlug);
+      } else {
+        console.error('❌ No slug found in pathname or slug is empty');
+        setIsLoading(false);
+      }
     } else if (slug) {
+      console.log('🔍 Assessment type: public (fallback)');
       setAssessmentType('public');
       loadAssessment(slug);
+    } else {
+      console.log('❌ No matching route found');
     }
   }, [slug, referralCode, assessmentCode, location.pathname]);
 
@@ -158,17 +184,49 @@ export default function PublicAssessment() {
   const loadAssessment = async (assessmentSlug: string) => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/a/${assessmentSlug}`);
+      console.log('🔍 Loading assessment for slug:', assessmentSlug);
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/a/${assessmentSlug}`);
+      console.log('🔍 Response status:', response.status);
       
       if (!response.ok) {
         throw new Error('Assessment not found');
       }
       
-      const data = await response.json();
+      console.log('🔍 Response headers:', Object.fromEntries(response.headers.entries()));
+      console.log('🔍 Response status:', response.status);
+      console.log('🔍 Response ok:', response.ok);
+      
+      const responseText = await response.text();
+      console.log('🔍 Raw response text:', responseText);
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log('🔍 Assessment data received:', data);
+        console.log('🔍 Assessment object:', data.assessment);
+        console.log('🔍 Questions array:', data.questions);
+      } catch (parseError) {
+        console.error('❌ JSON parse error:', parseError);
+        console.error('❌ Response text that failed to parse:', responseText);
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
+      
+      // Validate data structure
+      if (!data.assessment || !data.questions) {
+        throw new Error('Invalid data structure received from server');
+      }
+      
+      if (!Array.isArray(data.questions)) {
+        throw new Error('Questions must be an array');
+      }
+      
+      console.log('🔍 Setting assessment and questions...');
       setAssessment(data.assessment);
       setQuestions(data.questions);
+      console.log('🔍 Assessment loaded successfully');
     } catch (error) {
-      console.error('Failed to load assessment:', error);
+      console.error('❌ Failed to load assessment:', error);
       toast({
         title: "Error",
         description: "Failed to load assessment. Please check the link and try again.",
@@ -223,6 +281,26 @@ export default function PublicAssessment() {
     return errors;
   };
 
+  const handleNext = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else {
+      // All questions answered, ready to submit
+      setCurrentStep('questions');
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+    }
+  };
+
+  const handleStartAssessment = () => {
+    setCurrentStep('questions');
+    setCurrentQuestionIndex(0);
+  };
+
   const handleSubmit = async () => {
     const errors = validateForm();
     if (errors.length > 0) {
@@ -256,7 +334,7 @@ export default function PublicAssessment() {
           submitData.assessmentId = assessment.id;
         }
       } else if (assessmentType === 'public' && slug) {
-        submitUrl = `/api/a/${slug}/submit`;
+        submitUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/a/${slug}/submit`;
       } else {
         throw new Error('Invalid assessment configuration');
       }
@@ -357,6 +435,160 @@ export default function PublicAssessment() {
             </div>
           </CardContent>
         </Card>
+      </div>
+    );
+  }
+
+  if (currentStep === 'review') {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Review Your Answers</h1>
+            <p className="text-gray-600">
+              Please review your answers before submitting the assessment
+            </p>
+          </div>
+
+          <Card className="w-full">
+            <CardContent className="p-6">
+              {/* Personal Information Review */}
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <User className="w-5 h-5" />
+                  Personal Information
+                </h2>
+                
+                <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                  <div className="flex justify-between">
+                    <span className="font-medium text-gray-700">Full Name:</span>
+                    <span className="text-gray-900">{submitterInfo.full_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium text-gray-700">Email:</span>
+                    <span className="text-gray-900">{submitterInfo.email}</span>
+                  </div>
+                  {submitterInfo.phone && submitterInfo.phone !== '+91' && (
+                    <div className="flex justify-between">
+                      <span className="font-medium text-gray-700">Phone:</span>
+                      <span className="text-gray-900">{submitterInfo.phone}</span>
+                    </div>
+                  )}
+                  {submitterInfo.age && (
+                    <div className="flex justify-between">
+                      <span className="font-medium text-gray-700">Age:</span>
+                      <span className="text-gray-900">{submitterInfo.age} years</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Assessment Answers Review */}
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5" />
+                  Assessment Answers
+                </h2>
+                
+                <div className="space-y-4">
+                  {questions.map((question, index) => (
+                    <div key={question.id} className="bg-gray-50 p-4 rounded-lg">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="font-medium text-gray-700">
+                          {index + 1}. {question.label}
+                        </span>
+                        <Badge variant="outline" className="text-xs">
+                          {question.qtype}
+                        </Badge>
+                      </div>
+                      <div className="text-gray-900">
+                        {answers[question.qkey] || <span className="text-gray-500 italic">Not answered</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-between items-center pt-6">
+                <Button
+                  onClick={() => setCurrentStep('questions')}
+                  variant="outline"
+                  className="px-6"
+                >
+                  ← Back to Questions
+                </Button>
+                
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  size="lg"
+                  className="bg-green-600 hover:bg-green-700 px-8"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Assessment'
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentStep === 'intro') {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Risk Assessment</h1>
+            <p className="text-gray-600">
+              {assessment?.user_name ? `by ${assessment.user_name}` : 'Complete the form below to get started'}
+            </p>
+          </div>
+
+          <Card className="w-full">
+            <CardContent className="p-6">
+              {/* Assessment Introduction */}
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <BarChart3 className="w-8 h-8 text-blue-600" />
+                </div>
+                <h2 className="text-2xl font-semibold text-gray-900 mb-4">Welcome to Your Risk Assessment</h2>
+                <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
+                  This assessment will help us understand your financial goals, risk tolerance, and investment preferences. 
+                  It takes about 5-10 minutes to complete and will provide you with personalized investment recommendations.
+                </p>
+                
+                <div className="bg-blue-50 p-4 rounded-lg mb-6 max-w-md mx-auto">
+                  <h3 className="font-semibold text-blue-900 mb-2">What you'll need:</h3>
+                  <ul className="text-sm text-blue-800 space-y-1">
+                    <li>• Basic personal information</li>
+                    <li>• Financial situation details</li>
+                    <li>• Investment experience</li>
+                    <li>• Risk tolerance preferences</li>
+                  </ul>
+                </div>
+
+                <Button
+                  onClick={handleStartAssessment}
+                  size="lg"
+                  className="bg-blue-600 hover:bg-blue-700 px-8"
+                >
+                  Start Assessment
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -464,91 +696,129 @@ export default function PublicAssessment() {
                 </div>
               </div>
 
-              {/* Assessment Questions */}
+                            {/* Assessment Questions */}
               {questions.length > 0 && (
                 <>
                   <Separator className="my-8" />
                   
                   <div className="mb-8">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <BarChart3 className="w-5 h-5" />
-                      Risk Assessment Questions
-                    </h2>
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                        <BarChart3 className="w-5 h-5" />
+                        Question {currentQuestionIndex + 1} of {questions.length}
+                      </h2>
+                      <Progress value={((currentQuestionIndex + 1) / questions.length) * 100} className="w-32 h-2" />
+                    </div>
                     
-                    <div className="space-y-6">
-                      {questions.map((question, index) => (
-                        <div key={question.id} className="space-y-3">
-                          <Label className="text-sm font-medium">
-                            {index + 1}. {question.label}
-                            {question.required && <span className="text-red-500 ml-1">*</span>}
+                    {/* Single Question Display */}
+                    {questions[currentQuestionIndex] && (
+                      <div className="space-y-6">
+                        <div className="bg-white p-6 rounded-lg border border-gray-200">
+                          <Label className="text-lg font-medium mb-4 block">
+                            {questions[currentQuestionIndex].label}
+                            {questions[currentQuestionIndex].required && <span className="text-red-500 ml-1">*</span>}
                           </Label>
                           
-                          {question.qtype === 'mcq' && question.options && question.options.length > 0 ? (
+                          {questions[currentQuestionIndex].qtype === 'single' && questions[currentQuestionIndex].options && questions[currentQuestionIndex].options.length > 0 ? (
                             <RadioGroup
-                              value={answers[question.qkey] || ''}
-                              onValueChange={(value) => handleAnswerChange(question.qkey, value)}
+                              value={answers[questions[currentQuestionIndex].qkey] || ''}
+                              onValueChange={(value) => handleAnswerChange(questions[currentQuestionIndex].qkey, value)}
+                              className="space-y-3"
                             >
-                              {question.options.map((option: string, optionIndex: number) => (
-                                <div key={optionIndex} className="flex items-center space-x-2">
-                                  <RadioGroupItem value={option} id={`${question.qkey}-${optionIndex}`} />
-                                  <Label htmlFor={`${question.qkey}-${optionIndex}`} className="text-sm">
+                              {questions[currentQuestionIndex].options.map((option: string, optionIndex: number) => (
+                                <div key={optionIndex} className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+                                  <RadioGroupItem value={option} id={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} />
+                                  <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} className="text-base cursor-pointer flex-1">
                                     {option}
                                   </Label>
                                 </div>
                               ))}
                             </RadioGroup>
-                          ) : question.qtype === 'scale' ? (
-                            <div className="flex items-center gap-4">
-                              <span className="text-sm text-gray-500">Low</span>
+                          ) : questions[currentQuestionIndex].qtype === 'scale' ? (
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
+                                <span>Low</span>
+                                <span>High</span>
+                              </div>
                               <RadioGroup
-                                value={answers[question.qkey] || ''}
-                                onValueChange={(value) => handleAnswerChange(question.qkey, value)}
-                                className="flex items-center space-x-2"
+                                value={answers[questions[currentQuestionIndex].qkey] || ''}
+                                onValueChange={(value) => handleAnswerChange(questions[currentQuestionIndex].qkey, value)}
+                                className="grid grid-cols-5 gap-2"
                               >
                                 {[1, 2, 3, 4, 5].map((value) => (
-                                  <div key={value} className="flex items-center space-x-2">
-                                    <RadioGroupItem value={value.toString()} id={`${question.qkey}-${value}`} />
-                                    <Label htmlFor={`${question.qkey}-${value}`} className="text-sm">
+                                  <div key={value} className="flex flex-col items-center">
+                                    <RadioGroupItem value={value.toString()} id={`${questions[currentQuestionIndex].qkey}-${value}`} />
+                                    <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${value}`} className="text-sm mt-1">
                                       {value}
                                     </Label>
                                   </div>
                                 ))}
                               </RadioGroup>
-                              <span className="text-sm text-gray-500">High</span>
+                            </div>
+                          ) : questions[currentQuestionIndex].qtype === 'percent' ? (
+                            <div className="space-y-3">
+                              <Input
+                                type="number"
+                                min={questions[currentQuestionIndex].options?.min || 0}
+                                max={questions[currentQuestionIndex].options?.max || 100}
+                                value={answers[questions[currentQuestionIndex].qkey] || ''}
+                                onChange={(e) => handleAnswerChange(questions[currentQuestionIndex].qkey, e.target.value)}
+                                placeholder="Enter percentage (0-100)"
+                                className="w-32"
+                              />
+                              <p className="text-sm text-gray-500">
+                                Enter a value between {questions[currentQuestionIndex].options?.min || 0}% and {questions[currentQuestionIndex].options?.max || 100}%
+                              </p>
                             </div>
                           ) : (
                             <Textarea
-                              value={answers[question.qkey] || ''}
-                              onChange={(e) => handleAnswerChange(question.qkey, e.target.value)}
+                              value={answers[questions[currentQuestionIndex].qkey] || ''}
+                              onChange={(e) => handleAnswerChange(questions[currentQuestionIndex].qkey, e.target.value)}
                               placeholder="Enter your answer"
-                              rows={3}
+                              rows={4}
+                              className="w-full"
                             />
                           )}
                         </div>
-                      ))}
-                    </div>
+                        
+                        {/* Navigation Buttons */}
+                        <div className="flex justify-between items-center pt-4">
+                          <Button
+                            onClick={handlePrevious}
+                            disabled={currentQuestionIndex === 0}
+                            variant="outline"
+                            className="px-6"
+                          >
+                            Previous
+                          </Button>
+                          
+                          <div className="flex gap-2">
+                            {currentQuestionIndex < questions.length - 1 ? (
+                              <Button
+                                onClick={handleNext}
+                                disabled={!answers[questions[currentQuestionIndex].qkey] || answers[questions[currentQuestionIndex].qkey] === ''}
+                                className="bg-blue-600 hover:bg-blue-700 px-6"
+                              >
+                                Next Question
+                              </Button>
+                            ) : (
+                              <Button
+                                onClick={() => setCurrentStep('review')}
+                                disabled={!answers[questions[currentQuestionIndex].qkey] || answers[questions[currentQuestionIndex].qkey] === ''}
+                                className="bg-green-600 hover:bg-green-700 px-6"
+                              >
+                                Review & Submit
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
 
-              {/* Submit Button */}
-              <div className="flex justify-center pt-6">
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  size="lg"
-                  className="bg-blue-600 hover:bg-blue-700 px-8"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Submitting...
-                    </>
-                  ) : (
-                    'Submit Assessment'
-                  )}
-                </Button>
-              </div>
+
             </CardContent>
           </Card>
         </div>

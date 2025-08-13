@@ -288,15 +288,17 @@ export class AssessmentService {
   }
 
   /**
-   * Submit assessment and create lead
+   * Submit assessment and create/update lead
    */
   static async submitAssessment(
     assessmentId: string,
     answers: Record<string, any>,
-    submitterInfo: { full_name: string; email?: string; phone?: string },
+    submitterInfo: { full_name: string; email?: string; phone?: string; age?: number },
     sourceLink?: string
-  ): Promise<{ submission: AssessmentSubmission; leadId: string }> {
+  ): Promise<{ submission: AssessmentSubmission; leadId: string; isNewLead: boolean }> {
     try {
+      console.log('🔍 submitAssessment called with:', { assessmentId, answers, submitterInfo, sourceLink });
+      
       // Get assessment details
       const { data: assessment, error: assessmentError } = await supabase
         .from('assessments')
@@ -306,55 +308,142 @@ export class AssessmentService {
         .single();
 
       if (assessmentError || !assessment) {
+        console.error('❌ Assessment error:', assessmentError);
         throw new Error('Assessment not found or not published');
       }
+      
+      console.log('✅ Assessment found:', assessment.title);
 
       // Get framework config and score
+      console.log('🔍 Getting framework config for:', assessment.framework_version_id);
       const frameworkConfig = await getFrameworkConfig(assessment.framework_version_id);
       if (!frameworkConfig) {
+        console.error('❌ Framework config not found');
         throw new Error('Framework configuration not found');
       }
+      
+      console.log('✅ Framework config found, engine:', frameworkConfig.engine);
 
       // Import scoring function
+      console.log('🔍 Importing scoring function...');
       const { scoreSubmission } = await import('./riskScoring');
+      console.log('✅ Scoring function imported');
+      
+      console.log('🔍 Scoring submission...');
       const result = scoreSubmission(frameworkConfig, answers);
+      console.log('✅ Scoring completed, result:', result);
 
-      // Create submission
+      // Create submission using existing assessment_submissions table
       const { data: submission, error: submissionError } = await supabase
         .from('assessment_submissions')
         .insert({
           assessment_id: assessmentId,
           framework_version_id: assessment.framework_version_id,
           owner_id: assessment.user_id,
-          answers,
-          result
+          submitted_at: new Date().toISOString(),
+          answers: answers,
+          result: {
+            score: result.score,
+            bucket: result.bucket,
+            rubric: result.rubric
+          }
         })
         .select()
         .single();
 
       if (submissionError || !submission) {
-        throw new Error(submissionError?.message || 'Failed to create submission');
+        console.error('❌ Submission creation error:', submissionError);
+        throw new Error(submissionError?.message || 'Failed to create assessment submission');
       }
 
-      // Create lead
-      const { data: lead, error: leadError } = await supabase
-        .from('leads')
-        .insert({
-          user_id: assessment.user_id,
-          full_name: submitterInfo.full_name,
-          email: submitterInfo.email,
-          phone: submitterInfo.phone,
-          source_link: sourceLink || `Assessment: ${assessment.title}`,
-          status: 'assessment_done',
-          risk_bucket: result.bucket,
-          risk_score: result.score,
-          source_submission_id: submission.id
-        })
-        .select()
-        .single();
+      console.log('✅ Submission created:', submission.id);
 
-      if (leadError || !lead) {
-        throw new Error(leadError?.message || 'Failed to create lead');
+      // Check if lead with same email already exists for this user
+      let lead;
+      let isNewLead = false;
+      
+      if (submitterInfo.email) {
+        const { data: existingLead, error: existingLeadError } = await supabase
+          .from('leads')
+          .select('*')
+          .eq('user_id', assessment.user_id)
+          .eq('email', submitterInfo.email)
+          .single();
+
+        if (existingLead && !existingLeadError) {
+          // Update existing lead
+          const { data: updatedLead, error: updateError } = await supabase
+            .from('leads')
+            .update({
+              full_name: submitterInfo.full_name,
+              phone: submitterInfo.phone,
+              age: submitterInfo.age,
+              source_link: sourceLink || `Assessment: ${assessment.title}`,
+              status: 'assessment_done',
+              risk_profile_id: submission.id, // Link to the new submission
+              risk_bucket: result.bucket,
+              risk_score: result.score
+            })
+            .eq('id', existingLead.id)
+            .select()
+            .single();
+
+          if (updateError || !updatedLead) {
+            throw new Error(updateError?.message || 'Failed to update existing lead');
+          }
+          
+          lead = updatedLead;
+        } else {
+          // Create new lead
+          const { data: newLead, error: leadError } = await supabase
+            .from('leads')
+            .insert({
+              user_id: assessment.user_id,
+              full_name: submitterInfo.full_name,
+              email: submitterInfo.email,
+              phone: submitterInfo.phone,
+              age: submitterInfo.age,
+              source_link: sourceLink || `Assessment: ${assessment.title}`,
+              status: 'assessment_done',
+              risk_profile_id: submission.id,
+              risk_bucket: result.bucket,
+              risk_score: result.score
+            })
+            .select()
+            .single();
+
+          if (leadError || !newLead) {
+            throw new Error(leadError?.message || 'Failed to create lead');
+          }
+          
+          lead = newLead;
+          isNewLead = true;
+        }
+      } else {
+        // No email provided, always create new lead
+        const { data: newLead, error: leadError } = await supabase
+          .from('leads')
+          .insert({
+            user_id: assessment.user_id,
+            full_name: submitterInfo.full_name,
+            email: submitterInfo.email,
+            phone: submitterInfo.phone,
+            age: submitterInfo.age,
+            source_link: sourceLink || `Assessment: ${assessment.title}`,
+            status: 'assessment_done',
+            risk_profile_id: submission.id,
+            risk_bucket: result.bucket,
+            risk_score: result.score
+          })
+          .select()
+          .single();
+
+        if (leadError || !newLead) {
+          throw new Error(leadError?.message || 'Failed to create lead');
+        }
+        
+        lead = newLead;
+        isNewLead = true;
       }
 
       // Update submission with lead ID
@@ -363,9 +452,12 @@ export class AssessmentService {
         .update({ lead_id: lead.id })
         .eq('id', submission.id);
 
+      console.log('✅ Lead linked to submission:', lead.id);
+
       return {
         submission: submission as AssessmentSubmission,
-        leadId: lead.id
+        leadId: lead.id,
+        isNewLead
       };
     } catch (error) {
       console.error('Error submitting assessment:', error);

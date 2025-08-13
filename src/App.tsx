@@ -26,6 +26,7 @@ import Profile from "./pages/app/Profile";
 import PublicAssessment from "./pages/PublicAssessment";
 import AssessmentComplete from "./pages/AssessmentComplete";
 import AssessmentForms from "./pages/app/AssessmentForms";
+import AssessmentTest from "./pages/AssessmentTest";
 
 const queryClient = new QueryClient();
 
@@ -51,7 +52,9 @@ const App = () => (
                      {/* Public assessment routes */}
                      <Route path="/r/:referralCode" element={<PublicAssessment />} />
                      <Route path="/a/:slug" element={<PublicAssessment />} />
+                     <Route path="/a/:slug/test" element={<AssessmentTest />} />
                      <Route path="/assessment/:assessmentCode" element={<PublicAssessment />} />
+                     <Route path="/assessment-test/:slug" element={<AssessmentTest />} />
                      <Route path="/assessment-complete" element={<AssessmentComplete />} />
 
                      {/* Full screen assessment forms route */}

@@ -218,6 +218,20 @@ export default function Assessments() {
     window.open(assessmentLink, '_blank');
   };
 
+  const handleViewForm = () => {
+    if (!user?.assessment_link) {
+      toast({
+        title: "Assessment Link Not Found",
+        description: "Your assessment link is not available. Please contact support.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Navigate to the assessment form using the user's assessment_link
+    navigate(`/a/${user.assessment_link}`);
+  };
+
   const handleCreateNew = () => {
     navigate('/app/assessment/forms');
   };
@@ -321,6 +335,16 @@ export default function Assessments() {
                 </Button>
                 
                 <Button
+                  onClick={handleViewForm}
+                  variant="outline"
+                  size="sm"
+                  className="border-green-300 hover:border-green-500 hover:bg-green-50"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  View Form
+                </Button>
+                
+                <Button
                   onClick={handleCreateNew}
                   size="sm"
                   className="bg-blue-600 hover:bg-blue-700"
@@ -346,14 +370,26 @@ export default function Assessments() {
                 <p className="text-gray-600 mb-6 max-w-md mx-auto">
                   Create your first assessment form to start collecting client information and generating leads
                 </p>
-                <Button
-                  onClick={handleCreateNew}
-                  size="lg"
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Plus className="w-5 h-5 mr-2" />
-                  Create Your First Assessment
-                </Button>
+                <div className="flex gap-3 justify-center">
+                  <Button
+                    onClick={handleViewForm}
+                    variant="outline"
+                    size="lg"
+                    className="border-green-300 hover:border-green-500 hover:bg-green-50"
+                  >
+                    <FileText className="w-5 h-5 mr-2" />
+                    View Form
+                  </Button>
+                  
+                  <Button
+                    onClick={handleCreateNew}
+                    size="lg"
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Plus className="w-5 h-5 mr-2" />
+                    Create Your First Assessment
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ) : (
@@ -568,6 +604,16 @@ export default function Assessments() {
                           </Button>
                           
                           <Button
+                            onClick={() => handleViewForm()}
+                            variant="outline"
+                            size="sm"
+                            className="w-full border-green-300 hover:border-green-500 hover:bg-green-50"
+                          >
+                            <FileText className="w-4 h-4 mr-2" />
+                            View Form
+                          </Button>
+                          
+                          <Button
                             onClick={() => handleEditForm(selectedAssessment)}
                             size="sm"
                             className="w-full bg-blue-600 hover:bg-blue-700 text-white border-0"
@@ -633,6 +679,20 @@ export default function Assessments() {
                         <div className="text-xs text-gray-500 text-center mb-3">
                           Created: {formatDate(assessment.created_at)}
                         </div>
+                        
+                        {/* Action Button */}
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent card selection
+                            handleViewForm();
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="w-full border-green-300 hover:border-green-500 hover:bg-green-50"
+                        >
+                          <FileText className="w-4 h-4 mr-2" />
+                          View Form
+                        </Button>
                       </CardContent>
                     </Card>
                   ))}

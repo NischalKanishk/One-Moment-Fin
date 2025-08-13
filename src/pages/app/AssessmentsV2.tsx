@@ -17,7 +17,8 @@ import {
   Clock,
   BookOpen,
   FileText,
-  ChevronRight
+  ChevronRight,
+  Play
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -207,8 +208,17 @@ export default function AssessmentsV2() {
     }
   };
 
-  const copyAssessmentLink = async (slug: string) => {
-    const link = `${window.location.origin}/a/${slug}`;
+  const copyAssessmentLink = async () => {
+    if (!user?.assessment_link) {
+      toast({
+        title: "Assessment Link Not Found",
+        description: "Your assessment link is not available. Please contact support.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const link = `${window.location.origin}/a/${user.assessment_link}`;
     try {
       await navigator.clipboard.writeText(link);
       toast({
@@ -231,8 +241,30 @@ export default function AssessmentsV2() {
     }
   };
 
-  const openAssessmentLink = (slug: string) => {
-    window.open(`/a/${slug}`, '_blank');
+  const openAssessmentLink = () => {
+    if (!user?.assessment_link) {
+      toast({
+        title: "Assessment Link Not Found",
+        description: "Your assessment link is not available. Please contact support.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    window.open(`/a/${user.assessment_link}`, '_blank');
+  };
+
+  const openTestLiveForm = () => {
+    if (!user?.assessment_link) {
+      toast({
+        title: "Assessment Link Not Found",
+        description: "Your assessment link is not available. Please contact support.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    window.open(`/assessment-test/${user.assessment_link}`, '_blank');
   };
 
   const getFrameworkName = (frameworkVersionId: string) => {
@@ -313,17 +345,25 @@ export default function AssessmentsV2() {
             <div key={assessment.id} className="flex gap-2">
               <Button
                 variant="outline"
-                onClick={() => copyAssessmentLink(assessment.slug)}
+                onClick={() => copyAssessmentLink()}
               >
                 <Copy className="h-4 w-4 mr-2" />
                 Copy Link
               </Button>
               <Button
                 variant="outline"
-                onClick={() => openAssessmentLink(assessment.slug)}
+                onClick={() => openAssessmentLink()}
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 View Form
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => openTestLiveForm()}
+                className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Test Live Form
               </Button>
             </div>
           ))}
@@ -462,16 +502,16 @@ export default function AssessmentsV2() {
             ))}
           </div>
 
-          {/* Right Column - Risk Assessment Configuration */}
+          {/* Right Column - Framework Selection */}
           <div className="space-y-4">
             <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Settings className="h-5 w-5 text-purple-600" />
-                  Framework Configuration
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-blue-600" />
+                  Risk Framework Selection
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Choose your risk assessment framework
+                  Choose the risk assessment framework for your questions
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -534,7 +574,13 @@ export default function AssessmentsV2() {
         {assessments.filter(a => !a.is_default).length > 0 && (
           <Card className="border-0 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-lg">Other Assessments</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-gray-600" />
+                Other Assessments
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Additional assessment forms you've created
+              </p>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -546,11 +592,12 @@ export default function AssessmentsV2() {
                         Framework: {getFrameworkName(assessment.framework_version_id)}
                       </p>
                     </div>
+                    
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => copyAssessmentLink(assessment.slug)}
+                        onClick={() => copyAssessmentLink()}
                       >
                         <Copy className="h-4 w-4 mr-2" />
                         Copy Link
@@ -558,10 +605,18 @@ export default function AssessmentsV2() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => openAssessmentLink(assessment.slug)}
+                        onClick={() => openAssessmentLink()}
                       >
                         <ExternalLink className="h-4 w-4 mr-2" />
                         View Form
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openTestLiveForm()}
+                      >
+                        <Play className="w-4 h-4 mr-2" />
+                        Test Live Form
                       </Button>
                     </div>
                   </div>

@@ -21,6 +21,7 @@ import authRoutes from './routes/auth';
 import leadsRoutes from './routes/leads';
 import assessmentsRoutes from './routes/assessments';
 import publicAssessmentsRoutes from './routes/publicAssessments';
+import userAssessmentLinksRoutes from './routes/userAssessmentLinks';
 import aiRoutes from './routes/ai';
 
 import meetingsRoutes from './routes/meetings';
@@ -116,10 +117,8 @@ app.use('/api/admin', adminRoutes);
 
 
 // Public assessment routes
-app.use('/a', publicAssessmentsRoutes);
-
-// Assessment routes (for /assessment/:code)
-app.use('/assessment', publicAssessmentsRoutes);
+app.use('/a', userAssessmentLinksRoutes); // User assessment links (e.g., /a/1677811521d31-5477-4cf8-b718-78a64536e553RFEMC)
+app.use('/assessment', publicAssessmentsRoutes); // Legacy assessment routes
 
 // Referral-based assessment routes
 app.use('/r', publicAssessmentsRoutes);

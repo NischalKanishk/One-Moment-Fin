@@ -102,6 +102,9 @@ export class ClerkSupabaseSync {
 
       // Generate unique referral link locally to avoid frontend database calls
       const referralLink = this.generateReferralLinkLocally(clerkUserData.firstName || 'user', clerkUserData.id)
+      
+      // Generate unique assessment link in the format: 5 random digits + userid + 5 random letters
+      const assessmentLink = this.generateAssessmentLinkLocally(clerkUserData.id)
 
       const newUserData = {
         clerk_id: clerkUserData.id,
@@ -111,6 +114,7 @@ export class ClerkSupabaseSync {
         mfd_registration_number: null, // Will be updated later if provided
         auth_provider: 'clerk',
         referral_link: referralLink,
+        assessment_link: assessmentLink,
         profile_image_url: clerkUserData.imageUrl || '',
 
         role: 'mfd' as const
@@ -205,6 +209,13 @@ export class ClerkSupabaseSync {
         }
       }
 
+      // Only update assessment_link if it's completely missing
+      if (!existingUser.assessment_link || existingUser.assessment_link.trim() === '') {
+        const assessmentLink = this.generateAssessmentLinkLocally(clerkUserData.id)
+        updateData.assessment_link = assessmentLink
+        console.log('🔍 ClerkSupabaseSync: Updating missing assessment_link:', assessmentLink)
+      }
+
       // If no fields to update, just return the existing user
       if (Object.keys(updateData).length === 1) { // Only has updated_at
         console.log('🔍 ClerkSupabaseSync: No fields to update, returning existing user unchanged')
@@ -252,6 +263,24 @@ export class ClerkSupabaseSync {
     const uniqueId = userId.slice(-6);
     
     return `/r/${cleanName}${uniqueId}`;
+  }
+
+  /**
+   * Generate assessment link locally in the format: 5 random digits + userid + 5 random letters
+   * This prevents frontend from making direct Supabase calls
+   */
+  private static generateAssessmentLinkLocally(userId: string): string {
+    // Generate 5 random digits
+    const randomDigits = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
+    
+    // Generate 5 random letters
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const randomLetters = Array.from({ length: 5 }, () => 
+      letters.charAt(Math.floor(Math.random() * letters.length))
+    ).join('');
+    
+    // Combine: 5 digits + userid + 5 letters
+    return `${randomDigits}${userId}${randomLetters}`;
   }
 
   /**
