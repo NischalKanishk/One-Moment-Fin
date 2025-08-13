@@ -958,6 +958,62 @@ router.get('/submissions/:id', authenticateUser, async (req: express.Request, re
   }
 });
 
+// GET /api/assessments/frameworks/:frameworkId/questions - Get questions for a specific framework
+router.get('/frameworks/:frameworkId/questions', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const { frameworkId } = req.params;
+
+    // Get questions for the framework by joining framework_question_map with question_bank
+    const { data: questions, error: questionsError } = await supabase
+      .from('framework_question_map')
+      .select(`
+        id,
+        qkey,
+        required,
+        order_index,
+        alias,
+        transform,
+        options_override,
+        question_bank!inner (
+          label,
+          qtype,
+          options,
+          module
+        )
+      `)
+      .eq('framework_version_id', frameworkId)
+      .order('order_index', { ascending: true });
+
+    if (questionsError) {
+      console.error('❌ Error fetching framework questions:', questionsError);
+      return res.status(500).json({ error: 'Failed to fetch framework questions' });
+    }
+
+    // Transform the data to match the expected format
+    const transformedQuestions = questions?.map((q: any) => ({
+      id: q.id,
+      qkey: q.qkey,
+      label: q.question_bank?.label,
+      qtype: q.question_bank?.qtype,
+      options: q.options_override || q.question_bank?.options,
+      required: q.required,
+      order_index: q.order_index,
+      module: q.question_bank?.module
+    })) || [];
+
+    console.log(`✅ Found ${transformedQuestions.length} questions for framework ${frameworkId}`);
+    return res.json({ questions: transformedQuestions });
+
+  } catch (error) {
+    console.error('❌ Get framework questions error:', error);
+    return res.status(500).json({ error: 'Failed to fetch framework questions' });
+  }
+});
+
 // ============================================================================
 // LEGACY COMPATIBILITY ROUTES (for backward compatibility)
 // ============================================================================

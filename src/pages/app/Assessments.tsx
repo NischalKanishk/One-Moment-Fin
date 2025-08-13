@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Plus, 
   FileText, 
@@ -18,7 +19,8 @@ import {
   Target,
   Zap,
   Shield,
-  Star
+  Star,
+  BookOpen
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -40,18 +42,53 @@ interface Assessment {
   }>;
 }
 
+interface Framework {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  engine: string;
+  risk_framework_versions: Array<{
+    id: string;
+    version: number;
+    is_default: boolean;
+    created_at: string;
+  }>;
+}
+
+interface FrameworkQuestion {
+  id: string;
+  qkey: string;
+  label: string;
+  qtype: string;
+  options: any;
+  required: boolean;
+  order_index: number;
+}
+
 export default function Assessments() {
   const { toast } = useToast();
   const { user, getToken } = useAuth();
   const navigate = useNavigate();
   
   const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [frameworks, setFrameworks] = useState<Framework[]>([]);
   const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
+  const [selectedFramework, setSelectedFramework] = useState<string>('');
+  const [frameworkQuestions, setFrameworkQuestions] = useState<FrameworkQuestion[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingFramework, setIsLoadingFramework] = useState(false);
 
   useEffect(() => {
     loadAssessments();
+    loadFrameworks();
   }, []);
+
+  useEffect(() => {
+    if (selectedFramework) {
+      loadFrameworkQuestions(selectedFramework);
+    }
+  }, [selectedFramework]);
 
   const loadAssessments = async () => {
     try {
@@ -127,6 +164,50 @@ export default function Assessments() {
     }
   };
 
+  const loadFrameworks = async () => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const api = createAuthenticatedApi(token);
+      const response = await api.get('/api/assessments/frameworks');
+      
+      if (response.data.frameworks) {
+        setFrameworks(response.data.frameworks);
+        // Set default framework if available
+        const defaultFramework = response.data.frameworks.find((f: Framework) => 
+          f.risk_framework_versions.some(v => v.is_default)
+        );
+        if (defaultFramework) {
+          setSelectedFramework(defaultFramework.id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load frameworks:', error);
+    }
+  };
+
+  const loadFrameworkQuestions = async (frameworkId: string) => {
+    try {
+      setIsLoadingFramework(true);
+      const token = await getToken();
+      if (!token) return;
+
+      const api = createAuthenticatedApi(token);
+      const response = await api.get(`/api/assessments/frameworks/${frameworkId}/questions`);
+      
+      if (response.data.questions) {
+        setFrameworkQuestions(response.data.questions);
+      }
+    } catch (error) {
+      console.error('Failed to load framework questions:', error);
+      // For now, we'll use mock data until the backend endpoint is implemented
+      setFrameworkQuestions([]);
+    } finally {
+      setIsLoadingFramework(false);
+    }
+  };
+
   const handleEditForm = (assessment: Assessment) => {
     navigate('/app/assessment/forms', { state: { assessmentId: assessment.id } });
   };
@@ -183,6 +264,18 @@ export default function Assessments() {
       return 'Manual Scoring';
     }
     return 'Not Configured';
+  };
+
+  const getQuestionTypeLabel = (qtype: string) => {
+    switch (qtype) {
+      case 'single': return 'Single Choice';
+      case 'multi': return 'Multiple Choice';
+      case 'scale': return 'Rating Scale';
+      case 'number': return 'Number Input';
+      case 'percent': return 'Percentage';
+      case 'text': return 'Text Input';
+      default: return qtype.charAt(0).toUpperCase() + qtype.slice(1);
+    }
   };
 
   if (isLoading) {
@@ -291,69 +384,115 @@ export default function Assessments() {
                     <Card className="bg-white border-0 shadow-sm">
                       <CardHeader className="pb-4">
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg text-gray-900">Questions</CardTitle>
-                          <Badge variant="outline" className="text-xs">
-                            {getQuestionCount(selectedAssessment)} Questions
-                          </Badge>
+                          <CardTitle className="text-lg text-gray-900">Assessment Questions</CardTitle>
+                          <div className="flex items-center gap-3">
+                            {/* Framework Selection */}
+                            <div className="flex items-center gap-2">
+                              <BookOpen className="w-4 h-4 text-gray-500" />
+                              <Select value={selectedFramework} onValueChange={setSelectedFramework}>
+                                <SelectTrigger className="w-48">
+                                  <SelectValue placeholder="Select Framework" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {frameworks.map((framework) => (
+                                    <SelectItem key={framework.id} value={framework.id}>
+                                      {framework.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {frameworkQuestions.length} Questions
+                            </Badge>
+                          </div>
                         </div>
                       </CardHeader>
                       <CardContent>
-                        {selectedAssessment.questions ? (
-                          <div className="space-y-3">
-                            {selectedAssessment.questions.map((question, index) => (
-                              <div key={question.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                                <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">
-                                  {index + 1}
+                        {selectedFramework && frameworkQuestions.length > 0 ? (
+                          <>
+                            {/* Questions Summary */}
+                            <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                                <div>
+                                  <div className="text-lg font-semibold text-blue-900">{frameworkQuestions.length}</div>
+                                  <div className="text-xs text-blue-700">Total Questions</div>
                                 </div>
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium text-gray-900">{question.question_text}</p>
-                                  {question.type === 'radio' && question.options && question.options.length > 0 && (
-                                    <div className="mt-2 text-xs text-gray-600">
-                                      Options: {question.options.map((opt: any) => opt.label).join(', ')}
-                                    </div>
-                                  )}
-                                  {question.type === 'checkbox' && question.options && question.options.length > 0 && (
-                                    <div className="mt-2 text-xs text-gray-600">
-                                      Options: {question.options.map((opt: any) => opt.label).join(', ')}
-                                    </div>
-                                  )}
-                                  {question.type === 'text' && (
-                                    <div className="mt-2 text-xs text-gray-600">
-                                      Type: Text
-                                    </div>
-                                  )}
-                                  {question.type === 'number' && (
-                                    <div className="mt-2 text-xs text-gray-600">
-                                      Type: Number
-                                    </div>
-                                  )}
-                                  {question.type === 'rating' && (
-                                    <div className="mt-2 text-xs text-gray-600">
-                                      Type: Rating
-                                    </div>
-                                  )}
-                                  {question.weight !== undefined && (
-                                    <div className="mt-2 text-xs text-gray-600">
-                                      Weight: {question.weight}
-                                    </div>
-                                  )}
+                                <div>
+                                  <div className="text-lg font-semibold text-blue-900">
+                                    {frameworkQuestions.filter(q => q.qtype === 'single' || q.qtype === 'multi').length}
+                                  </div>
+                                  <div className="text-xs text-blue-700">Choice Questions</div>
+                                </div>
+                                <div>
+                                  <div className="text-lg font-semibold text-blue-900">
+                                    {frameworkQuestions.filter(q => q.qtype === 'text' || q.qtype === 'number').length}
+                                  </div>
+                                  <div className="text-xs text-blue-700">Input Questions</div>
+                                </div>
+                                <div>
+                                  <div className="text-lg font-semibold text-blue-900">
+                                    {frameworkQuestions.filter(q => q.required).length}
+                                  </div>
+                                  <div className="text-xs text-blue-700">Required</div>
                                 </div>
                               </div>
-                            ))}
+                            </div>
+                            
+                            {/* Questions List */}
+                            <div className="space-y-3">
+                              {frameworkQuestions
+                                .sort((a, b) => a.order_index - b.order_index)
+                                .map((question, index) => (
+                                <div key={question.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                  <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
+                                      {index + 1}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-gray-900 mb-2">{question.label}</p>
+                                      <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                                        <Badge variant="outline" className="text-xs px-2 py-1">
+                                          {getQuestionTypeLabel(question.qtype)}
+                                        </Badge>
+                                        {question.required && (
+                                          <Badge variant="outline" className="text-xs px-2 py-1 bg-red-50 text-red-700 border-red-200">
+                                            Required
+                                          </Badge>
+                                        )}
+                                        {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && (
+                                          <span className="text-xs text-gray-500">
+                                            {question.qtype === 'scale' ? 'Scale' : 'Options'}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {question.options && Array.isArray(question.options) && (
+                                        <div className="mt-2 text-xs text-gray-600">
+                                          <span className="font-medium">Options:</span> {question.options.join(', ')}
+                                        </div>
+                                      )}
+                                      {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && question.qtype === 'scale' && (
+                                        <div className="mt-2 text-xs text-gray-600">
+                                          <span className="font-medium">Scale:</span> {question.options.min} - {question.options.max}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        ) : selectedFramework ? (
+                          <div className="text-center py-8 text-gray-500">
+                            <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                            <p className="mb-2">No questions found for this framework</p>
+                            <p className="text-sm text-gray-400 mb-4">The selected framework doesn't have any questions configured</p>
                           </div>
                         ) : (
                           <div className="text-center py-8 text-gray-500">
-                            <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                            <p>No questions configured yet</p>
-                            <Button
-                              onClick={() => handleEditForm(selectedAssessment)}
-                              variant="outline"
-                              size="sm"
-                              className="mt-3"
-                            >
-                              <Pencil className="w-4 h-4 mr-2" />
-                              Configure Questions
-                            </Button>
+                            <BookOpen className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                            <p className="mb-2">Select a Framework</p>
+                            <p className="text-sm text-gray-400 mb-4">Choose a framework to view its questions</p>
                           </div>
                         )}
                       </CardContent>
@@ -364,58 +503,69 @@ export default function Assessments() {
                   <div className="lg:col-span-1">
                     <Card className="bg-white border-0 shadow-sm">
                       <CardHeader className="pb-4">
-                        <CardTitle className="text-lg text-gray-900">Scoring Configuration</CardTitle>
+                        <CardTitle className="text-lg text-gray-900">Framework Information</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        {/* Scoring Method */}
-                        <div className="p-4 bg-blue-50 rounded-lg">
-                          <div className="flex items-center gap-2 mb-2">
-                            <BarChart3 className="w-4 h-4 text-blue-600" />
-                            <span className="text-sm font-medium text-blue-900">Method</span>
-                          </div>
-                          <p className="text-sm text-blue-800">{getScoringMethod(selectedAssessment)}</p>
-                        </div>
-
-                        {/* AI Status */}
-                        <div className="p-4 bg-purple-50 rounded-lg">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Brain className="w-4 h-4 text-purple-600" />
-                            <span className="text-sm font-medium text-purple-900">AI Scoring</span>
-                          </div>
-                          <Badge className={getAIStatusColor(getAIStatus(selectedAssessment))}>
-                            {getAIStatus(selectedAssessment)}
-                          </Badge>
-                        </div>
-
-                        {/* Version Info */}
-                        {/* This section needs to be updated to reflect the new assessment structure */}
-                        {/* For now, we'll remove it as it's not directly applicable to the new questions structure */}
-                        {/* {selectedAssessment.latest_version && (
-                          <div className="p-4 bg-gray-50 rounded-lg">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Settings className="w-4 h-4 text-gray-600" />
-                              <span className="text-sm font-medium text-gray-900">Version</span>
-                            </div>
-                            <div className="text-sm text-gray-700">
-                              <p>v{selectedAssessment.latest_version.version}</p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                Updated: {formatDate(selectedAssessment.latest_version.created_at)}
+                        {selectedFramework && frameworks.find(f => f.id === selectedFramework) && (
+                          <>
+                            {/* Framework Details */}
+                            <div className="p-4 bg-blue-50 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <BookOpen className="w-4 h-4 text-blue-600" />
+                                <span className="text-sm font-medium text-blue-900">Framework</span>
+                              </div>
+                              <p className="text-sm text-blue-800">
+                                {frameworks.find(f => f.id === selectedFramework)?.name}
+                              </p>
+                              <p className="text-xs text-blue-600 mt-1">
+                                {frameworks.find(f => f.id === selectedFramework)?.description}
                               </p>
                             </div>
-                          </div>
-                        )} */}
+
+                            {/* Engine Type */}
+                            <div className="p-4 bg-purple-50 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Brain className="w-4 h-4 text-purple-600" />
+                                <span className="text-sm font-medium text-purple-900">Scoring Engine</span>
+                              </div>
+                              <Badge className="bg-purple-100 text-purple-800 border-purple-200">
+                                {frameworks.find(f => f.id === selectedFramework)?.engine.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              </Badge>
+                            </div>
+
+                            {/* Version Info */}
+                            <div className="p-4 bg-gray-50 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Settings className="w-4 h-4 text-gray-600" />
+                                <span className="text-sm font-medium text-gray-900">Available Versions</span>
+                              </div>
+                              <div className="text-sm text-gray-700">
+                                {frameworks.find(f => f.id === selectedFramework)?.risk_framework_versions.map(v => (
+                                  <div key={v.id} className="flex items-center gap-2">
+                                    <span>v{v.version}</span>
+                                    {v.is_default && (
+                                      <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                        Default
+                                      </Badge>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </>
+                        )}
 
                         {/* Action Buttons */}
                         <div className="space-y-2 pt-2">
-                                                     <Button
-                             onClick={() => handleViewLive(selectedAssessment)}
-                             variant="outline"
-                             size="sm"
-                             className="w-full border-gray-300 hover:border-blue-500 hover:bg-blue-50"
-                           >
-                             <Play className="w-4 h-4 mr-2" />
-                             Open Assessment Link
-                           </Button>
+                          <Button
+                            onClick={() => handleViewLive(selectedAssessment)}
+                            variant="outline"
+                            size="sm"
+                            className="w-full border-gray-300 hover:border-blue-500 hover:bg-blue-50"
+                          >
+                            <Play className="w-4 h-4 mr-2" />
+                            Open Assessment Link
+                          </Button>
                           
                           <Button
                             onClick={() => handleEditForm(selectedAssessment)}
@@ -458,14 +608,6 @@ export default function Assessments() {
                               >
                                 {assessment.is_active ? "Active" : "Inactive"}
                               </Badge>
-                              
-                              {/* This section needs to be updated to reflect the new assessment structure */}
-                              {/* For now, we'll remove it as it's not directly applicable to the new questions structure */}
-                              {/* {assessment.latest_version && (
-                                <Badge variant="outline" className="border-blue-200 text-blue-700 text-xs">
-                                  v{assessment.latest_version.version}
-                                </Badge>
-                              )} */}
                             </div>
                           </div>
                         </div>

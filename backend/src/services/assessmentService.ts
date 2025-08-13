@@ -124,7 +124,12 @@ export class AssessmentService {
 
       // If framework is changing, regenerate snapshot
       if (data.framework_version_id && data.framework_version_id !== existingAssessment.framework_version_id) {
-        await this.generateSnapshot(assessmentId, data.framework_version_id);
+        try {
+          await this.generateSnapshot(assessmentId, data.framework_version_id);
+        } catch (error) {
+          console.warn(`Warning: Could not generate snapshot for framework ${data.framework_version_id}:`, error);
+          // Continue with the update even if snapshot generation fails
+        }
       }
 
       // Update the assessment
@@ -243,7 +248,13 @@ export class AssessmentService {
       const questions = await getFrameworkQuestions(frameworkVersionId);
       
       if (questions.length === 0) {
-        throw new Error('No questions found for framework');
+        console.warn(`Warning: No questions found for framework version ${frameworkVersionId}`);
+        // Don't throw error, just clear existing snapshot and return
+        await supabase
+          .from('assessment_question_snapshots')
+          .delete()
+          .eq('assessment_id', assessmentId);
+        return;
       }
 
       // Delete existing snapshot
