@@ -18,7 +18,8 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Calendar, Edit } from 'lucide-react';
+import { formatSourceLink } from "@/lib/utils";
 
 
 interface Lead {
@@ -72,6 +73,8 @@ export default function Leads(){
   const [statusFilter, setStatusFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   
   const form = useForm<LeadFormData>({
@@ -93,6 +96,118 @@ export default function Leads(){
       age: '',
     });
   }, []);
+
+  // Handle opening edit modal
+  const handleEditLead = (lead: Lead) => {
+    setSelectedLead(lead);
+    form.reset({
+      full_name: lead.full_name || '',
+      email: lead.email || '',
+      phone: lead.phone || '',
+      age: lead.age?.toString() || '',
+    });
+    setEditOpen(true);
+  };
+
+  // Handle opening schedule modal (placeholder for now)
+  const handleScheduleMeeting = (lead: Lead) => {
+    // TODO: Implement schedule meeting modal
+    toast({
+      title: "Schedule Meeting",
+      description: `Schedule meeting functionality for ${lead.full_name} will be implemented soon.`,
+    });
+  };
+
+  // Handle form submission for editing
+  const onSubmitEdit = async (data: LeadFormData) => {
+    if (!selectedLead) return;
+    
+    try {
+      const token = await getToken();
+      if (!token) {
+        toast({
+          title: "Authentication Error",
+          description: "Please log in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await leadsAPI.update(token, selectedLead.id, {
+        full_name: data.full_name,
+        email: data.email || null,
+        phone: data.phone || null,
+        age: data.age ? parseInt(data.age) : null,
+      });
+
+      if (response.success) {
+        toast({
+          title: "Lead Updated",
+          description: "Lead information has been updated successfully.",
+        });
+        
+        // Refresh leads list
+        fetchLeads();
+        setEditOpen(false);
+        setSelectedLead(null);
+        form.reset();
+      } else {
+        toast({
+          title: "Update Failed",
+          description: response.message || "Failed to update lead.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error updating lead:', error);
+      toast({
+        title: "Update Failed",
+        description: "An error occurred while updating the lead.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Calculate conversion percentage based on lead status
+  const calculateConversionPercentage = (status: string): { percentage: number; color: string } => {
+    // Debug: Log the status value being processed
+    console.log('🔍 Processing status:', status, 'Type:', typeof status);
+    
+    if (!status) {
+      console.log('⚠️ No status provided, defaulting to 0%');
+      return { percentage: 0, color: 'bg-gray-500' };
+    }
+    
+    // Normalize the status string for comparison
+    const normalizedStatus = status.toString().toLowerCase().trim();
+    console.log('🔍 Normalized status:', normalizedStatus);
+    
+    switch (normalizedStatus) {
+      case 'lead':
+      case 'new':
+        console.log('✅ Status: Lead/New -> 25%');
+        return { percentage: 25, color: 'bg-blue-500' };
+      case 'assessment done':
+      case 'assessment_done':
+      case 'assessmentdone':
+        console.log('✅ Status: Assessment Done -> 50%');
+        return { percentage: 50, color: 'bg-yellow-500' };
+      case 'meeting scheduled':
+      case 'meeting_scheduled':
+      case 'meetingscheduled':
+        console.log('✅ Status: Meeting Scheduled -> 75%');
+        return { percentage: 75, color: 'bg-orange-500' };
+      case 'converted':
+        console.log('✅ Status: Converted -> 100%');
+        return { percentage: 100, color: 'bg-green-500' };
+      case 'dropped':
+        console.log('✅ Status: Dropped -> 0%');
+        return { percentage: 0, color: 'bg-red-500' };
+      default:
+        console.log('⚠️ Unknown status:', normalizedStatus, '-> Defaulting to 0%');
+        return { percentage: 0, color: 'bg-gray-500' };
+    }
+  };
 
   // Authentication guard
   if (authLoading) {
@@ -130,7 +245,7 @@ export default function Leads(){
   }, [addOpen, form]);
 
   useEffect(() => {
-    loadLeads();
+    fetchLeads();
   }, [pagination.page, statusFilter, searchTerm, sourceFilter]);
 
   // Debounce search term changes
@@ -139,14 +254,14 @@ export default function Leads(){
       if (pagination.page !== 1) {
         setPagination(prev => ({ ...prev, page: 1 }));
       } else {
-        loadLeads();
+        fetchLeads();
       }
     }, 500);
 
     return () => clearTimeout(delayedSearch);
   }, [searchTerm]);
 
-  const loadLeads = async () => {
+  const fetchLeads = async () => {
     try {
       setLoading(true);
       
@@ -243,7 +358,7 @@ export default function Leads(){
         phone: '',
         age: '',
       });
-      loadLeads();
+      fetchLeads();
       toast({ 
         title: 'Success', 
         description: 'Lead created successfully.' 
@@ -438,11 +553,111 @@ export default function Leads(){
         </Dialog>
       </div>
 
+      {/* Edit Lead Modal */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-gray-900">
+              Edit Lead: {selectedLead?.full_name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmitEdit)} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="full_name"
+                  rules={{ required: "Full name is required" }}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter full name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  rules={{ 
+                    required: false,
+                    pattern: { 
+                      value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, 
+                      message: 'Please enter a valid email address' 
+                    }
+                  }}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email (Optional)</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="Enter email address" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  rules={{ 
+                    required: false,
+                    pattern: { 
+                      value: /^[\+]?[1-9][\d]{0,15}$/, 
+                      message: 'Please enter a valid phone number' 
+                    }
+                  }}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone (Optional)</FormLabel>
+                      <FormControl>
+                        <Input type="tel" placeholder="Enter phone number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="age"
+                  rules={{ 
+                    required: false,
+                    pattern: { 
+                      value: /^(1[8-9]|[2-9]\d|100)$/, 
+                      message: 'Age must be between 18 and 100' 
+                    }
+                  }}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Age (Optional)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="Enter age" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <DialogFooter className="pt-6">
+                <Button type="submit" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg">
+                  Update Lead
+                </Button>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">Cancel</Button>
+                </DialogClose>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
       <div className="border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              {['Name','Contact','Age','Source','Status','Meeting','Actions'].map(h => (
+              {['Name','Contact','Age','Source','Status','Conversion %','Actions'].map(h => (
                 <TableHead key={h}>{h}</TableHead>
               ))}
             </TableRow>
@@ -472,7 +687,7 @@ export default function Leads(){
                   <TableCell>{lead.age || 'N/A'}</TableCell>
                   <TableCell>
                     <span className="px-2 py-0.5 text-xs rounded bg-blue-100 text-blue-800">
-                      {lead.source_link || 'Unknown'}
+                      {formatSourceLink(lead.source_link)}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -481,7 +696,19 @@ export default function Leads(){
                     </span>
                   </TableCell>
                   <TableCell>
-                    {lead.meetings?.[0]?.status || 'Not scheduled'}
+                    <div className="flex items-center gap-3">
+                      {/* Progress Bar - Always Blue */}
+                      <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="h-2 rounded-full transition-all duration-300 bg-blue-500"
+                          style={{ width: `${calculateConversionPercentage(lead.status || 'New').percentage}%` }}
+                        />
+                      </div>
+                      {/* Percentage Text */}
+                      <span className="text-xs font-semibold min-w-[3rem] text-right text-gray-700">
+                        {calculateConversionPercentage(lead.status || 'New').percentage}%
+                      </span>
+                    </div>
                   </TableCell>
 
                   <TableCell className="space-x-2" onClick={(e) => e.stopPropagation()}>
@@ -492,7 +719,20 @@ export default function Leads(){
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-
+                        <DropdownMenuItem 
+                          onClick={() => handleScheduleMeeting(lead)}
+                          className="flex items-center gap-2 cursor-pointer"
+                        >
+                          <Calendar className="h-4 w-4" />
+                          Schedule
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleEditLead(lead)}
+                          className="flex items-center gap-2 cursor-pointer"
+                        >
+                          <Edit className="h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

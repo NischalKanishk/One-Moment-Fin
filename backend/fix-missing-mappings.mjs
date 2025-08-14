@@ -48,14 +48,6 @@ async function fixMissingMappings() {
 
     // Define the mappings that should exist
     const requiredMappings = {
-      'edj_6q_2023': [
-        { qkey: 'edj_q1', required: true, order_index: 1 },
-        { qkey: 'edj_q2', required: true, order_index: 2 },
-        { qkey: 'edj_q3', required: true, order_index: 3 },
-        { qkey: 'edj_q4', required: true, order_index: 4 },
-        { qkey: 'edj_q5', required: true, order_index: 5 },
-        { qkey: 'edj_q6', required: true, order_index: 6 }
-      ],
       'dsp_style_10q_v1': [
         { qkey: 'dependents', required: true, order_index: 1 },
         { qkey: 'income_bracket', required: true, order_index: 2 },

@@ -346,24 +346,18 @@ export default function AssessmentsV2() {
               <Button
                 variant="outline"
                 onClick={() => copyAssessmentLink()}
+                className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
               >
-                <Copy className="h-4 w-4 mr-2" />
+                <Copy className="w-4 h-4 mr-2" />
                 Copy Link
               </Button>
               <Button
                 variant="outline"
                 onClick={() => openAssessmentLink()}
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                View Form
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => openTestLiveForm()}
                 className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
               >
-                <Play className="w-4 h-4 mr-2" />
-                Test Live Form
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Open Link
               </Button>
             </div>
           ))}
@@ -609,14 +603,6 @@ export default function AssessmentsV2() {
                       >
                         <ExternalLink className="h-4 w-4 mr-2" />
                         View Form
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openTestLiveForm()}
-                      >
-                        <Play className="w-4 h-4 mr-2" />
-                        Test Live Form
                       </Button>
                     </div>
                   </div>

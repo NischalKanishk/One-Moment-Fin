@@ -241,6 +241,16 @@ export const leadsAPI = {
     const response = await authApi.get(`/api/admin/users/${userUUID}/leads`, { params });
     return response.data;
   },
+
+  // Check if lead already exists (for preventing duplicate submissions)
+  checkExisting: async (email?: string, phone?: string, userId?: string) => {
+    const response = await api.post('/api/leads/check-existing', {
+      email,
+      phone,
+      user_id: userId
+    });
+    return response.data;
+  },
 };
 
 // Assessments API

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Phone, Mail, Calendar, FileText, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
+import { formatSourceLink } from "@/lib/utils";
 
 interface Lead {
   id: string;

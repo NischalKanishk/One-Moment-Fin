@@ -12,7 +12,6 @@ This document summarizes the implementation of the new risk assessment system fo
 - **Migration**: Safe, idempotent migration that preserves existing data
 
 ### 2. Risk Assessment Frameworks
-- **Edward Jones 6-Question 2023**: Weighted sum scoring with 5 risk bands
 - **CFA Three Pillar v1**: Capacity, tolerance, and need analysis with warnings
 - **DSP Style 10-Question v1**: India-focused framework with 4 risk bands
 - **Nippon Style v1**: Minimalist 4-question framework with 3 risk bands

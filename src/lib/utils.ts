@@ -45,3 +45,28 @@ export function generateAssessmentLink(userId: string): string {
   // Combine: 5 digits + userid + 5 letters
   return `${randomDigits}${userId}${randomLetters}`;
 }
+
+/**
+ * Format source link for display
+ * Replaces assessment links with "Via link" for better readability
+ */
+export function formatSourceLink(sourceLink: string | null | undefined): string {
+  if (!sourceLink) return 'N/A';
+  
+  // Check if it's an assessment link (format: 5 digits + userid + 5 letters)
+  const assessmentLinkRegex = /^\d{5}[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}[A-Z]{5}$/i;
+  
+  if (assessmentLinkRegex.test(sourceLink)) {
+    return 'Via link';
+  }
+  
+  // Check if it contains common assessment-related text
+  if (sourceLink.toLowerCase().includes('assessment') || 
+      sourceLink.toLowerCase().includes('form') ||
+      sourceLink.toLowerCase().includes('link')) {
+    return 'Via link';
+  }
+  
+  // Return original source link for other cases
+  return sourceLink;
+}

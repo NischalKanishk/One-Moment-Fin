@@ -17,7 +17,9 @@ import {
   Edit,
   Trash2,
   ArrowLeft,
-  Plus
+  Plus,
+  CheckCircle,
+  AlertTriangle
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -47,6 +49,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
+import { formatSourceLink } from "@/lib/utils";
 
 interface Lead {
   id: string;
@@ -95,6 +98,7 @@ export default function LeadDetail() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [canDelete, setCanDelete] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
 
   const form = useForm<EditFormData>({
@@ -245,6 +249,39 @@ export default function LeadDetail() {
     }
   };
 
+  const handleStatusChange = async (newStatus: string) => {
+    try {
+      const token = await getToken();
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      await leadsAPI.updateStatus(token, id!, newStatus);
+      toast({
+        title: "Success",
+        description: `Lead status changed to ${newStatus.replace('_', ' ')}!`,
+      });
+      loadLead();
+    } catch (error) {
+      console.error('Failed to change status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to change lead status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleStatusChangeWithConfirmation = (newStatus: string) => {
+    const statusText = newStatus === 'converted' ? 'Converted' : 'Dropped';
+    const message = newStatus === 'converted' 
+      ? 'Are you sure you want to mark this lead as converted? This action cannot be undone.'
+      : 'Are you sure you want to mark this lead as dropped? This action cannot be undone.';
+    
+    if (window.confirm(`${message}\n\nClick OK to confirm or Cancel to abort.`)) {
+      handleStatusChange(newStatus);
+    }
+  };
 
 
   if (loading) {
@@ -299,343 +336,423 @@ export default function LeadDetail() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gray-50">
       <Helmet>
         <title>{lead.full_name} – OneMFin</title>
         <meta name="description" content="Lead summary, risk assessment, meetings and AI suggestions." />
       </Helmet>
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => navigate('/app/leads')}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{lead.full_name}</h1>
-            <p className="text-muted-foreground">Lead Details</p>
+      {/* Header Section */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          {/* Back to Leads Button - Higher up */}
+          <div className="mb-4">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate('/app/leads')}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Leads
+            </Button>
+          </div>
+
+          {/* Stroked Border Section with Lead Info */}
+          <div className="border border-gray-300 rounded-lg p-6 bg-gray-50">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-4 mb-2">
+                  <h2 className="text-3xl font-bold text-gray-900">{lead.full_name}</h2>
+                  <Badge 
+                    variant="default" 
+                    className="text-sm px-3 py-1 bg-blue-600 text-white"
+                  >
+                    {lead.status.replace('_', ' ')}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2 text-gray-600 mb-4">
+                  <Mail className="w-4 h-4" />
+                  <span>{lead.email || 'No email provided'}</span>
+                </div>
+                
+                {/* Source, Mobile, Created on - Left side */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <ExternalLink className="w-4 h-4" />
+                    <span>Source: {formatSourceLink(lead.source_link)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Phone className="w-4 h-4" />
+                    <span>Mobile: {lead.phone || 'No phone provided'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Calendar className="w-4 h-4" />
+                    <span>Created on: {new Date(lead.created_at).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <Button 
+                  onClick={() => setIsScheduleModalOpen(true)}
+                  size="sm"
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+                >
+                  <Calendar className="h-4 w-4" />
+                  Schedule
+                </Button>
+                
+                {/* Status Change Button - Only enabled when meetings are scheduled */}
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      disabled={
+                        !lead.meetings || 
+                        lead.meetings.length === 0 || 
+                        lead.status === 'converted' || 
+                        lead.status === 'dropped'
+                      }
+                      className={`flex items-center gap-2 ${
+                        !lead.meetings || 
+                        lead.meetings.length === 0 || 
+                        lead.status === 'converted' || 
+                        lead.status === 'dropped'
+                          ? 'opacity-50 cursor-not-allowed' 
+                          : 'hover:bg-gray-100'
+                      }`}
+                    >
+                      <TrendingUp className="h-4 w-4" />
+                      {lead.status === 'converted' ? 'Converted' : 
+                       lead.status === 'dropped' ? 'Dropped' : 'Change Status'}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                      <DialogTitle>Change Lead Status</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <p className="text-sm text-gray-600">
+                        Current status: <span className="font-medium">{lead.status.replace('_', ' ')}</span>
+                      </p>
+                      
+                      {/* Show current status info */}
+                      {lead.status === 'converted' && (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                          <p className="text-sm text-green-800">
+                            🎉 This lead has been successfully converted!
+                          </p>
+                        </div>
+                      )}
+                      
+                      {lead.status === 'dropped' && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                          <p className="text-sm text-red-800">
+                            ❌ This lead has been marked as dropped.
+                          </p>
+                        </div>
+                      )}
+                      
+                      {/* Only show status change options if not in final state */}
+                      {lead.status !== 'converted' && lead.status !== 'dropped' && (
+                        <>
+                          <div className="space-y-3">
+                            <Button
+                              onClick={() => handleStatusChangeWithConfirmation('converted')}
+                              className="w-full bg-green-600 hover:bg-green-700 text-white"
+                              size="sm"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Mark as Converted
+                            </Button>
+                            <Button
+                              onClick={() => handleStatusChangeWithConfirmation('dropped')}
+                              variant="destructive"
+                              className="w-full"
+                              size="sm"
+                            >
+                              <AlertTriangle className="h-4 w-4 mr-2" />
+                              Mark as Dropped
+                            </Button>
+                          </div>
+                          
+                          <div className="text-xs text-gray-500 text-center">
+                            💡 You can only change status after scheduling a meeting
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                
+                <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <Edit className="h-4 w-4" />
+                      Edit
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-visible">
+                    <DialogHeader className="pb-4">
+                      <DialogTitle className="text-xl font-semibold">Edit Lead</DialogTitle>
+                    </DialogHeader>
+                    <div 
+                      className="max-h-[calc(90vh-120px)] overflow-y-auto scroll-smooth"
+                      style={{ 
+                        scrollBehavior: 'smooth',
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: 'hsl(var(--border)) hsl(var(--background))'
+                      }}
+                    >
+                      <Form {...form}>
+                        <form onSubmit={form.handleSubmit(handleSaveEdit)} className="space-y-4">
+                          <div className="grid grid-cols-1 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="full_name"
+                              rules={{ required: 'Full name is required' }}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Full Name *</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Enter full name" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div className="grid grid-cols-2 gap-4">
+                              <FormField
+                                control={form.control}
+                                name="email"
+                                rules={{ 
+                                  pattern: { 
+                                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i, 
+                                    message: 'Invalid email address' 
+                                  } 
+                                }}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Email</FormLabel>
+                                    <FormControl>
+                                      <Input type="email" placeholder="Enter email address" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name="phone"
+                                rules={{ 
+                                  pattern: { 
+                                    value: /^[0-9]{10}$/, 
+                                    message: 'Phone number must be 10 digits' 
+                                  } 
+                                }}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Phone</FormLabel>
+                                    <FormControl>
+                                      <Input type="tel" placeholder="Enter phone number" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <FormField
+                                control={form.control}
+                                name="age"
+                                rules={{ 
+                                  pattern: { 
+                                    value: /^[0-9]+$/, 
+                                    message: 'Age must be a number' 
+                                  },
+                                  min: { value: 18, message: 'Age must be at least 18' },
+                                  max: { value: 120, message: 'Age must be less than 120' }
+                                }}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Age</FormLabel>
+                                    <FormControl>
+                                      <Input type="number" placeholder="Enter age" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          </div>
+                          <DialogFooter>
+                            <DialogClose asChild>
+                              <Button type="button" variant="outline">Cancel</Button>
+                            </DialogClose>
+                            <Button type="submit">Save Changes</Button>
+                          </DialogFooter>
+                        </form>
+                      </Form>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                
+                <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" className="flex items-center gap-2">
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete the lead
+                        and all associated data.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
           </div>
         </div>
-        
-        <div className="flex gap-2">
-          <Button 
-            onClick={() => setIsScheduleModalOpen(true)}
-            className="flex items-center gap-2"
-          >
-            <Calendar className="h-4 w-4" />
-            Schedule
-          </Button>
-          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2">
-                <Edit className="h-4 w-4" />
-                Edit
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-visible">
-              <DialogHeader className="pb-4">
-                <DialogTitle className="text-xl font-semibold">Edit Lead</DialogTitle>
-              </DialogHeader>
-              <div 
-                className="max-h-[calc(90vh-120px)] overflow-y-auto scroll-smooth"
-                style={{ 
-                  scrollBehavior: 'smooth',
-                  scrollbarWidth: 'thin',
-                  scrollbarColor: 'hsl(var(--border)) hsl(var(--background))'
-                }}
-              >
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(handleSaveEdit)} className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="full_name"
-                        rules={{ required: 'Full name is required' }}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Full Name *</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Enter full name" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="email"
-                          rules={{ 
-                            pattern: { 
-                              value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i, 
-                              message: 'Invalid email address' 
-                            } 
-                          }}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Email</FormLabel>
-                              <FormControl>
-                                <Input type="email" placeholder="Enter email address" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="phone"
-                          rules={{ 
-                            pattern: { 
-                              value: /^[0-9]{10}$/, 
-                              message: 'Phone number must be 10 digits' 
-                            } 
-                          }}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Phone</FormLabel>
-                              <FormControl>
-                                <Input type="tel" placeholder="Enter phone number" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="age"
-                          rules={{ 
-                            pattern: { 
-                              value: /^[0-9]+$/, 
-                              message: 'Age must be a number' 
-                            },
-                            min: { value: 18, message: 'Age must be at least 18' },
-                            max: { value: 120, message: 'Age must be less than 120' }
-                          }}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Age</FormLabel>
-                              <FormControl>
-                                <Input type="number" placeholder="Enter age" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <DialogClose asChild>
-                        <Button type="button" variant="outline">Cancel</Button>
-                      </DialogClose>
-                      <Button type="submit">Save Changes</Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </div>
-            </DialogContent>
-          </Dialog>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Tabs */}
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="grid w-full grid-cols-4 bg-white border border-gray-200 rounded-xl p-1 h-16 shadow-sm">
+            <TabsTrigger 
+              value="overview" 
+              className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:border-blue-200 data-[state=active]:shadow-sm rounded-lg h-14 transition-all duration-200 font-medium"
+            >
+              Overview
+            </TabsTrigger>
+            <TabsTrigger 
+              value="risk" 
+              className="data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 data-[state=active]:border-purple-200 data-[state=active]:shadow-sm rounded-lg h-14 transition-all duration-200 font-medium"
+            >
+              Risk Assessment
+            </TabsTrigger>
+            <TabsTrigger 
+              value="meetings" 
+              className="data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:border-green-200 data-[state=active]:shadow-sm rounded-lg h-14 transition-all duration-200 font-medium"
+            >
+              Meetings ({lead?.meetings?.length || 0})
+            </TabsTrigger>
+            <TabsTrigger 
+              value="suggestions" 
+              className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 data-[state=active]:border-indigo-200 data-[state=active]:shadow-sm rounded-lg h-14 transition-all duration-200 font-medium"
+            >
+              Suggestions
+            </TabsTrigger>
+          </TabsList>
           
-          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" className="flex items-center gap-2">
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the lead
-                  and all associated data.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </div>
-
-      {/* Lead Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Contact Info</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">{lead.email || 'No email'}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Phone className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">{lead.phone || 'No phone'}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Lead Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">Age: {lead.age || 'N/A'}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <ExternalLink className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">Source: {lead.source_link || 'N/A'}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">
-                Age: {lead.age || 'N/A'}
-              </Badge>
-              <Badge variant="secondary">Status: {lead.status.replace('_', ' ')}</Badge>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tabs */}
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="risk">Risk</TabsTrigger>
-          <TabsTrigger value="meetings">Meetings ({lead?.meetings?.length || 0})</TabsTrigger>
-          <TabsTrigger value="suggestions">Suggestions</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="overview" className="space-y-4">
-          {/* Risk Profile Summary */}
-          {lead.assessment && (
-            <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-blue-800">
-                  <TrendingUp className="h-5 w-5" />
-                  Risk Profile Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-blue-600 mb-1">
-                      {lead.risk_score || 0}
-                    </div>
-                    <div className="text-sm text-blue-600 font-medium">Risk Score</div>
+          <TabsContent value="overview" className="space-y-6 mt-8">
+            {/* Side by side layout: Lead Information and Risk Profile Summary */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Lead Information - Left side */}
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <User className="w-5 h-5 text-gray-600" />
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-800 mb-1">
-                      {lead.risk_bucket || 'N/A'}
-                    </div>
-                    <div className="text-sm text-blue-700">Risk Category</div>
+                  <h3 className="text-xl font-semibold text-gray-900">Lead Information</h3>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">Full Name</span>
+                    <span className="text-sm font-semibold text-gray-900">{lead.full_name}</span>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600 mb-1">
-                      {lead.assessment.mappedAnswers.length}
-                    </div>
-                    <div className="text-sm text-blue-600">Questions Answered</div>
+                  <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">Age</span>
+                    <span className="text-sm font-semibold text-gray-900">{lead.age ? `${lead.age} years` : 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">Email</span>
+                    <span className="text-sm font-semibold text-gray-900">{lead.email || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-3">
+                    <span className="text-sm font-medium text-gray-600">Phone</span>
+                    <span className="text-sm font-semibold text-gray-900">{lead.phone || 'N/A'}</span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Lead Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-sm text-muted-foreground">Full Name:</span>
-                  <p className="font-medium">{lead.full_name}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">Age:</span>
-                  <p className="font-medium">{lead.age ? `${lead.age} years` : 'N/A'}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">Email:</span>
-                  <p className="font-medium">{lead.email || 'N/A'}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">Phone:</span>
-                  <p className="font-medium">{lead.phone || 'N/A'}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">Current Status:</span>
-                  <p className="font-medium capitalize">{lead.status.replace('_', ' ')}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">Created:</span>
-                  <p className="font-medium">{new Date(lead.created_at).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">Source:</span>
-                  <p className="font-medium capitalize">{lead.source_link || 'N/A'}</p>
-                </div>
-                {lead.assessment && (
-                  <div>
-                    <span className="text-sm text-muted-foreground">Assessment Date:</span>
-                    <p className="font-medium">
-                      {new Date(lead.assessment.submission.submitted_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                )}
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="risk" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Risk Assessment
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+
+              {/* Risk Profile Summary - Right side */}
+              {lead.assessment && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-8 shadow-sm border border-blue-100">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center">
+                      <TrendingUp className="w-7 h-7 text-blue-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-blue-900">Risk Profile Summary</h2>
+                      <p className="text-blue-700">Assessment completed on {new Date(lead.assessment.submission.submitted_at).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div className="text-center">
+                      <div className="text-4xl font-bold text-blue-600 mb-3">{lead.risk_score || 0}</div>
+                      <div className="text-sm font-medium text-blue-700 uppercase tracking-wide">Risk Score</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-blue-800 mb-3">{lead.risk_bucket || 'N/A'}</div>
+                      <div className="text-sm font-medium text-blue-700 uppercase tracking-wide">Risk Category</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-blue-600 mb-3">{lead.assessment.mappedAnswers.length}</div>
+                      <div className="text-sm font-medium text-blue-700 uppercase tracking-wide">Questions Answered</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="risk" className="space-y-6 mt-8">
+            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center">
+                  <TrendingUp className="w-7 h-7 text-purple-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Risk Assessment</h2>
+                  <p className="text-gray-600">Detailed analysis of the lead's risk profile</p>
+                </div>
+              </div>
+              
               {lead.assessment ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   {/* Left Side: Questions and Answers */}
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <h3 className="font-medium">Assessment Questions & Answers</h3>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <FileText className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <h3 className="text-xl font-semibold text-gray-900">Assessment Questions & Answers</h3>
                     </div>
                     <div className="space-y-3">
                       {lead.assessment.mappedAnswers.map((qa, index) => (
-                        <div key={index} className="border rounded-lg p-3 bg-muted/30">
-                          <div className="font-medium text-sm mb-1">{qa.question}</div>
-                          <div className="text-sm text-muted-foreground">
-                            <span className="font-medium">Answer:</span> {qa.answer}
+                        <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                          <div className="font-medium text-sm text-gray-900 mb-2">{qa.question}</div>
+                          <div className="text-sm text-gray-700">
+                            <span className="font-medium text-gray-900">Answer:</span> {qa.answer}
                           </div>
                           {qa.module && (
-                            <div className="text-xs text-muted-foreground mt-1">
+                            <div className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                              <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
                               Module: {qa.module}
                             </div>
                           )}
@@ -646,128 +763,173 @@ export default function LeadDetail() {
 
                   {/* Right Side: Risk Factors */}
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                      <h3 className="font-medium">Risk Profile</h3>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <TrendingUp className="w-5 h-5 text-purple-600" />
+                      </div>
+                      <h3 className="text-xl font-semibold text-gray-900">Risk Profile</h3>
                     </div>
                     
                     {/* Risk Score Card */}
-                    <div className="border rounded-lg p-4 bg-gradient-to-br from-blue-50 to-indigo-50">
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-100">
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-600 mb-1">
+                        <div className="text-3xl font-bold text-blue-600 mb-2">
                           {lead.risk_score || 0}
                         </div>
-                        <div className="text-sm text-blue-600 font-medium">Risk Score</div>
+                        <div className="text-sm font-medium text-blue-700 uppercase tracking-wide">Risk Score</div>
                       </div>
                     </div>
 
                     {/* Risk Category Card */}
-                    <div className="border rounded-lg p-4">
+                    <div className="bg-white rounded-lg p-6 border border-gray-200">
                       <div className="text-center">
-                        <div className="text-lg font-semibold mb-1">
+                        <div className="text-2xl font-bold text-gray-900 mb-2">
                           {lead.risk_bucket || 'N/A'}
                         </div>
-                        <div className="text-sm text-muted-foreground">Risk Category</div>
+                        <div className="text-sm text-gray-600 uppercase tracking-wide">Risk Category</div>
                       </div>
                     </div>
 
                     {/* Assessment Details */}
-                    <div className="border rounded-lg p-4 space-y-3">
-                      <div className="text-sm">
-                        <span className="font-medium">Assessment Date:</span>
-                        <div className="text-muted-foreground">
-                          {new Date(lead.assessment.submission.submitted_at).toLocaleDateString()}
+                    <div className="bg-white rounded-lg p-6 border border-gray-200">
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-gray-600">Assessment Date</span>
+                          <span className="text-sm font-semibold text-gray-900">
+                            {new Date(lead.assessment.submission.submitted_at).toLocaleDateString()}
+                          </span>
                         </div>
-                      </div>
-                      <div className="text-sm">
-                        <span className="font-medium">Assessment Title:</span>
-                        <div className="text-muted-foreground">
-                          {lead.assessment.assessment.title}
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-gray-600">Assessment Title</span>
+                          <span className="text-sm font-semibold text-gray-900">
+                            {lead.assessment.assessment.title}
+                          </span>
                         </div>
-                      </div>
-                      <div className="text-sm">
-                        <span className="font-medium">Total Questions:</span>
-                        <div className="text-muted-foreground">
-                          {lead.assessment.mappedAnswers.length}
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-gray-600">Total Questions</span>
+                          <span className="text-sm font-semibold text-gray-900">
+                            {lead.assessment.mappedAnswers.length}
+                          </span>
                         </div>
                       </div>
                     </div>
 
                     {/* Risk Insights */}
                     {lead.assessment.submission.result?.rubric && (
-                      <div className="border rounded-lg p-4 bg-amber-50">
-                        <div className="text-sm">
-                          <span className="font-medium text-amber-800">Risk Insights:</span>
-                          <div className="text-amber-700 mt-1">
-                            {lead.risk_bucket === 'Low' && 'Conservative approach recommended'}
-                            {lead.risk_bucket === 'Medium' && 'Balanced approach suitable'}
-                            {lead.risk_bucket === 'High' && 'Aggressive approach possible'}
+                      <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg p-6 border border-amber-100">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+                            <TrendingUp className="w-4 h-4 text-amber-600" />
                           </div>
+                          <h4 className="font-semibold text-amber-800">Risk Insights</h4>
+                        </div>
+                        <div className="text-sm text-amber-700">
+                          {lead.risk_bucket === 'Low' && 'Conservative approach recommended for this risk profile.'}
+                          {lead.risk_bucket === 'Medium' && 'Balanced approach suitable for moderate risk tolerance.'}
+                          {lead.risk_bucket === 'High' && 'Aggressive approach possible given high risk tolerance.'}
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground mb-2">No risk assessment completed yet.</p>
-                  <p className="text-sm text-muted-foreground">
-                    This lead hasn't completed an assessment. Send them an assessment link to get started.
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <TrendingUp className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Risk Assessment Completed</h3>
+                  <p className="text-gray-600 max-w-md mx-auto">
+                    This lead hasn't completed an assessment yet. Send them an assessment link to get started with risk profiling.
                   </p>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="meetings" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Meetings
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="meetings" className="space-y-6 mt-8">
+            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center">
+                  <Calendar className="w-7 h-7 text-green-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Meetings & Appointments</h2>
+                  <p className="text-gray-600">Schedule and manage meetings with this lead</p>
+                </div>
+              </div>
+              
               {lead.meetings && lead.meetings.length > 0 ? (
                 <div className="space-y-4">
                   {lead.meetings.map((meeting: any) => (
-                    <div key={meeting.id} className="border-l-2 border-primary pl-4 py-2">
-                      <div className="font-medium">{meeting.title}</div>
-                      <div className="text-sm text-muted-foreground">{meeting.description}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {new Date(meeting.start_time).toLocaleString()} - {new Date(meeting.end_time).toLocaleString()}
+                    <div key={meeting.id} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center gap-3">
+                            <h4 className="font-semibold text-gray-900">{meeting.title}</h4>
+                            <Badge 
+                              variant={meeting.status === 'completed' ? 'default' : 'secondary'}
+                              className="text-xs"
+                            >
+                              {meeting.status}
+                            </Badge>
+                          </div>
+                          {meeting.description && (
+                            <p className="text-sm text-gray-600">{meeting.description}</p>
+                          )}
+                          <div className="flex items-center gap-4 text-xs text-gray-500">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(meeting.start_time).toLocaleDateString()}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                              {new Date(meeting.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(meeting.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <Badge variant={meeting.status === 'completed' ? 'default' : 'secondary'}>
-                        {meeting.status}
-                      </Badge>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground">No meetings scheduled yet.</p>
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Calendar className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Meetings Scheduled</h3>
+                  <p className="text-gray-600 max-w-md mx-auto">
+                    No meetings have been scheduled with this lead yet. Use the Schedule Meeting button above to set up an appointment.
+                  </p>
+                </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          </TabsContent>
         
-        <TabsContent value="suggestions" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                AI Suggestions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">AI-powered product suggestions will be displayed here.</p>
-            </CardContent>
-          </Card>
+        <TabsContent value="suggestions" className="space-y-6 mt-8">
+          <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-14 h-14 bg-indigo-100 rounded-xl flex items-center justify-center">
+                <FileText className="w-7 h-7 text-indigo-600" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">AI-Powered Suggestions</h2>
+                <p className="text-gray-600">Personalized recommendations based on risk profile</p>
+              </div>
+            </div>
+            
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FileText className="h-8 w-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Suggestions Coming Soon</h3>
+              <p className="text-gray-600 max-w-md mx-auto">
+                AI-powered product suggestions and recommendations will be displayed here based on the lead's risk profile and preferences.
+              </p>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
-
-
     </div>
+  </div>
   );
 }

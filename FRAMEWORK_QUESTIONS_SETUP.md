@@ -9,7 +9,7 @@ The Assessment Questions section now displays questions from the selected framew
 The system consists of several interconnected tables:
 
 1. **`question_bank`** - Contains all available questions with their types and options
-2. **`risk_frameworks`** - Different assessment frameworks (e.g., Edward Jones, CFA Three Pillar)
+2. **`risk_frameworks`** - Different assessment frameworks (e.g., CFA Three Pillar)
 3. **`risk_framework_versions`** - Specific versions of frameworks with scoring configurations
 4. **`framework_question_map`** - Maps which questions belong to which framework version
 
@@ -57,7 +57,6 @@ If the tables are empty, run the seed script:
 
 The system comes with several pre-configured frameworks:
 
-- **Edward Jones 6-Question 2023** - Six-question risk assessment with explicit scoring
 - **CFA Three Pillar v1** - Three-pillar approach: capacity, tolerance, and need
 - **DSP Style 10-Question v1** - India-style 10-question framework
 - **Nippon Style v1** - Minimalist framework focusing on key risk factors

@@ -21,7 +21,8 @@ import {
   Phone,
   Mail,
   User,
-  Info
+  Info,
+  FileText
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -77,9 +78,11 @@ export default function PublicAssessment() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<AssessmentResult | null>(null);
-  const [currentStep, setCurrentStep] = useState<'intro' | 'questions' | 'review' | 'result'>('intro');
+  const [currentStep, setCurrentStep] = useState<'intro' | 'verification' | 'questions' | 'review' | 'result' | 'already-completed'>('intro');
   const [assessmentType, setAssessmentType] = useState<'referral' | 'assessment' | 'public'>('public');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [existingLead, setExistingLead] = useState<any>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     console.log('🔍 useEffect triggered with:', {
@@ -187,46 +190,18 @@ export default function PublicAssessment() {
       console.log('🔍 Loading assessment for slug:', assessmentSlug);
       
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/a/${assessmentSlug}`);
-      console.log('🔍 Response status:', response.status);
       
       if (!response.ok) {
-        throw new Error('Assessment not found');
+        throw new Error('Failed to load assessment');
       }
       
-      console.log('🔍 Response headers:', Object.fromEntries(response.headers.entries()));
-      console.log('🔍 Response status:', response.status);
-      console.log('🔍 Response ok:', response.ok);
+      const data = await response.json();
+      console.log('✅ Assessment data loaded:', data);
       
-      const responseText = await response.text();
-      console.log('🔍 Raw response text:', responseText);
-      
-      let data;
-      try {
-        data = JSON.parse(responseText);
-        console.log('🔍 Assessment data received:', data);
-        console.log('🔍 Assessment object:', data.assessment);
-        console.log('🔍 Questions array:', data.questions);
-      } catch (parseError) {
-        console.error('❌ JSON parse error:', parseError);
-        console.error('❌ Response text that failed to parse:', responseText);
-        throw new Error(`Failed to parse response: ${parseError.message}`);
-      }
-      
-      // Validate data structure
-      if (!data.assessment || !data.questions) {
-        throw new Error('Invalid data structure received from server');
-      }
-      
-      if (!Array.isArray(data.questions)) {
-        throw new Error('Questions must be an array');
-      }
-      
-      console.log('🔍 Setting assessment and questions...');
       setAssessment(data.assessment);
       setQuestions(data.questions);
-      console.log('🔍 Assessment loaded successfully');
     } catch (error) {
-      console.error('❌ Failed to load assessment:', error);
+      console.error('Failed to load assessment:', error);
       toast({
         title: "Error",
         description: "Failed to load assessment. Please check the link and try again.",
@@ -234,6 +209,64 @@ export default function PublicAssessment() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const verifyExistingLead = async () => {
+    if (!submitterInfo.email && !submitterInfo.phone) {
+      toast({
+        title: "Error",
+        description: "Please provide either email or phone number to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!assessment?.user_id) {
+      toast({
+        title: "Error",
+        description: "Assessment information is missing. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsVerifying(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/leads/check-existing`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: submitterInfo.email || undefined,
+          phone: submitterInfo.phone || undefined,
+          user_id: assessment.user_id
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to verify existing lead');
+      }
+
+      const data = await response.json();
+      
+      if (data.exists) {
+        setExistingLead(data);
+        setCurrentStep('already-completed');
+      } else {
+        // No existing lead found, proceed to questions
+        setCurrentStep('questions');
+      }
+    } catch (error) {
+      console.error('Failed to verify existing lead:', error);
+      toast({
+        title: "Error",
+        description: "Failed to verify existing lead. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -282,23 +315,32 @@ export default function PublicAssessment() {
   };
 
   const handleNext = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
-      // All questions answered, ready to submit
-      setCurrentStep('questions');
+    if (currentStep === 'verification') {
+      verifyExistingLead();
+    } else if (currentStep === 'questions') {
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+      } else {
+        setCurrentStep('review');
+      }
     }
   };
 
   const handlePrevious = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
+    if (currentStep === 'questions') {
+      if (currentQuestionIndex > 0) {
+        setCurrentQuestionIndex(currentQuestionIndex - 1);
+      } else {
+        setCurrentStep('verification');
+      }
+    } else if (currentStep === 'review') {
+      setCurrentQuestionIndex(questions.length - 1);
+      setCurrentStep('questions');
     }
   };
 
   const handleStartAssessment = () => {
-    setCurrentStep('questions');
-    setCurrentQuestionIndex(0);
+    setCurrentStep('verification');
   };
 
   const handleSubmit = async () => {
@@ -373,16 +415,6 @@ export default function PublicAssessment() {
     }
   };
 
-  const handlePhoneChange = (value: string) => {
-    if (value.startsWith('+91')) {
-      setSubmitterInfo(prev => ({ ...prev, phone: value }));
-    } else if (value.startsWith('+')) {
-      setSubmitterInfo(prev => ({ ...prev, phone: value }));
-    } else {
-      setSubmitterInfo(prev => ({ ...prev, phone: `+91${value}` }));
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -443,6 +475,15 @@ export default function PublicAssessment() {
     return (
       <div className="min-h-screen bg-gray-50 py-8 px-4">
         <div className="max-w-4xl mx-auto">
+          {/* Progress Indicator */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Step 3 of 3: Review & Submit</span>
+              <span className="text-sm text-muted-foreground">100%</span>
+            </div>
+            <Progress value={100} className="h-2" />
+          </div>
+
           {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Review Your Answers</h1>
@@ -568,24 +609,220 @@ export default function PublicAssessment() {
                   It takes about 5-10 minutes to complete and will provide you with personalized investment recommendations.
                 </p>
                 
-                <div className="bg-blue-50 p-4 rounded-lg mb-6 max-w-md mx-auto">
-                  <h3 className="font-semibold text-blue-900 mb-2">What you'll need:</h3>
-                  <ul className="text-sm text-blue-800 space-y-1">
-                    <li>• Basic personal information</li>
-                    <li>• Financial situation details</li>
-                    <li>• Investment experience</li>
-                    <li>• Risk tolerance preferences</li>
-                  </ul>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Users className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <h3 className="font-semibold text-gray-900 mb-2">Personalized Approach</h3>
+                    <p className="text-sm text-gray-600">Tailored recommendations based on your unique profile</p>
+                  </div>
+                  
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Target className="w-6 h-6 text-green-600" />
+                    </div>
+                    <h3 className="font-semibold text-gray-900 mb-2">Risk Assessment</h3>
+                    <p className="text-sm text-gray-600">Understand your risk tolerance and capacity</p>
+                  </div>
+                  
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Calendar className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <h3 className="font-semibold text-gray-900 mb-2">Quick & Easy</h3>
+                    <p className="text-sm text-gray-600">Complete in just 5-10 minutes</p>
+                  </div>
                 </div>
 
                 <Button
                   onClick={handleStartAssessment}
                   size="lg"
-                  className="bg-blue-600 hover:bg-blue-700 px-8"
+                  className="bg-blue-600 hover:bg-blue-700 px-8 py-3 text-lg"
                 >
                   Start Assessment
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentStep === 'verification') {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 px-4">
+        <div className="max-w-2xl mx-auto">
+          {/* Progress Indicator */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Step 1 of 3: Verification</span>
+              <span className="text-sm text-muted-foreground">25%</span>
+            </div>
+            <Progress value={25} className="h-2" />
+          </div>
+
+          <Card>
+            <CardHeader className="text-center">
+              <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                <User className="w-8 h-8 text-blue-600" />
+              </div>
+              <CardTitle className="text-2xl">Verify Your Information</CardTitle>
+              <p className="text-muted-foreground">
+                Please provide your basic details so we can check if you've already completed this assessment.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="full_name">Full Name *</Label>
+                  <Input
+                    id="full_name"
+                    value={submitterInfo.full_name}
+                    onChange={(e) => setSubmitterInfo(prev => ({ ...prev, full_name: e.target.value }))}
+                    placeholder="Enter your full name"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="age">Age</Label>
+                  <Input
+                    id="age"
+                    type="number"
+                    value={submitterInfo.age}
+                    onChange={(e) => setSubmitterInfo(prev => ({ ...prev, age: e.target.value }))}
+                    placeholder="Enter your age"
+                    min="18"
+                    max="100"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={submitterInfo.email}
+                  onChange={(e) => setSubmitterInfo(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="Enter your email address"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Provide either email or phone number to continue
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <div className="relative">
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={submitterInfo.phone}
+                    onChange={(e) => {
+                      let value = e.target.value;
+                      if (!value.startsWith('+91')) {
+                        value = '+91' + value.replace('+91', '');
+                      }
+                      setSubmitterInfo(prev => ({ ...prev, phone: value }));
+                    }}
+                    placeholder="Enter your phone number"
+                  />
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
+                    +91
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentStep('intro')}
+                  className="flex-1"
+                >
+                  Back
+                </Button>
+                <Button
+                  onClick={handleNext}
+                  disabled={isVerifying || (!submitterInfo.email && !submitterInfo.phone) || !submitterInfo.full_name.trim()}
+                  className="flex-1"
+                >
+                  {isVerifying ? 'Verifying...' : 'Continue'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentStep === 'already-completed' && existingLead) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 px-4">
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <CardHeader className="text-center">
+              <div className="mx-auto w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle className="w-8 h-8 text-amber-600" />
+              </div>
+              <CardTitle className="text-2xl">Assessment Already Completed</CardTitle>
+              <p className="text-muted-foreground">
+                We found that you've already completed this assessment. Here are your results:
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Lead Information */}
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <h3 className="font-medium mb-3">Your Information</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Name:</span>
+                    <p className="font-medium">{existingLead.lead.full_name}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Status:</span>
+                    <p className="font-medium capitalize">{existingLead.lead.status.replace('_', ' ')}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Completed:</span>
+                    <p className="font-medium">
+                      {new Date(existingLead.lead.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Source:</span>
+                    <p className="font-medium">Via link</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Assessment Results */}
+              {existingLead.assessment && (
+                <div className="border rounded-lg p-4 bg-gradient-to-br from-blue-50 to-indigo-50">
+                  <h3 className="font-medium mb-3 text-blue-800">Risk Assessment Results</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600 mb-1">
+                        {existingLead.assessment.riskScore || 0}
+                      </div>
+                      <div className="text-sm text-blue-600 font-medium">Risk Score</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xl font-semibold text-blue-800 mb-1">
+                        {existingLead.assessment.riskBucket || 'N/A'}
+                      </div>
+                      <div className="text-sm text-blue-700">Risk Category</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 text-center">
+                    <p className="text-sm text-blue-700">
+                      Assessment completed on {new Date(existingLead.assessment.submission.submitted_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -602,223 +839,137 @@ export default function PublicAssessment() {
 
       <div className="min-h-screen bg-gray-50 py-8 px-4">
         <div className="max-w-4xl mx-auto">
+          {/* Progress Indicator */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Step 2 of 3: Questions ({currentQuestionIndex + 1}/{questions.length})</span>
+              <span className="text-sm text-muted-foreground">{Math.round(((currentQuestionIndex + 1) / questions.length) * 50 + 25)}%</span>
+            </div>
+            <Progress value={((currentQuestionIndex + 1) / questions.length) * 50 + 25} className="h-2" />
+          </div>
+
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Risk Assessment</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Risk Assessment Questions</h1>
             <p className="text-gray-600">
-              {assessment?.user_name ? `by ${assessment.user_name}` : 'Complete the form below to get started'}
+              Please answer the following questions to help us understand your risk profile
             </p>
           </div>
 
           <Card className="w-full">
             <CardContent className="p-6">
-              {/* Progress */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">Progress</span>
-                  <span className="text-sm text-gray-500">
-                    {questions.length > 0 ? '1' : '0'} of {questions.length + 1}
-                  </span>
-                </div>
-                <Progress value={questions.length > 0 ? 25 : 0} className="h-2" />
-              </div>
-
-              {/* Personal Information Section */}
+              {/* Questions Section */}
               <div className="mb-8">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <User className="w-5 h-5" />
-                  Personal Information
+                  <FileText className="w-5 h-5" />
+                  Question {currentQuestionIndex + 1} of {questions.length}
                 </h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="full_name" className="text-sm font-medium">
-                      Full Name <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="full_name"
-                      value={submitterInfo.full_name}
-                      onChange={(e) => setSubmitterInfo(prev => ({ ...prev, full_name: e.target.value }))}
-                      placeholder="Enter your full name"
-                      className="mt-1"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="email" className="text-sm font-medium">
-                      Email Address <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={submitterInfo.email}
-                      onChange={(e) => setSubmitterInfo(prev => ({ ...prev, email: e.target.value }))}
-                      placeholder="Enter your email"
-                      className="mt-1"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="phone" className="text-sm font-medium">
-                      Phone Number
-                    </Label>
-                    <div className="mt-1 relative">
-                      <Input
-                        id="phone"
-                        value={submitterInfo.phone}
-                        onChange={(e) => handlePhoneChange(e.target.value)}
-                        placeholder="Enter 10-digit phone number"
-                        className="pl-12"
-                      />
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
-                        +91
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">10 digits, optional</p>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="age" className="text-sm font-medium">
-                      Age
-                    </Label>
-                    <Input
-                      id="age"
-                      type="number"
-                      min="18"
-                      max="100"
-                      value={submitterInfo.age}
-                      onChange={(e) => setSubmitterInfo(prev => ({ ...prev, age: e.target.value }))}
-                      placeholder="Enter your age"
-                      className="mt-1"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Minimum 18 years, optional</p>
-                  </div>
-                </div>
-              </div>
-
-                            {/* Assessment Questions */}
-              {questions.length > 0 && (
-                <>
-                  <Separator className="my-8" />
-                  
-                  <div className="mb-8">
-                    <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                        <BarChart3 className="w-5 h-5" />
-                        Question {currentQuestionIndex + 1} of {questions.length}
-                      </h2>
-                      <Progress value={((currentQuestionIndex + 1) / questions.length) * 100} className="w-32 h-2" />
+                     
+                {/* Single Question Display */}
+                {questions[currentQuestionIndex] && (
+                  <div className="space-y-6">
+                    <div className="bg-white p-6 rounded-lg border border-gray-200">
+                      <Label className="text-lg font-medium mb-4 block">
+                        {questions[currentQuestionIndex].label}
+                        {questions[currentQuestionIndex].required && <span className="text-red-500 ml-1">*</span>}
+                      </Label>
+                      
+                      {questions[currentQuestionIndex].qtype === 'single' && questions[currentQuestionIndex].options && questions[currentQuestionIndex].options.length > 0 ? (
+                        <RadioGroup
+                          value={answers[questions[currentQuestionIndex].qkey] || ''}
+                          onValueChange={(value) => handleAnswerChange(questions[currentQuestionIndex].qkey, value)}
+                          className="space-y-3"
+                        >
+                          {questions[currentQuestionIndex].options.map((option: string, optionIndex: number) => (
+                            <div key={optionIndex} className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+                              <RadioGroupItem value={option} id={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} />
+                              <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} className="text-base cursor-pointer flex-1">
+                                {option}
+                              </Label>
+                            </div>
+                          ))}
+                        </RadioGroup>
+                      ) : questions[currentQuestionIndex].qtype === 'scale' ? (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
+                            <span>Low</span>
+                            <span>High</span>
+                          </div>
+                          <RadioGroup
+                            value={answers[questions[currentQuestionIndex].qkey] || ''}
+                            onValueChange={(value) => handleAnswerChange(questions[currentQuestionIndex].qkey, value)}
+                            className="grid grid-cols-5 gap-2"
+                          >
+                            {[1, 2, 3, 4, 5].map((value) => (
+                              <div key={value} className="flex flex-col items-center">
+                                <RadioGroupItem value={value.toString()} id={`${questions[currentQuestionIndex].qkey}-${value}`} />
+                                <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${value}`} className="text-sm mt-1">
+                                  {value}
+                                </Label>
+                              </div>
+                            ))}
+                          </RadioGroup>
+                        </div>
+                      ) : questions[currentQuestionIndex].qtype === 'percent' ? (
+                        <div className="space-y-3">
+                          <Input
+                            type="number"
+                            min={questions[currentQuestionIndex].options?.min || 0}
+                            max={questions[currentQuestionIndex].options?.max || 100}
+                            value={answers[questions[currentQuestionIndex].qkey] || ''}
+                            onChange={(e) => handleAnswerChange(questions[currentQuestionIndex].qkey, e.target.value)}
+                            placeholder="Enter percentage (0-100)"
+                            className="w-32"
+                          />
+                          <p className="text-sm text-gray-500">
+                            Enter a value between {questions[currentQuestionIndex].options?.min || 0}% and {questions[currentQuestionIndex].options?.max || 100}%
+                          </p>
+                        </div>
+                      ) : (
+                        <Textarea
+                          value={answers[questions[currentQuestionIndex].qkey] || ''}
+                          onChange={(e) => handleAnswerChange(questions[currentQuestionIndex].qkey, e.target.value)}
+                          placeholder="Enter your answer"
+                          rows={4}
+                          className="w-full"
+                        />
+                      )}
                     </div>
                     
-                    {/* Single Question Display */}
-                    {questions[currentQuestionIndex] && (
-                      <div className="space-y-6">
-                        <div className="bg-white p-6 rounded-lg border border-gray-200">
-                          <Label className="text-lg font-medium mb-4 block">
-                            {questions[currentQuestionIndex].label}
-                            {questions[currentQuestionIndex].required && <span className="text-red-500 ml-1">*</span>}
-                          </Label>
-                          
-                          {questions[currentQuestionIndex].qtype === 'single' && questions[currentQuestionIndex].options && questions[currentQuestionIndex].options.length > 0 ? (
-                            <RadioGroup
-                              value={answers[questions[currentQuestionIndex].qkey] || ''}
-                              onValueChange={(value) => handleAnswerChange(questions[currentQuestionIndex].qkey, value)}
-                              className="space-y-3"
-                            >
-                              {questions[currentQuestionIndex].options.map((option: string, optionIndex: number) => (
-                                <div key={optionIndex} className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
-                                  <RadioGroupItem value={option} id={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} />
-                                  <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} className="text-base cursor-pointer flex-1">
-                                    {option}
-                                  </Label>
-                                </div>
-                              ))}
-                            </RadioGroup>
-                          ) : questions[currentQuestionIndex].qtype === 'scale' ? (
-                            <div className="space-y-4">
-                              <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
-                                <span>Low</span>
-                                <span>High</span>
-                              </div>
-                              <RadioGroup
-                                value={answers[questions[currentQuestionIndex].qkey] || ''}
-                                onValueChange={(value) => handleAnswerChange(questions[currentQuestionIndex].qkey, value)}
-                                className="grid grid-cols-5 gap-2"
-                              >
-                                {[1, 2, 3, 4, 5].map((value) => (
-                                  <div key={value} className="flex flex-col items-center">
-                                    <RadioGroupItem value={value.toString()} id={`${questions[currentQuestionIndex].qkey}-${value}`} />
-                                    <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${value}`} className="text-sm mt-1">
-                                      {value}
-                                    </Label>
-                                  </div>
-                                ))}
-                              </RadioGroup>
-                            </div>
-                          ) : questions[currentQuestionIndex].qtype === 'percent' ? (
-                            <div className="space-y-3">
-                              <Input
-                                type="number"
-                                min={questions[currentQuestionIndex].options?.min || 0}
-                                max={questions[currentQuestionIndex].options?.max || 100}
-                                value={answers[questions[currentQuestionIndex].qkey] || ''}
-                                onChange={(e) => handleAnswerChange(questions[currentQuestionIndex].qkey, e.target.value)}
-                                placeholder="Enter percentage (0-100)"
-                                className="w-32"
-                              />
-                              <p className="text-sm text-gray-500">
-                                Enter a value between {questions[currentQuestionIndex].options?.min || 0}% and {questions[currentQuestionIndex].options?.max || 100}%
-                              </p>
-                            </div>
-                          ) : (
-                            <Textarea
-                              value={answers[questions[currentQuestionIndex].qkey] || ''}
-                              onChange={(e) => handleAnswerChange(questions[currentQuestionIndex].qkey, e.target.value)}
-                              placeholder="Enter your answer"
-                              rows={4}
-                              className="w-full"
-                            />
-                          )}
-                        </div>
-                        
-                        {/* Navigation Buttons */}
-                        <div className="flex justify-between items-center pt-4">
+                    {/* Navigation Buttons */}
+                    <div className="flex justify-between items-center pt-4">
+                      <Button
+                        onClick={handlePrevious}
+                        disabled={currentQuestionIndex === 0}
+                        variant="outline"
+                        className="px-6"
+                      >
+                        Previous
+                      </Button>
+                      
+                      <div className="flex gap-2">
+                        {currentQuestionIndex < questions.length - 1 ? (
                           <Button
-                            onClick={handlePrevious}
-                            disabled={currentQuestionIndex === 0}
-                            variant="outline"
-                            className="px-6"
+                            onClick={handleNext}
+                            disabled={!answers[questions[currentQuestionIndex].qkey] || answers[questions[currentQuestionIndex].qkey] === ''}
+                            className="bg-blue-600 hover:bg-blue-700 px-6"
                           >
-                            Previous
+                            Next Question
                           </Button>
-                          
-                          <div className="flex gap-2">
-                            {currentQuestionIndex < questions.length - 1 ? (
-                              <Button
-                                onClick={handleNext}
-                                disabled={!answers[questions[currentQuestionIndex].qkey] || answers[questions[currentQuestionIndex].qkey] === ''}
-                                className="bg-blue-600 hover:bg-blue-700 px-6"
-                              >
-                                Next Question
-                              </Button>
-                            ) : (
-                              <Button
-                                onClick={() => setCurrentStep('review')}
-                                disabled={!answers[questions[currentQuestionIndex].qkey] || answers[questions[currentQuestionIndex].qkey] === ''}
-                                className="bg-green-600 hover:bg-green-700 px-6"
-                              >
-                                Review & Submit
-                              </Button>
-                            )}
-                          </div>
-                        </div>
+                        ) : (
+                          <Button
+                            onClick={() => setCurrentStep('review')}
+                            disabled={!answers[questions[currentQuestionIndex].qkey] || answers[questions[currentQuestionIndex].qkey] === ''}
+                            className="bg-green-600 hover:bg-green-700 px-6"
+                          >
+                            Review & Submit
+                          </Button>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
-                </>
-              )}
-
-
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
