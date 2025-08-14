@@ -210,7 +210,16 @@ export const leadsAPI = {
     return response.data;
   },
 
-  update: async (token: string, id: string, data: { full_name?: string; email?: string; phone?: string; age?: number; notes?: string }) => {
+  update: async (token: string, id: string, data: { 
+    full_name?: string; 
+    email?: string; 
+    phone?: string; 
+    age?: number; 
+    notes?: string;
+    cfa_goals?: string;
+    cfa_min_investment?: string;
+    cfa_investment_horizon?: string;
+  }) => {
     const authApi = createAuthenticatedApi(token);
     const response = await authApi.put(`/api/leads/${id}`, data);
     return response.data;

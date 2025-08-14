@@ -382,7 +382,8 @@ export class AssessmentService {
               status: 'assessment_done',
               risk_profile_id: submission.id, // Link to the new submission
               risk_bucket: result.bucket,
-              risk_score: result.score
+              risk_score: result.score,
+              risk_category: result.bucket
             })
             .eq('id', existingLead.id)
             .select()
@@ -407,7 +408,8 @@ export class AssessmentService {
               status: 'assessment_done',
               risk_profile_id: submission.id,
               risk_bucket: result.bucket,
-              risk_score: result.score
+              risk_score: result.score,
+              risk_category: result.bucket
             })
             .select()
             .single();
@@ -433,7 +435,8 @@ export class AssessmentService {
             status: 'assessment_done',
             risk_profile_id: submission.id,
             risk_bucket: result.bucket,
-            risk_score: result.score
+            risk_score: result.score,
+            risk_category: result.bucket
           })
           .select()
           .single();

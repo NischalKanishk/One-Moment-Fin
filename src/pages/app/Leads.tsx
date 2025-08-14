@@ -18,6 +18,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
+
 import { ChevronDown, Calendar, Edit } from 'lucide-react';
 import { formatSourceLink } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ interface Lead {
   email?: string;
   phone?: string;
   age?: number;
+  risk_category?: string;
   status?: string;
   source_link?: string;
   created_at: string;
@@ -72,8 +74,10 @@ export default function Leads(){
 
   const [statusFilter, setStatusFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
+  const [riskCategoryFilter, setRiskCategoryFilter] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   
@@ -209,6 +213,35 @@ export default function Leads(){
     }
   };
 
+  const getRiskCategoryStyle = (riskCategory: string) => {
+    const normalizedCategory = riskCategory?.toLowerCase() || 'not-assessed';
+    switch (normalizedCategory) {
+      case 'conservative':
+        return 'bg-blue-100 text-blue-800 border border-blue-200 hover:bg-blue-200 transition-colors duration-200';
+      case 'moderate':
+        return 'bg-green-100 text-green-800 border border-green-200 hover:bg-green-200 transition-colors duration-200';
+      case 'growth':
+        return 'bg-yellow-100 text-yellow-800 border border-yellow-200 hover:bg-yellow-200 transition-colors duration-200';
+      case 'aggressive':
+        return 'bg-red-100 text-red-800 border border-red-200 hover:bg-red-200 transition-colors duration-200';
+      case 'not assessed':
+      default:
+        return 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-300 transition-colors duration-200';
+    }
+  };
+
+  const getSourceStyle = (sourceLink: string) => {
+    switch (sourceLink) {
+      case 'Link Submission':
+        return 'bg-purple-100 text-purple-800';
+      case 'Manually Added':
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+
+
   // Authentication guard
   if (authLoading) {
     return (
@@ -246,7 +279,7 @@ export default function Leads(){
 
   useEffect(() => {
     fetchLeads();
-  }, [pagination.page, statusFilter, searchTerm, sourceFilter]);
+  }, [pagination.page, statusFilter, searchTerm, sourceFilter, riskCategoryFilter]);
 
   // Debounce search term changes
   useEffect(() => {
@@ -279,7 +312,8 @@ export default function Leads(){
         ...(statusFilter !== 'all' && { status: statusFilter }),
         ...(searchTerm.trim() && { search: searchTerm.trim() }),
 
-        ...(sourceFilter !== 'all' && { source_link: sourceFilter })
+        ...(sourceFilter !== 'all' && { source_link: sourceFilter }),
+        ...(riskCategoryFilter !== 'all' && { risk_category: riskCategoryFilter })
       };
 
       const response = await leadsAPI.getAll(token, params);
@@ -408,42 +442,22 @@ export default function Leads(){
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent 
-            position="popper" 
-            side="bottom" 
-            align="start"
-            sideOffset={4}
-            className="max-h-[200px] overflow-y-auto"
-          >
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="lead">Lead</SelectItem>
-            <SelectItem value="assessment_done">Assessment Done</SelectItem>
-            <SelectItem value="meeting_scheduled">Meeting Scheduled</SelectItem>
-            <SelectItem value="converted">Converted</SelectItem>
-            <SelectItem value="dropped">Dropped</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={sourceFilter} onValueChange={setSourceFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Source" />
-          </SelectTrigger>
-          <SelectContent 
-            position="popper" 
-            side="bottom" 
-            align="start"
-            sideOffset={4}
-            className="max-h-[200px] overflow-y-auto"
-          >
-            <SelectItem value="all">All Sources</SelectItem>
-            <SelectItem value="Manually Added">Manually Added</SelectItem>
-            <SelectItem value="Link Submission">Link Submission</SelectItem>
-          </SelectContent>
-        </Select>
+        
+        <Button 
+          variant="outline" 
+          onClick={() => setFiltersOpen(true)}
+          className="px-4 flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
+          </svg>
+          Filters
+          {(statusFilter !== 'all' || sourceFilter !== 'all' || riskCategoryFilter !== 'all') && (
+            <span className="ml-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded-full">
+              Active
+            </span>
+          )}
+        </Button>
         <Dialog key="add-lead-dialog" open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
             <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg">Add Lead</Button>
@@ -653,11 +667,94 @@ export default function Leads(){
         </DialogContent>
       </Dialog>
 
+      {/* Filters Modal */}
+      <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">Filter Leads</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Status Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Status</label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="lead">Lead</SelectItem>
+                  <SelectItem value="assessment_done">Assessment Done</SelectItem>
+                  <SelectItem value="meeting_scheduled">Meeting Scheduled</SelectItem>
+                  <SelectItem value="converted">Converted</SelectItem>
+                  <SelectItem value="dropped">Dropped</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Source Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Source</label>
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  <SelectItem value="Manually Added">Manually Added</SelectItem>
+                  <SelectItem value="Link Submission">Link Submission</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Risk Category Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Risk Category</label>
+              <Select value={riskCategoryFilter} onValueChange={setRiskCategoryFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Risk Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Risk Categories</SelectItem>
+                  <SelectItem value="Conservative">Conservative</SelectItem>
+                  <SelectItem value="Moderate">Moderate</SelectItem>
+                  <SelectItem value="Growth">Growth</SelectItem>
+                  <SelectItem value="Aggressive">Aggressive</SelectItem>
+                  <SelectItem value="Not Assessed">Not Assessed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Filter Actions */}
+            <div className="flex gap-3 pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setStatusFilter('all');
+                  setSourceFilter('all');
+                  setRiskCategoryFilter('all');
+                }}
+                className="flex-1"
+              >
+                Reset Filters
+              </Button>
+              <Button 
+                onClick={() => setFiltersOpen(false)}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+              >
+                Apply Filters
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              {['Name','Contact','Age','Source','Status','Conversion %','Actions'].map(h => (
+              {['Name','Contact','Age','Risk Category','Source','Status','Conversion %','Actions'].map(h => (
                 <TableHead key={h}>{h}</TableHead>
               ))}
             </TableRow>
@@ -665,11 +762,11 @@ export default function Leads(){
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">Loading leads...</TableCell>
+                <TableCell colSpan={8} className="text-center py-8">Loading leads...</TableCell>
               </TableRow>
             ) : filteredLeads.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   <div className="text-muted-foreground">No leads found</div>
                 </TableCell>
               </TableRow>
@@ -686,7 +783,12 @@ export default function Leads(){
                   <TableCell>{lead.phone || lead.email || 'N/A'}</TableCell>
                   <TableCell>{lead.age || 'N/A'}</TableCell>
                   <TableCell>
-                    <span className="px-2 py-0.5 text-xs rounded bg-blue-100 text-blue-800">
+                    <span className={`px-2 py-0.5 text-xs rounded ${getRiskCategoryStyle(lead.risk_category)}`}>
+                      {lead.risk_category || 'Not Assessed'}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-0.5 text-xs rounded ${getSourceStyle(lead.source_link)}`}>
                       {formatSourceLink(lead.source_link)}
                     </span>
                   </TableCell>

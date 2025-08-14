@@ -14,6 +14,7 @@ import Dashboard from "./pages/app/Dashboard";
 import ActionDashboard from "./pages/app/ActionDashboard";
 import Leads from "./pages/app/Leads";
 import LeadDetail from "./pages/app/LeadDetail";
+import SmartSummary from "./pages/app/SmartSummary";
 import Auth from "./pages/Auth";
 import Signup from "./pages/Signup";
 import FormBuilder from "./pages/app/FormBuilder";
@@ -61,6 +62,13 @@ const App = () => (
                      <Route path="/app/assessment/forms" element={
                        <ProtectedRoute>
                          <AssessmentForms />
+                       </ProtectedRoute>
+                     } />
+
+                     {/* Full screen Smart Summary route */}
+                     <Route path="/smart-summary/:id" element={
+                       <ProtectedRoute>
+                         <SmartSummary />
                        </ProtectedRoute>
                      } />
 

@@ -276,6 +276,7 @@ router.get('/', authenticateUser, [
           email,
           phone,
           age,
+          risk_category,
           status,
           source_link,
           created_at,
@@ -634,6 +635,7 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
         email,
         phone,
         age,
+        risk_category,
         status,
         source_link,
         created_at,
@@ -873,7 +875,11 @@ router.put('/:id', authenticateUser, [
   body('full_name').optional().notEmpty().withMessage('Full name cannot be empty'),
   body('email').optional().isEmail().withMessage('Valid email required'),
   body('phone').optional().isMobilePhone('en-IN').withMessage('Valid phone number required'),
-  body('age').optional().isInt({ min: 18, max: 100 }).withMessage('Valid age required')
+  body('age').optional().isInt({ min: 18, max: 100 }).withMessage('Valid age required'),
+  body('notes').optional().isLength({ max: 500 }).withMessage('Notes cannot exceed 500 characters'),
+  body('cfa_goals').optional().isLength({ max: 1000 }).withMessage('CFA goals cannot exceed 1000 characters'),
+  body('cfa_min_investment').optional().isLength({ max: 100 }).withMessage('CFA min investment cannot exceed 100 characters'),
+  body('cfa_investment_horizon').optional().isIn(['short_term', 'medium_term', 'long_term']).withMessage('Invalid investment horizon value')
 ], async (req: express.Request, res: express.Response) => {
   try {
     const errors = validationResult(req);
@@ -889,7 +895,7 @@ router.put('/:id', authenticateUser, [
     }
 
     const { id } = req.params;
-    const { full_name, email, phone, age } = req.body;
+    const { full_name, email, phone, age, notes, cfa_goals, cfa_min_investment, cfa_investment_horizon } = req.body;
     const clerkUserId = req.user!.clerk_id;
 
     // Get the actual user UUID from the users table using the Clerk ID
@@ -913,7 +919,16 @@ router.put('/:id', authenticateUser, [
 
     const { data, error } = await supabase
       .from('leads')
-      .update({ full_name, email, phone, age })
+      .update({ 
+        full_name, 
+        email, 
+        phone, 
+        age, 
+        notes, 
+        cfa_goals, 
+        cfa_min_investment, 
+        cfa_investment_horizon 
+      })
       .eq('id', id)
       .eq('user_id', user_id)
       .select()

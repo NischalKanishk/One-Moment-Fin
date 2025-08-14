@@ -63,6 +63,10 @@ interface Lead {
   risk_profile_id?: string;
   risk_bucket?: string;
   risk_score?: number;
+  notes?: string;
+  cfa_goals?: string;
+  cfa_min_investment?: string;
+  cfa_investment_horizon?: string;
   assessment?: {
     submission: any;
     assessment: any;
@@ -99,6 +103,7 @@ export default function LeadDetail() {
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [canDelete, setCanDelete] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [savingNotes, setSavingNotes] = useState(false);
 
 
   const form = useForm<EditFormData>({
@@ -283,6 +288,68 @@ export default function LeadDetail() {
     }
   };
 
+  const handleSaveNotes = async () => {
+    if (!lead) return;
+    
+    try {
+      setSavingNotes(true);
+      const token = await getToken();
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      await leadsAPI.update(token, lead.id, {
+        notes: lead.notes
+      });
+
+      toast({
+        title: "Success",
+        description: "Notes saved successfully!",
+      });
+    } catch (error: any) {
+      console.error('Failed to save notes:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save notes. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
+  const handleSaveCFAInfo = async () => {
+    if (!lead) return;
+    
+    try {
+      setSavingNotes(true);
+      const token = await getToken();
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      await leadsAPI.update(token, lead.id, {
+        cfa_goals: lead.cfa_goals,
+        cfa_min_investment: lead.cfa_min_investment,
+        cfa_investment_horizon: lead.cfa_investment_horizon
+      });
+
+      toast({
+        title: "Success",
+        description: "CFA information saved successfully!",
+      });
+    } catch (error: any) {
+      console.error('Failed to save CFA information:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save CFA information. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -346,7 +413,7 @@ export default function LeadDetail() {
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-6">
           {/* Back to Leads Button - Higher up */}
-          <div className="mb-4">
+          <div>
             <Button 
               variant="ghost" 
               size="sm" 
@@ -365,8 +432,14 @@ export default function LeadDetail() {
                 <div className="flex items-center gap-4 mb-2">
                   <h2 className="text-3xl font-bold text-gray-900">{lead.full_name}</h2>
                   <Badge 
-                    variant="default" 
-                    className="text-sm px-3 py-1 bg-blue-600 text-white"
+                    variant="outline" 
+                    className={`text-sm px-3 py-1 border-2 ${
+                      lead.status === 'converted' ? 'bg-green-50 text-green-700 border-green-300' :
+                      lead.status === 'dropped' ? 'bg-red-50 text-red-700 border-red-300' :
+                      lead.status === 'meeting_scheduled' ? 'bg-orange-50 text-orange-700 border-orange-300' :
+                      lead.status === 'assessment_done' ? 'bg-purple-50 text-purple-700 border-purple-300' :
+                      'bg-blue-50 text-blue-700 border-blue-300'
+                    }`}
                   >
                     {lead.status.replace('_', ' ')}
                   </Badge>
@@ -378,18 +451,20 @@ export default function LeadDetail() {
                 
                 {/* Source, Mobile, Created on - Left side */}
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <div className="flex items-center gap-6 text-sm text-gray-600">
+                  <div className="flex items-center gap-2">
                     <ExternalLink className="w-4 h-4" />
                     <span>Source: {formatSourceLink(lead.source_link)}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4" />
                     <span>Mobile: {lead.phone || 'No phone provided'}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
                     <span>Created on: {new Date(lead.created_at).toLocaleDateString()}</span>
                   </div>
+                </div>
                 </div>
               </div>
               
@@ -489,9 +564,8 @@ export default function LeadDetail() {
                 
                 <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0">
                       <Edit className="h-4 w-4" />
-                      Edit
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-visible">
@@ -601,9 +675,8 @@ export default function LeadDetail() {
                 
                 <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                   <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm" className="flex items-center gap-2">
+                    <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
                       <Trash2 className="h-4 w-4" />
-                      Delete
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
@@ -650,10 +723,10 @@ export default function LeadDetail() {
               Meetings ({lead?.meetings?.length || 0})
             </TabsTrigger>
             <TabsTrigger 
-              value="suggestions" 
-              className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 data-[state=active]:border-indigo-200 data-[state=active]:shadow-sm rounded-lg h-14 transition-all duration-200 font-medium"
+              value="notes" 
+              className="data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:border-amber-200 data-[state=active]:shadow-sm rounded-lg h-14 transition-all duration-200 font-medium"
             >
-              Suggestions
+              Notes
             </TabsTrigger>
           </TabsList>
           
@@ -662,11 +735,20 @@ export default function LeadDetail() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Lead Information - Left side */}
               <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <User className="w-5 h-5 text-gray-600" />
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <User className="w-5 h-5 text-gray-600" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900">Lead Information</h3>
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900">Lead Information</h3>
+                          <Button
+          onClick={() => window.open(`/smart-summary/${lead.id}`, '_blank')}
+          size="sm"
+          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+        >
+          Smart Summary
+        </Button>
                 </div>
                 
                 <div className="space-y-4">
@@ -691,29 +773,76 @@ export default function LeadDetail() {
 
               {/* Risk Profile Summary - Right side */}
               {lead.assessment && (
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-8 shadow-sm border border-blue-100">
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center">
-                      <TrendingUp className="w-7 h-7 text-blue-600" />
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <TrendingUp className="w-5 h-5 text-purple-600" />
                     </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-blue-900">Risk Profile Summary</h2>
-                      <p className="text-blue-700">Assessment completed on {new Date(lead.assessment.submission.submitted_at).toLocaleDateString()}</p>
-                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900">Risk Profile</h3>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div className="text-center">
-                      <div className="text-4xl font-bold text-blue-600 mb-3">{lead.risk_score || 0}</div>
-                      <div className="text-sm font-medium text-blue-700 uppercase tracking-wide">Risk Score</div>
+                  <div className="space-y-4">
+                    {/* Risk Score and Category Row */}
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-bold text-purple-700">RS</span>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">Risk Score</div>
+                          <div className="text-lg font-bold text-gray-900">{lead.risk_score || 0}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm text-gray-600">Category</div>
+                        <Badge className={`text-xs px-2 py-1 ${
+                          lead.risk_bucket === 'Conservative' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                          lead.risk_bucket === 'Moderate' ? 'bg-green-100 text-green-800 border-green-200' :
+                          lead.risk_bucket === 'Growth' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                          lead.risk_bucket === 'Aggressive' ? 'bg-red-100 text-red-800 border-red-200' :
+                          'bg-gray-100 text-gray-600 border-gray-200'
+                        }`}>
+                          {lead.risk_bucket || 'Not Assessed'}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-blue-800 mb-3">{lead.risk_bucket || 'N/A'}</div>
-                      <div className="text-sm font-medium text-blue-700 uppercase tracking-wide">Risk Category</div>
+                    
+                    {/* Assessment Details */}
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                        <FileText className="w-4 h-4 text-gray-500" />
+                        <div>
+                          <div className="text-gray-600">Questions</div>
+                          <div className="font-semibold text-gray-900">{lead.assessment.mappedAnswers.length}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                        <Calendar className="w-4 h-4 text-gray-500" />
+                        <div>
+                          <div className="text-gray-600">Completed</div>
+                          <div className="font-semibold text-gray-900">
+                            {new Date(lead.assessment.submission.submitted_at).toLocaleDateString('en-IN', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-blue-600 mb-3">{lead.assessment.mappedAnswers.length}</div>
-                      <div className="text-sm font-medium text-blue-700 uppercase tracking-wide">Questions Answered</div>
+                    
+                    {/* Quick Insight */}
+                    <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-purple-400 rounded-full mt-2"></div>
+                        <div className="text-xs text-purple-700">
+                          {lead.risk_bucket === 'Conservative' && 'Low risk tolerance - suitable for stable investments'}
+                          {lead.risk_bucket === 'Moderate' && 'Balanced approach - mix of growth and stability'}
+                          {lead.risk_bucket === 'Growth' && 'Growth-oriented - comfortable with market volatility'}
+                          {lead.risk_bucket === 'Aggressive' && 'High risk tolerance - potential for higher returns'}
+                          {!lead.risk_bucket && 'Risk profile assessment completed'}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -994,26 +1123,105 @@ export default function LeadDetail() {
             </div>
           </TabsContent>
         
-        <TabsContent value="suggestions" className="space-y-6 mt-8">
+        <TabsContent value="notes" className="space-y-6 mt-8">
           <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100">
             <div className="flex items-center gap-4 mb-6">
-              <div className="w-14 h-14 bg-indigo-100 rounded-xl flex items-center justify-center">
-                <FileText className="w-7 h-7 text-indigo-600" />
+              <div className="w-14 h-14 bg-amber-100 rounded-xl flex items-center justify-center">
+                <FileText className="w-7 h-7 text-amber-600" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">AI-Powered Suggestions</h2>
-                <p className="text-gray-600">Personalized recommendations based on risk profile</p>
+                <h2 className="text-2xl font-bold text-gray-900">Notes & Key Information</h2>
+                <p className="text-gray-600">Add and manage notes about this lead</p>
               </div>
             </div>
             
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FileText className="h-8 w-8 text-gray-400" />
+            <div className="space-y-6">
+              {/* Notes Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-gray-900">Notes</h4>
+                  <span className="text-xs text-gray-500">
+                    {lead.notes ? lead.notes.length : 0}/500 characters
+                  </span>
+                </div>
+                <textarea
+                  value={lead.notes || ''}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 500) {
+                      setLead({ ...lead, notes: e.target.value });
+                    }
+                  }}
+                  placeholder="Add notes about this lead, their preferences, or any important information..."
+                  className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  maxLength={500}
+                />
+                <div className="flex justify-end">
+                  <Button 
+                    onClick={handleSaveNotes}
+                    size="sm"
+                    disabled={savingNotes}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {savingNotes ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </div>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Suggestions Coming Soon</h3>
-              <p className="text-gray-600 max-w-md mx-auto">
-                AI-powered product suggestions and recommendations will be displayed here based on the lead's risk profile and preferences.
-              </p>
+
+              {/* CFA Framework Questions - Only show if CFA framework is selected */}
+              {lead.assessment?.assessment?.framework === 'CFA' && (
+                <div className="space-y-4 pt-6 border-t border-gray-200">
+                  <h4 className="font-semibold text-gray-900">CFA Framework Questions</h4>
+                  
+                  {/* Goals */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Goals</label>
+                    <textarea
+                      value={lead.cfa_goals || ''}
+                      onChange={(e) => setLead({ ...lead, cfa_goals: e.target.value })}
+                      placeholder="What are the lead's primary financial goals?"
+                      className="w-full h-20 p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* Minimum Investment Amount */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Minimum Investment Amount</label>
+                    <input
+                      type="text"
+                      value={lead.cfa_min_investment || ''}
+                      onChange={(e) => setLead({ ...lead, cfa_min_investment: e.target.value })}
+                      placeholder="e.g., ₹50,000"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* Investment Horizon */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Investment Horizon</label>
+                    <select
+                      value={lead.cfa_investment_horizon || ''}
+                      onChange={(e) => setLead({ ...lead, cfa_investment_horizon: e.target.value })}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select investment horizon</option>
+                      <option value="short_term">Short Term (1-3 years)</option>
+                      <option value="medium_term">Medium Term (3-7 years)</option>
+                      <option value="long_term">Long Term (7+ years)</option>
+                    </select>
+                  </div>
+
+                                        <div className="flex justify-end">
+                        <Button 
+                          onClick={handleSaveCFAInfo}
+                          size="sm"
+                          disabled={savingNotes}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          {savingNotes ? 'Saving...' : 'Save CFA Information'}
+                        </Button>
+                      </div>
+                </div>
+              )}
             </div>
           </div>
         </TabsContent>

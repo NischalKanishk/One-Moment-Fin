@@ -132,7 +132,7 @@ export default function AppLayout() {
           
 
           
-          <main className="py-8 md:py-10 px-4">
+          <main className="pt-0 pb-8 md:pb-10 px-4">
             <Outlet />
           </main>
         </SidebarInset>
