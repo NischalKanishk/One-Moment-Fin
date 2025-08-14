@@ -442,6 +442,106 @@ router.get('/test', (req: express.Request, res: express.Response) => {
   res.json({ message: 'Test route working', timestamp: new Date().toISOString() });
 });
 
+// Check if lead already exists by email or phone (for preventing duplicate submissions)
+router.post('/check-existing', [
+  body('email').optional().isEmail().withMessage('Email must be valid'),
+  body('phone').optional().isString().withMessage('Phone must be a string'),
+  body('user_id').notEmpty().withMessage('User ID is required')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { email, phone, user_id } = req.body;
+
+    if (!email && !phone) {
+      return res.status(400).json({ 
+        error: 'Either email or phone is required' 
+      });
+    }
+
+    // Check if lead with same email or phone already exists for this user
+    let existingLead = null;
+    
+    if (email) {
+      const { data: emailLead, error: emailError } = await supabase
+        .from('leads')
+        .select('id, full_name, email, phone, status, created_at, risk_profile_id, risk_bucket, risk_score')
+        .eq('user_id', user_id)
+        .eq('email', email)
+        .single();
+
+      if (!emailError && emailLead) {
+        existingLead = emailLead;
+      }
+    }
+
+    if (!existingLead && phone) {
+      const { data: phoneLead, error: phoneError } = await supabase
+        .from('leads')
+        .select('id, full_name, email, phone, status, created_at, risk_profile_id, risk_bucket, risk_score')
+        .eq('user_id', user_id)
+        .eq('phone', phone)
+        .single();
+
+      if (!phoneError && phoneLead) {
+        existingLead = phoneLead;
+      }
+    }
+
+    if (existingLead) {
+      // Check if they have completed an assessment
+      let assessmentData = null;
+      if (existingLead.risk_profile_id) {
+        try {
+          const { data: submission, error: submissionError } = await supabase
+            .from('assessment_submissions')
+            .select(`
+              id,
+              answers,
+              result,
+              submitted_at
+            `)
+            .eq('id', existingLead.risk_profile_id)
+            .single();
+
+          if (!submissionError && submission) {
+            assessmentData = {
+              submission,
+              hasAssessment: true,
+              riskScore: existingLead.risk_score,
+              riskBucket: existingLead.risk_bucket
+            };
+          }
+        } catch (error) {
+          console.log('Could not fetch assessment data for existing lead');
+        }
+      }
+
+      return res.json({
+        exists: true,
+        lead: existingLead,
+        assessment: assessmentData,
+        message: 'Lead already exists'
+      });
+    }
+
+    return res.json({
+      exists: false,
+      message: 'No existing lead found'
+    });
+
+  } catch (error) {
+    console.error('Check existing lead error:', error);
+    return res.status(500).json({ error: 'Failed to check existing lead' });
+  }
+});
+
 // GET /api/leads/search (Search leads for autocomplete)
 router.get('/search', authenticateUser, [
   query('search').notEmpty().withMessage('Search term is required'),
@@ -603,14 +703,90 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
                 submission,
                 assessment,
                 questions: frameworkQuestions,
-                mappedAnswers: frameworkQuestions.map((q: any) => ({
-                  question: q.question_bank?.label || q.qkey,
-                  answer: submission.answers[q.qkey] || 'Not answered',
-                  type: q.question_bank?.qtype,
-                  options: q.question_bank?.options,
-                  module: q.question_bank?.module
-                }))
+                mappedAnswers: frameworkQuestions.map((q: any) => {
+                  // Get the answer value, handling different possible formats
+                  let answerValue = submission.answers[q.qkey];
+                  
+                  // If no direct match, try alternative keys or formats
+                  if (!answerValue || answerValue === 'Not answered') {
+                    const possibleKeys = [
+                      q.qkey,
+                      q.question_bank?.label,
+                      q.question_bank?.label?.toLowerCase().replace(/\s+/g, '_'),
+                      q.question_bank?.label?.toLowerCase().replace(/\s+/g, '-'),
+                      typeof q.qkey === 'number' ? q.qkey.toString() : null,
+                      q.qkey?.toString().toLowerCase(),
+                      q.qkey?.toString().toUpperCase()
+                    ].filter(Boolean); // Remove null/undefined values
+                    
+                    for (const key of possibleKeys) {
+                      if (key && submission.answers[key]) {
+                        answerValue = submission.answers[key];
+                        console.log(`🔍 Found answer for ${q.qkey} using key: ${key}`);
+                        break;
+                      }
+                    }
+                  }
+                  
+                  // If still no answer, try to find any answer that might match this question
+                  if (!answerValue || answerValue === 'Not answered') {
+                    const questionText = q.question_bank?.label || q.qkey;
+                    if (questionText) {
+                      for (const [answerKey, answerVal] of Object.entries(submission.answers)) {
+                        if (answerKey.toLowerCase().includes(questionText.toLowerCase()) || 
+                            questionText.toLowerCase().includes(answerKey.toLowerCase())) {
+                          answerValue = answerVal;
+                          console.log(`🔍 Found answer for ${q.qkey} using fuzzy match: ${answerKey}`);
+                          break;
+                        }
+                      }
+                    }
+                  }
+                  
+                  // If still no answer, check if it's a required field that might be empty
+                  if (!answerValue || answerValue === 'Not answered') {
+                    if (q.required) {
+                      answerValue = 'Required field - No response provided';
+                    } else {
+                      answerValue = 'No response provided';
+                    }
+                  }
+                  
+                  console.log(`🔍 Final answer for ${q.qkey}: ${answerValue}`);
+                  
+                  return {
+                    question: q.question_bank?.label || q.qkey,
+                    answer: answerValue,
+                    type: q.question_bank?.qtype,
+                    options: q.question_bank?.options,
+                    module: q.question_bank?.module
+                  };
+                })
               };
+              
+              // Fallback to show raw answers if no mapped answers found
+              if (assessmentData.mappedAnswers.every(qa => qa.answer === 'No response provided' || qa.answer === 'Required field - No response provided')) {
+                console.log('⚠️ No mapped answers found, showing raw answers');
+                assessmentData.mappedAnswers = Object.entries(submission.answers).map(([key, value]) => ({
+                  question: key,
+                  answer: value,
+                  type: 'unknown',
+                  options: null,
+                  module: 'Raw Data'
+                }));
+              }
+              
+              // Fallback to show data structure info if no answers at all
+              if (assessmentData.mappedAnswers.length === 0) {
+                console.log('⚠️ No answers found at all, showing data structure info');
+                assessmentData.mappedAnswers = [{
+                  question: 'Data Structure Information',
+                  answer: `Submission ID: ${submission.id}, Answers object keys: ${Object.keys(submission.answers).join(', ')}`,
+                  type: 'info',
+                  options: null,
+                  module: 'Debug Info'
+                }];
+              }
             }
           }
         }
