@@ -11,21 +11,13 @@ import {
   FileText,
   Phone,
   Mail,
-  ExternalLink,
-  CheckCircle,
-  AlertTriangle,
-  Clock,
-  Target,
-  BarChart3,
-  Lightbulb,
-  Edit
+  AlertTriangle
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { leadsAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { formatSourceLink } from "@/lib/utils";
 
 interface Lead {
   id: string;
@@ -101,8 +93,6 @@ export default function SmartSummary() {
     }
   };
 
-
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -170,7 +160,7 @@ export default function SmartSummary() {
 
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-6">
+        <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
             <Button 
               variant="ghost" 
@@ -190,13 +180,13 @@ export default function SmartSummary() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="space-y-6">
           
-          {/* Left Column - Lead Overview */}
-          <div className="lg:col-span-1 space-y-6">
+          {/* Top Row - Lead Overview and Risk Profile Side by Side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            {/* Lead Basic Info */}
+            {/* Lead Overview */}
             <Card className="border-0 shadow-sm bg-white">
               <CardHeader className="pb-4">
                 <CardTitle className="text-lg font-semibold text-gray-900">Lead Overview</CardTitle>
@@ -216,32 +206,26 @@ export default function SmartSummary() {
                 
                 <Separator className="bg-gray-200" />
                 
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
                     <Mail className="w-4 h-4 text-gray-400" />
                     <span className="text-sm text-gray-700">{lead.email || 'No email'}</span>
                   </div>
-                  <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
                     <Phone className="w-4 h-4 text-gray-400" />
                     <span className="text-sm text-gray-700">{lead.phone || 'No phone'}</span>
                   </div>
-                  <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
                     <User className="w-4 h-4 text-gray-400" />
                     <span className="text-sm text-gray-700">{lead.age ? `${lead.age} years` : 'Age not specified'}</span>
                   </div>
-                  <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
                     <Calendar className="w-4 h-4 text-gray-400" />
                     <span className="text-sm text-gray-700">Added {new Date(lead.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
-
-
-          </div>
-
-          {/* Right Column - Detailed Summary */}
-          <div className="lg:col-span-3 space-y-6">
             
             {/* Risk Assessment Summary */}
             {lead.assessment && (
@@ -297,117 +281,117 @@ export default function SmartSummary() {
                 </CardContent>
               </Card>
             )}
-
-            {/* Investment Preference - First 3 Questions */}
-            {lead.assessment && lead.assessment.mappedAnswers && lead.assessment.mappedAnswers.length > 0 && (
-              <Card className="border-0 shadow-sm bg-white">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg font-semibold text-gray-900">Investment Preference</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {lead.assessment.mappedAnswers.slice(0, 3).map((answer, index) => (
-                      <div key={index} className="p-4 bg-gray-50 rounded-lg border-l-4 border-gray-300">
-                        <div className="flex items-start gap-3">
-                          <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                            <span className="text-xs font-semibold text-gray-700">{index + 1}</span>
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-gray-800 mb-2">{answer.question}</div>
-                            <div className="text-sm text-gray-700 bg-white px-3 py-2 rounded border border-gray-200">
-                              {answer.answer}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Risk Assessment - Remaining Questions */}
-            {lead.assessment && lead.assessment.mappedAnswers && lead.assessment.mappedAnswers.length > 3 && (
-              <Card className="border-0 shadow-sm bg-white">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg font-semibold text-gray-900">Risk Assessment</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {lead.assessment.mappedAnswers.slice(3).map((answer, index) => (
-                      <div key={index + 3} className="p-4 bg-gray-50 rounded-lg border-l-4 border-gray-300">
-                        <div className="flex items-start gap-3">
-                          <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                            <span className="text-xs font-semibold text-gray-700">{index + 4}</span>
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-gray-800 mb-2">{answer.question}</div>
-                            <div className="text-sm text-gray-700 bg-white px-3 py-2 rounded border border-gray-200">
-                              {answer.answer}
-                            </div>
-                            </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Notes Display */}
-            {lead.notes && (
-              <Card className="border-0 shadow-sm bg-white">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg font-semibold text-gray-900">Notes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="p-4 bg-gray-50 rounded-lg border-l-4 border-gray-300">
-                    <div className="text-sm text-gray-700 whitespace-pre-wrap">
-                      {lead.notes}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* CFA Information Display */}
-            {(lead.cfa_goals || lead.cfa_min_investment || lead.cfa_investment_horizon) && (
-              <Card className="border-0 shadow-sm bg-white">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg font-semibold text-gray-900">CFA Framework Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {lead.cfa_goals && (
-                      <div className="p-3 bg-gray-50 rounded-lg border-l-4 border-gray-300">
-                        <div className="text-sm font-medium text-gray-800 mb-1">Goals</div>
-                        <div className="text-sm text-gray-700">{lead.cfa_goals}</div>
-                      </div>
-                    )}
-                    
-                    {lead.cfa_min_investment && (
-                      <div className="p-3 bg-gray-50 rounded-lg border-l-4 border-gray-300">
-                        <div className="text-sm font-medium text-gray-800 mb-1">Minimum Investment Amount</div>
-                        <div className="text-sm text-gray-700">{lead.cfa_min_investment}</div>
-                      </div>
-                    )}
-                    
-                    {lead.cfa_investment_horizon && (
-                      <div className="p-4 bg-gray-50 rounded-lg border-l-4 border-gray-300">
-                        <div className="text-sm font-medium text-gray-800 mb-1">Investment Horizon</div>
-                        <div className="text-sm text-gray-700">
-                          {lead.cfa_investment_horizon === 'short_term' && 'Short Term (1-3 years)'}
-                          {lead.cfa_investment_horizon === 'medium_term' && 'Medium Term (3-7 years)'}
-                          {lead.cfa_investment_horizon === 'long_term' && 'Long Term (7+ years)'}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
           </div>
+
+          {/* Investment Preference - First 3 Questions */}
+          {lead.assessment && lead.assessment.mappedAnswers && lead.assessment.mappedAnswers.length > 0 && (
+            <Card className="border-0 shadow-sm bg-white">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-gray-900">Investment Preference</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {lead.assessment.mappedAnswers.slice(0, 3).map((answer, index) => (
+                    <div key={index} className="p-4 bg-gray-50 rounded-lg border-l-4 border-gray-300">
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                          <span className="text-xs font-semibold text-gray-700">{index + 1}</span>
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-800 mb-2">{answer.question}</div>
+                          <div className="text-sm text-gray-700 bg-white px-3 py-2 rounded border border-gray-200">
+                            {answer.answer}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Risk Assessment - Remaining Questions */}
+          {lead.assessment && lead.assessment.mappedAnswers && lead.assessment.mappedAnswers.length > 3 && (
+            <Card className="border-0 shadow-sm bg-white">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-gray-900">Risk Assessment</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {lead.assessment.mappedAnswers.slice(3).map((answer, index) => (
+                    <div key={index + 3} className="p-4 bg-gray-50 rounded-lg border-l-4 border-gray-300">
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                          <span className="text-xs font-semibold text-gray-700">{index + 4}</span>
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-800 mb-2">{answer.question}</div>
+                          <div className="text-sm text-gray-700 bg-white px-3 py-2 rounded border border-gray-200">
+                            {answer.answer}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Notes Display */}
+          {lead.notes && (
+            <Card className="border-0 shadow-sm bg-white">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-gray-900">Notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="p-4 bg-gray-50 rounded-lg border-l-4 border-gray-300">
+                  <div className="text-sm text-gray-700 whitespace-pre-wrap">
+                    {lead.notes}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* CFA Information Display */}
+          {(lead.cfa_goals || lead.cfa_min_investment || lead.cfa_investment_horizon) && (
+            <Card className="border-0 shadow-sm bg-white">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-gray-900">CFA Framework Information</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {lead.cfa_goals && (
+                    <div className="p-3 bg-gray-50 rounded-lg border-l-4 border-gray-300">
+                      <div className="text-sm font-medium text-gray-800 mb-1">Goals</div>
+                      <div className="text-sm text-gray-700">{lead.cfa_goals}</div>
+                    </div>
+                  )}
+                  
+                  {lead.cfa_min_investment && (
+                    <div className="p-3 bg-gray-50 rounded-lg border-l-4 border-gray-300">
+                      <div className="text-sm font-medium text-gray-800 mb-1">Minimum Investment Amount</div>
+                      <div className="text-sm text-gray-700">{lead.cfa_min_investment}</div>
+                    </div>
+                  )}
+                  
+                  {lead.cfa_investment_horizon && (
+                    <div className="p-4 bg-gray-50 rounded-lg border-l-4 border-gray-300">
+                      <div className="text-sm font-medium text-gray-800 mb-1">Investment Horizon</div>
+                      <div className="text-sm text-gray-700">
+                        {lead.cfa_investment_horizon === 'short_term' && 'Short Term (1-3 years)'}
+                        {lead.cfa_investment_horizon === 'medium_term' && 'Medium Term (3-7 years)'}
+                        {lead.cfa_investment_horizon === 'long_term' && 'Long Term (7+ years)'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
         </div>
       </div>
     </div>
