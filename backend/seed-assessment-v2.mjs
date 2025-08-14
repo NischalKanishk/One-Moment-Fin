@@ -66,6 +66,32 @@ async function seedAssessmentV2() {
     const sampleSchema = {
       type: 'object',
       properties: {
+        // Compulsory Investment Questions (First)
+        investment_goals: {
+          type: 'array',
+          title: 'What are your goals?',
+          description: 'Select all that apply',
+          items: {
+            type: 'string',
+            enum: ['Buying a Home', 'Retirement Planning', 'Investment Growth', 'Health and Wellness', 'Building an Emergency Fund']
+          },
+          uniqueItems: true,
+          minItems: 1
+        },
+        investment_horizon: {
+          type: 'string',
+          title: 'What is your Investment Horizon?',
+          description: 'Select one option',
+          enum: ['Short term (0-1yr)', 'Medium Term (2-5yr)', 'Long term (5-10yr)']
+        },
+        monthly_investment: {
+          type: 'number',
+          title: 'How much can you invest monthly (Minimum amount)?',
+          description: 'Enter amount in Rs',
+          minimum: 100,
+          default: 1000
+        },
+        // Risk Assessment Questions
         investment_experience: {
           type: 'string',
           title: 'What is your investment experience?',
@@ -78,7 +104,7 @@ async function seedAssessmentV2() {
           enum: ['Conservative', 'Moderate', 'Aggressive'],
           default: 'Moderate'
         },
-        investment_horizon: {
+        investment_horizon_risk: {
           type: 'string',
           title: 'What is your investment time horizon?',
           enum: ['Less than 3 years', '3-5 years', '5-10 years', 'More than 10 years'],
@@ -97,21 +123,31 @@ async function seedAssessmentV2() {
           default: 'Yes, 3-6 months'
         }
       },
-      required: ['investment_experience', 'risk_tolerance', 'investment_horizon', 'financial_goals', 'emergency_fund']
+      required: ['investment_goals', 'investment_horizon', 'monthly_investment', 'investment_experience', 'risk_tolerance', 'investment_horizon_risk', 'financial_goals', 'emergency_fund']
     };
 
     const sampleScoring = {
       weights: {
+        // Compulsory questions have lower weights (not used for risk scoring)
+        investment_goals: 0.05,
+        investment_horizon: 0.05,
+        monthly_investment: 0.05,
+        // Risk assessment questions (higher weights for scoring)
         investment_experience: 0.2,
         risk_tolerance: 0.3,
-        investment_horizon: 0.25,
+        investment_horizon_risk: 0.25,
         financial_goals: 0.15,
         emergency_fund: 0.1
       },
       scoring: {
+        // Compulsory questions scoring (basic)
+        investment_goals: { 'Buying a Home': 1, 'Retirement Planning': 1, 'Investment Growth': 1, 'Health and Wellness': 1, 'Building an Emergency Fund': 1 },
+        investment_horizon: { 'Short term (0-1yr)': 1, 'Medium Term (2-5yr)': 2, 'Long term (5-10yr)': 3 },
+        monthly_investment: { 'default': 1 },
+        // Risk assessment questions scoring
         investment_experience: { 'None': 1, 'Beginner': 2, 'Intermediate': 3, 'Advanced': 4 },
         risk_tolerance: { 'Conservative': 1, 'Moderate': 2, 'Aggressive': 3 },
-        investment_horizon: { 'Less than 3 years': 1, '3-5 years': 2, '5-10 years': 3, 'More than 10 years': 4 },
+        investment_horizon_risk: { 'Less than 3 years': 1, '3-5 years': 2, '5-10 years': 3, 'More than 10 years': 4 },
         financial_goals: { 'Capital preservation': 1, 'Income generation': 2, 'Growth': 3, 'Tax efficiency': 2 },
         emergency_fund: { 'Yes, 6+ months': 3, 'Yes, 3-6 months': 2, 'Yes, less than 3 months': 1, 'No': 0 }
       },
@@ -131,7 +167,8 @@ async function seedAssessmentV2() {
         ui: {
           layout: 'vertical',
           theme: 'default',
-          showProgress: true
+          showProgress: true,
+          compulsoryQuestionsFirst: true
         },
         scoring: sampleScoring
       })

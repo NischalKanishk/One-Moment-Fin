@@ -16,33 +16,47 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import { Users, Calendar, ClipboardList, TrendingUp, Plus, Send, Clock } from "lucide-react";
+import { Users, Calendar, ClipboardList, TrendingUp, Plus, Send, Clock, Video, ExternalLink } from "lucide-react";
 import { useUser, useAuth } from "@clerk/clerk-react";
 import { leadsAPI } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useChartTheme } from "@/components/charts/ThemeProvider";
+import { useNavigate } from "react-router-dom";
 
 const spark = Array.from({ length: 24 }, (_, i) => ({
   x: i,
   y: Math.round(60 + Math.sin(i / 2) * 20 + Math.random() * 10),
 }));
 
+interface Meeting {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  lead_name: string | null;
+  platform: string;
+  meeting_link: string | null;
+}
+
 export default function Dashboard() {
   const { user } = useUser();
   const { getToken } = useAuth();
   const { toast } = useToast();
   const chartTheme = useChartTheme();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     total: 0,
     byStatus: { lead: 0, assessment_done: 0, meeting_scheduled: 0, converted: 0, dropped: 0 },
     thisMonth: 0
   });
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     loadStats();
+    loadMeetings();
   }, []);
 
   const loadStats = async () => {
@@ -70,6 +84,57 @@ export default function Dashboard() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMeetings = async () => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Get only upcoming meetings (scheduled and in the future)
+        const upcomingMeetings = data.meetings
+          ?.filter((meeting: Meeting) => 
+            meeting.status === 'scheduled' && new Date(meeting.start_time) > new Date()
+          )
+          .sort((a: Meeting, b: Meeting) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+          .slice(0, 3) || [];
+        
+        setMeetings(upcomingMeetings);
+      }
+    } catch (error) {
+      console.error('Failed to load meetings:', error);
+    }
+  };
+
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getPlatformIcon = (platform: string) => {
+    switch (platform.toLowerCase()) {
+      case 'google_meet':
+        return <Video className="h-4 w-4 text-blue-600" />;
+      case 'zoom':
+        return <Video className="h-4 w-4 text-blue-500" />;
+      default:
+        return <Calendar className="h-4 w-4 text-gray-500" />;
     }
   };
 
@@ -102,94 +167,76 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Quick Actions */}
-      <section className="flex flex-wrap gap-3">
-        <Button variant="primary" size="sm">
-          <Plus className="mr-2 h-4 w-4" />
-          Add Lead
-        </Button>
-        <Button variant="outline" size="sm">
-          <Send className="mr-2 h-4 w-4" />
-          Send Assessment
-        </Button>
-        <Button variant="secondary" size="sm">
-          <Clock className="mr-2 h-4 w-4" />
-          Schedule Meeting
-        </Button>
+      {/* Quick Stats */}
+      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.thisMonth > 0 ? `+${stats.thisMonth} this month` : 'No new leads this month'}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Assessments Done</CardTitle>
+            <ClipboardList className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.byStatus.assessment_done}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.total > 0 ? `${Math.round((stats.byStatus.assessment_done / stats.total) * 100)}% completion rate` : 'No leads yet'}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Meetings Scheduled</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.byStatus.meeting_scheduled}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.byStatus.assessment_done > 0 ? `${Math.round((stats.byStatus.meeting_scheduled / stats.byStatus.assessment_done) * 100)}% conversion rate` : 'No assessments yet'}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Converted</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.byStatus.converted}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.total > 0 ? `${Math.round((stats.byStatus.converted / stats.total) * 100)}% success rate` : 'No leads yet'}
+            </p>
+          </CardContent>
+        </Card>
       </section>
 
-      {/* Overview Cards */}
-      <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {[
-          { 
-            title: "Total Leads", 
-            value: loading ? "..." : stats.total.toString(),
-            icon: Users,
-            trend: "+12% from last month"
-          },
-          { 
-            title: "Meetings Scheduled", 
-            value: loading ? "..." : stats.byStatus.meeting_scheduled.toString(),
-            icon: Calendar,
-            trend: "+5 this week"
-          },
-          { 
-            title: "Risk Profiles Completed", 
-            value: loading ? "..." : stats.byStatus.assessment_done.toString(),
-            icon: ClipboardList,
-            trend: "+8% completion rate"
-          },
-          { 
-            title: "KYC Complete", 
-            value: loading ? "..." : (stats.byStatus.converted || 0).toString(),
-            icon: TrendingUp,
-            trend: "+3 this month"
-          },
-        ].map((stat, index) => (
-          <Card key={stat.title} className="group hover:shadow-lg transition-all duration-200">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <stat.icon className="h-5 w-5 text-muted-foreground" />
-                <Badge variant="secondary" className="text-xs">
-                  {stat.trend}
-                </Badge>
-              </div>
-              <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex items-end justify-between">
-              <div className="text-3xl font-bold">{stat.value}</div>
-              <div className="h-12 w-20">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={spark} margin={{ left: 0, right: 0, top: 10, bottom: 0 }}>
-                    <Area 
-                      type="monotone" 
-                      dataKey="y" 
-                      stroke={chartTheme.colors.primary} 
-                      fill={chartTheme.colors.primary} 
-                      fillOpacity={0.15} 
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </section>
-
-      {/* Charts + Activity */}
+      {/* Charts Section */}
       <section className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
+        <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Risk Category Mix</CardTitle>
+            <CardTitle className="text-lg">Risk Profile Distribution</CardTitle>
           </CardHeader>
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie 
-                  data={riskData} 
-                  dataKey="value" 
-                  nameKey="name" 
-                  innerRadius={50} 
+                <Pie
+                  data={riskData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   outerRadius={80}
                   paddingAngle={2}
                 >
@@ -251,23 +298,82 @@ export default function Dashboard() {
         </Card>
       </section>
 
-      {/* Activity & Insights */}
+      {/* Upcoming Meetings Section */}
       <section className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between pb-3">
-            <CardTitle className="text-lg">Latest Activity</CardTitle>
-            <Button variant="outline" size="sm">View all</Button>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Upcoming Meetings
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate('/app/meetings')}
+              >
+                View all
+              </Button>
+              <Button 
+                size="sm"
+                onClick={() => navigate('/app/meetings')}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Schedule
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-4 text-sm">
-              {loading ? (
-                <li className="text-center text-muted-foreground py-8">Loading activity...</li>
-              ) : stats.total === 0 ? (
-                <li className="text-center text-muted-foreground py-8">No recent activity</li>
-              ) : (
-                <li className="text-center text-muted-foreground py-8">Activity data will appear here</li>
-              )}
-            </ul>
+            {meetings.length === 0 ? (
+              <div className="text-center py-8">
+                <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">No upcoming meetings</h3>
+                <p className="text-muted-foreground mb-4">
+                  Schedule your first meeting to get started.
+                </p>
+                <Button onClick={() => navigate('/app/meetings')}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Schedule Meeting
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {meetings.map((meeting) => (
+                  <div key={meeting.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center space-x-3">
+                      {getPlatformIcon(meeting.platform)}
+                      <div>
+                        <p className="font-medium">{meeting.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {meeting.lead_name} • {formatDateTime(meeting.start_time)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {meeting.meeting_link && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(meeting.meeting_link, '_blank')}
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Join
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate('/app/meetings')}
+                      >
+                        <Calendar className="h-3 w-3 mr-1" />
+                        Details
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -281,7 +387,37 @@ export default function Dashboard() {
             ) : stats.total === 0 ? (
               <div className="text-center text-muted-foreground py-8">No insights available</div>
             ) : (
-              <div className="text-center text-muted-foreground py-8">AI insights will appear here</div>
+              <div className="space-y-4">
+                <div className="p-3 bg-blue-50 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-1">Lead Conversion</h4>
+                  <p className="text-blue-700 text-xs">
+                    {stats.byStatus.converted > 0 
+                      ? `Your conversion rate is ${Math.round((stats.byStatus.converted / stats.total) * 100)}%. Consider focusing on high-quality leads.`
+                      : 'Focus on lead qualification to improve conversion rates.'
+                    }
+                  </p>
+                </div>
+                
+                <div className="p-3 bg-green-50 rounded-lg">
+                  <h4 className="font-medium text-green-900 mb-1">Meeting Strategy</h4>
+                  <p className="text-green-700 text-xs">
+                    {stats.byStatus.meeting_scheduled > 0
+                      ? `You have ${stats.byStatus.meeting_scheduled} meetings scheduled. Great job on follow-up!`
+                      : 'Schedule follow-up meetings with qualified leads to improve conversion.'
+                    }
+                  </p>
+                </div>
+
+                <div className="p-3 bg-purple-50 rounded-lg">
+                  <h4 className="font-medium text-purple-900 mb-1">Assessment Completion</h4>
+                  <p className="text-purple-700 text-xs">
+                    {stats.byStatus.assessment_done > 0
+                      ? `${Math.round((stats.byStatus.assessment_done / stats.total) * 100)}% of leads completed assessments.`
+                      : 'Encourage leads to complete risk assessments for better qualification.'
+                    }
+                  </p>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>

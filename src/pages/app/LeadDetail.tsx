@@ -848,14 +848,23 @@ export default function LeadDetail() {
           
           <TabsContent value="meetings" className="space-y-6 mt-8">
             <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center">
-                  <Calendar className="w-7 h-7 text-green-600" />
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center">
+                    <Calendar className="w-7 h-7 text-green-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Meetings & Appointments</h2>
+                    <p className="text-gray-600">Schedule and manage meetings with this lead</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Meetings & Appointments</h2>
-                  <p className="text-gray-600">Schedule and manage meetings with this lead</p>
-                </div>
+                <Button 
+                  onClick={() => navigate('/app/meetings')}
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Schedule Meeting
+                </Button>
               </div>
               
               {lead.meetings && lead.meetings.length > 0 ? (
@@ -863,29 +872,75 @@ export default function LeadDetail() {
                   {lead.meetings.map((meeting: any) => (
                     <div key={meeting.id} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
                       <div className="flex items-start justify-between">
-                        <div className="space-y-2 flex-1">
+                        <div className="space-y-3 flex-1">
                           <div className="flex items-center gap-3">
                             <h4 className="font-semibold text-gray-900">{meeting.title}</h4>
                             <Badge 
-                              variant={meeting.status === 'completed' ? 'default' : 'secondary'}
+                              variant={meeting.status === 'completed' ? 'default' : 
+                                     meeting.status === 'cancelled' ? 'destructive' : 'secondary'}
                               className="text-xs"
                             >
                               {meeting.status}
                             </Badge>
+                            {meeting.platform && (
+                              <Badge variant="outline" className="text-xs">
+                                {meeting.platform.replace('_', ' ')}
+                              </Badge>
+                            )}
                           </div>
+                          
                           {meeting.description && (
                             <p className="text-sm text-gray-600">{meeting.description}</p>
                           )}
+                          
                           <div className="flex items-center gap-4 text-xs text-gray-500">
                             <div className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
-                              {new Date(meeting.start_time).toLocaleDateString()}
+                              {new Date(meeting.start_time).toLocaleDateString('en-IN', {
+                                timeZone: 'Asia/Kolkata',
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })}
                             </div>
                             <div className="flex items-center gap-1">
                               <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                              {new Date(meeting.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(meeting.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {new Date(meeting.start_time).toLocaleTimeString('en-IN', { 
+                                timeZone: 'Asia/Kolkata',
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })} - {new Date(meeting.end_time).toLocaleTimeString('en-IN', { 
+                                timeZone: 'Asia/Kolkata',
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
                             </div>
                           </div>
+                          
+                          {meeting.meeting_link && meeting.status === 'scheduled' && (
+                            <div className="pt-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(meeting.meeting_link, '_blank')}
+                                className="flex items-center gap-2"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                Join Meeting
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate('/app/meetings')}
+                          >
+                            <Edit className="h-3 w-3 mr-1" />
+                            Edit
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -897,9 +952,43 @@ export default function LeadDetail() {
                     <Calendar className="h-8 w-8 text-gray-400" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No Meetings Scheduled</h3>
-                  <p className="text-gray-600 max-w-md mx-auto">
-                    No meetings have been scheduled with this lead yet. Use the Schedule Meeting button above to set up an appointment.
+                  <p className="text-gray-600 max-w-md mx-auto mb-6">
+                    No meetings have been scheduled with this lead yet. Schedule a meeting to discuss their financial goals and provide personalized recommendations.
                   </p>
+                  <Button 
+                    onClick={() => navigate('/app/meetings')}
+                    className="flex items-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Schedule First Meeting
+                  </Button>
+                </div>
+              )}
+              
+              {/* Meeting Statistics */}
+              {lead.meetings && lead.meetings.length > 0 && (
+                <div className="mt-8 pt-6 border-t border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Meeting Summary</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="text-center p-4 bg-gray-50 rounded-lg">
+                      <div className="text-2xl font-bold text-gray-900">
+                        {lead.meetings.filter((m: any) => m.status === 'scheduled').length}
+                      </div>
+                      <div className="text-sm text-gray-600">Upcoming</div>
+                    </div>
+                    <div className="text-center p-4 bg-gray-50 rounded-lg">
+                      <div className="text-2xl font-bold text-gray-900">
+                        {lead.meetings.filter((m: any) => m.status === 'completed').length}
+                      </div>
+                      <div className="text-sm text-gray-600">Completed</div>
+                    </div>
+                    <div className="text-center p-4 bg-gray-50 rounded-lg">
+                      <div className="text-2xl font-bold text-gray-900">
+                        {lead.meetings.filter((m: any) => m.status === 'cancelled').length}
+                      </div>
+                      <div className="text-sm text-gray-600">Cancelled</div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

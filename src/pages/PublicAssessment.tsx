@@ -306,8 +306,13 @@ export default function PublicAssessment() {
     
     // Check required questions
     questions.forEach(question => {
-      if (question.required && (!answers[question.qkey] || answers[question.qkey] === '')) {
-        errors.push(`${question.label} is required`);
+      if (question.required) {
+        const answer = answers[question.qkey];
+        if (!answer || 
+            (Array.isArray(answer) && answer.length === 0) || 
+            (typeof answer === 'string' && answer.trim() === '')) {
+          errors.push(`${question.label} is required`);
+        }
       }
     });
     
@@ -874,7 +879,31 @@ export default function PublicAssessment() {
                         {questions[currentQuestionIndex].required && <span className="text-red-500 ml-1">*</span>}
                       </Label>
                       
-                      {questions[currentQuestionIndex].qtype === 'single' && questions[currentQuestionIndex].options && questions[currentQuestionIndex].options.length > 0 ? (
+                      {questions[currentQuestionIndex].qtype === 'multi' && questions[currentQuestionIndex].options && questions[currentQuestionIndex].options.length > 0 ? (
+                        <div className="space-y-3">
+                          {questions[currentQuestionIndex].options.map((option: string, optionIndex: number) => (
+                            <div key={optionIndex} className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+                              <input
+                                type="checkbox"
+                                id={`${questions[currentQuestionIndex].qkey}-${optionIndex}`}
+                                checked={Array.isArray(answers[questions[currentQuestionIndex].qkey]) && answers[questions[currentQuestionIndex].qkey].includes(option)}
+                                onChange={(e) => {
+                                  const currentAnswers = Array.isArray(answers[questions[currentQuestionIndex].qkey]) ? answers[questions[currentQuestionIndex].qkey] : [];
+                                  if (e.target.checked) {
+                                    handleAnswerChange(questions[currentQuestionIndex].qkey, [...currentAnswers, option]);
+                                  } else {
+                                    handleAnswerChange(questions[currentQuestionIndex].qkey, currentAnswers.filter((ans: string) => ans !== option));
+                                  }
+                                }}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                              />
+                              <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} className="text-base cursor-pointer flex-1">
+                                {option}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      ) : questions[currentQuestionIndex].qtype === 'single' && questions[currentQuestionIndex].options && questions[currentQuestionIndex].options.length > 0 ? (
                         <RadioGroup
                           value={answers[questions[currentQuestionIndex].qkey] || ''}
                           onValueChange={(value) => handleAnswerChange(questions[currentQuestionIndex].qkey, value)}
@@ -889,6 +918,23 @@ export default function PublicAssessment() {
                             </div>
                           ))}
                         </RadioGroup>
+                      ) : questions[currentQuestionIndex].qtype === 'number' ? (
+                        <div className="space-y-3">
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">Rs</span>
+                            <Input
+                              type="number"
+                              min={questions[currentQuestionIndex].options?.minimum || 0}
+                              value={answers[questions[currentQuestionIndex].qkey] || ''}
+                              onChange={(e) => handleAnswerChange(questions[currentQuestionIndex].qkey, e.target.value)}
+                              placeholder="Enter amount"
+                              className="w-full pl-10"
+                            />
+                          </div>
+                          <p className="text-sm text-gray-500">
+                            Minimum amount: Rs {questions[currentQuestionIndex].options?.minimum || 100}
+                          </p>
+                        </div>
                       ) : questions[currentQuestionIndex].qtype === 'scale' ? (
                         <div className="space-y-4">
                           <div className="flex items-center justify-between text-sm text-gray-500 mb-2">

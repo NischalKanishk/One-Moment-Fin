@@ -2,60 +2,13 @@ import express from 'express';
 import { UserDeletionServiceSimple } from '../services/userDeletionServiceSimple';
 import { logger } from '../services/logger';
 import { supabase } from '../config/supabase';
-
-// Note: The user property is already declared in middleware/auth.ts
-// We'll work with the existing structure: { clerk_id, supabase_user_id, email, phone, role }
+import { authenticateUser, requireRole } from '../middleware/auth';
 
 const router = express.Router();
 
-// Middleware to check if user is admin
-const requireAdmin = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  try {
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Authorization header required' });
-    }
-
-    const token = authHeader.substring(7);
-    
-    // Verify the JWT token and check if user is admin
-    // This is a simplified check - in production, you'd want proper JWT verification
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    
-    if (error || !user) {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-
-    // Check if user has admin role
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (userError || !userData || userData.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    // Add user info to request for logging
-    req.user = {
-      clerk_id: user.id, // Use user.id as clerk_id for consistency
-      supabase_user_id: user.id,
-      email: user.email,
-      phone: undefined,
-      role: userData.role
-    };
-    next();
-    return; // Add explicit return to satisfy TypeScript
-  } catch (error) {
-    logger.error('Admin middleware error', { error });
-    return res.status(500).json({ error: 'Authentication failed' });
-  }
-};
-
-// Apply admin middleware to all routes
-router.use(requireAdmin);
+// Apply authentication and admin role requirement to all routes
+router.use(authenticateUser);
+router.use(requireRole(['admin']));
 
 // GET /admin/users - List all active users
 router.get('/users', async (req: express.Request, res: express.Response) => {
@@ -104,248 +57,150 @@ router.get('/users/:id', async (req: express.Request, res: express.Response) => 
     res.json({ user });
     return; // Add explicit return
   } catch (error) {
-    logger.error('Error fetching user details', { userId: req.params.id, error });
+    logger.error('Unexpected error fetching user details', { error });
     res.status(500).json({ error: 'Internal server error' });
     return; // Add explicit return
   }
 });
 
-// DELETE /admin/users/:id - Manually delete a user (admin override)
+// DELETE /admin/users/:id - Delete user and all associated data
 router.delete('/users/:id', async (req: express.Request, res: express.Response) => {
   try {
     const { id } = req.params;
-    const { reason = 'admin_manual_deletion' } = req.body;
+    const adminUserId = req.user!.supabase_user_id;
 
-    logger.info('Admin manual user deletion requested', { 
-      userId: id, 
-      reason, 
-      adminId: req.user?.supabase_user_id 
-    });
-
-    // Use the simplified UserDeletionServiceSimple to handle the deletion
-    const deletionResult = await UserDeletionServiceSimple.deleteUser(id, reason);
-
-    if (deletionResult.success) {
-      logger.info('Admin user deletion successful with simplified approach', { 
-        userId: id, 
-        deprecatedUserId: deletionResult.deprecatedUserId,
-        migratedDataCount: deletionResult.migratedDataCount
-      });
-
-      res.json({
-        success: true,
-        message: deletionResult.message,
-        deprecatedUserId: deletionResult.deprecatedUserId,
-        migratedDataCount: deletionResult.migratedDataCount
-      });
-    } else {
-      logger.error('Admin user deletion failed', { 
-        userId: id, 
-        error: deletionResult.message 
-      });
-
-      res.status(400).json({
-        success: false,
-        message: deletionResult.message
-      });
-    }
-  } catch (error) {
-    logger.error('Unexpected error during admin user deletion', { 
-      userId: req.params.id, 
-      error 
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// GET /admin/deprecated-users - List all deprecated users
-router.get('/deprecated-users', async (req: express.Request, res: express.Response) => {
-  try {
-    const deprecatedUsers = await UserDeletionServiceSimple.getAllDeprecatedUsers();
-
-    res.json({ deprecatedUsers });
-  } catch (error) {
-    logger.error('Error fetching deprecated users', { error });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// GET /admin/deprecated-users/:id - Get specific deprecated user details
-router.get('/deprecated-users/:id', async (req: express.Request, res: express.Response) => {
-  try {
-    const { id } = req.params;
-
-    // Get deprecated user data
-    const { data: deprecatedUser, error: userError } = await supabase
-      .from('deprecated_users')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (userError || !deprecatedUser) {
-      return res.status(404).json({ error: 'Deprecated user not found' });
+    // Prevent admin from deleting themselves
+    if (id === adminUserId) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
-    // Extract data from the JSON user_data field
-    const userData = deprecatedUser.user_data || {};
-    
-    res.json({
-      deprecatedUser: {
-        id: deprecatedUser.id,
-        original_user_id: deprecatedUser.original_user_id,
-        clerk_id: deprecatedUser.clerk_id,
-        full_name: deprecatedUser.full_name,
-        email: deprecatedUser.email,
-        phone: deprecatedUser.phone,
-        role: deprecatedUser.role,
-        deleted_at: deprecatedUser.deleted_at,
-        deletion_reason: deprecatedUser.deletion_reason,
-        data_migration_status: deprecatedUser.data_migration_status
-      },
-      userData: {
-        user_info: userData.user_info,
+    const result = await UserDeletionServiceSimple.deleteUser(id);
 
-        leads: userData.leads,
-        assessments: userData.assessments,
-        assessment_questions: userData.assessment_questions,
-        risk_assessments: userData.risk_assessments,
-        meetings: userData.meetings,
-        user_subscriptions: userData.user_subscriptions,
-        product_recommendations: userData.product_recommendations,
-        ai_feedback: userData.ai_feedback,
-        migration_metadata: userData.migration_metadata
+          if (result.success) {
+        logger.info('User deleted successfully', { 
+          deletedUserId: id, 
+          adminUserId,
+          deprecatedUserId: result.deprecatedUserId,
+          migratedDataCount: result.migratedDataCount
+        });
+        res.json({ 
+          message: 'User deleted successfully', 
+          deprecatedUserId: result.deprecatedUserId,
+          migratedDataCount: result.migratedDataCount
+        });
+      } else {
+        logger.error('Failed to delete user', { 
+          userId: id, 
+          message: result.message,
+          adminUserId 
+        });
+        res.status(500).json({ error: result.message });
       }
-    });
     return; // Add explicit return
   } catch (error) {
-    logger.error('Error fetching deprecated user details', { deprecatedUserId: req.params.id, error });
+    logger.error('Unexpected error deleting user', { error });
     res.status(500).json({ error: 'Internal server error' });
     return; // Add explicit return
-  }
-});
-
-// GET /admin/deprecated-users/:id/:dataType - Get specific data type from deprecated user
-router.get('/deprecated-users/:id/:dataType', async (req: express.Request, res: express.Response) => {
-  try {
-    const { id, dataType } = req.params;
-
-    // Validate data type
-    const validDataTypes = ['leads', 'assessments', 'meetings', 'user_subscriptions', 'product_recommendations', 'ai_feedback'];
-    
-    if (!validDataTypes.includes(dataType)) {
-      return res.status(400).json({ error: 'Invalid data type. Valid types: ' + validDataTypes.join(', ') });
-    }
-
-    const data = await UserDeletionServiceSimple.getDeprecatedUserDataByType(id, dataType);
-
-    if (data === null) {
-      return res.status(404).json({ error: 'Data not found or error occurred' });
-    }
-
-    res.json({ dataType, data });
-    return; // Add explicit return
-  } catch (error) {
-    logger.error('Error fetching deprecated user data by type', { 
-      deprecatedUserId: req.params.id, 
-      dataType: req.params.dataType, 
-      error 
-    });
-    res.status(500).json({ error: 'Internal server error' });
-    return; // Add explicit return
-  }
-});
-
-// POST /admin/deprecated-users/:id/restore - Mark deprecated user as restorable
-router.post('/deprecated-users/:id/restore', async (req: express.Request, res: express.Response) => {
-  try {
-    const { id } = req.params;
-
-    logger.info('Admin restoration request for deprecated user', { 
-      deprecatedUserId: id, 
-      adminId: req.user?.supabase_user_id 
-    });
-
-    const restorationResult = await UserDeletionServiceSimple.restoreDeprecatedUser(id);
-
-    if (restorationResult.success) {
-      res.json({
-        success: true,
-        message: restorationResult.message
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: restorationResult.message
-      });
-    }
-  } catch (error) {
-    logger.error('Error marking deprecated user as restorable', { 
-      deprecatedUserId: req.params.id, 
-      error 
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// GET /admin/deprecated-users/search/:term - Search deprecated users
-router.get('/deprecated-users/search/:term', async (req: express.Request, res: express.Response) => {
-  try {
-    const { term } = req.params;
-
-    const searchResults = await UserDeletionServiceSimple.searchDeprecatedUsers(term);
-
-    res.json({ searchTerm: term, results: searchResults });
-  } catch (error) {
-    logger.error('Error searching deprecated users', { searchTerm: req.params.term, error });
-    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // GET /admin/stats - Get system statistics
 router.get('/stats', async (req: express.Request, res: express.Response) => {
   try {
-    const [
-      { count: activeUsers },
-      { count: deprecatedUsers },
-      { count: totalLeads },
-      { count: totalAssessments },
-      { count: totalMeetings }
-    ] = await Promise.all([
-      supabase.from('users').select('*', { count: 'exact', head: true }),
-      supabase.from('deprecated_users').select('*', { count: 'exact', head: true }),
-      supabase.from('leads').select('*', { count: 'exact', head: true }),
-      supabase.from('assessments').select('*', { count: 'exact', head: true }),
-      supabase.from('meetings').select('*', { count: 'exact', head: true })
-    ]);
+    // Get total users count
+    const { count: totalUsers, error: usersError } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true });
 
-    // Get deprecated data statistics
-    const deprecatedStats = await UserDeletionServiceSimple.getDeprecatedDataStats();
+    if (usersError) {
+      logger.error('Error counting users', { error: usersError });
+      return res.status(500).json({ error: 'Failed to get user count' });
+    }
 
-    res.json({
-      stats: {
-        activeUsers: activeUsers || 0,
-        deprecatedUsers: deprecatedUsers || 0,
-        totalLeads: totalLeads || 0,
-        totalAssessments: totalAssessments || 0,
-        totalMeetings: totalMeetings || 0
-      },
-      deprecatedStats,
+    // Get total leads count
+    const { count: totalLeads, error: leadsError } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true });
+
+    if (leadsError) {
+      logger.error('Error counting leads', { error: leadsError });
+      return res.status(500).json({ error: 'Failed to get lead count' });
+    }
+
+    // Get total meetings count
+    const { count: totalMeetings, error: meetingsError } = await supabase
+      .from('meetings')
+      .select('*', { count: 'exact', head: true });
+
+    if (meetingsError) {
+      logger.error('Error counting meetings', { error: meetingsError });
+      return res.status(500).json({ error: 'Failed to get meeting count' });
+    }
+
+    // Get total assessments count
+    const { count: totalAssessments, error: assessmentsError } = await supabase
+      .from('risk_assessments')
+      .select('*', { count: 'exact', head: true });
+
+    if (assessmentsError) {
+      logger.error('Error counting assessments', { error: assessmentsError });
+      return res.status(500).json({ error: 'Failed to get assessment count' });
+    }
+
+    const stats = {
+      totalUsers: totalUsers || 0,
+      totalLeads: totalLeads || 0,
+      totalMeetings: totalMeetings || 0,
+      totalAssessments: totalAssessments || 0,
       timestamp: new Date().toISOString()
-    });
+    };
+
+    logger.info('Admin stats retrieved', { adminUserId: req.user!.supabase_user_id });
+    res.json({ stats });
+    return; // Add explicit return
   } catch (error) {
-    logger.error('Error fetching admin stats', { error });
+    logger.error('Unexpected error getting admin stats', { error });
     res.status(500).json({ error: 'Internal server error' });
+    return; // Add explicit return
   }
 });
 
-// GET /admin/health - Admin endpoint health check
-router.get('/health', (req: express.Request, res: express.Response) => {
-      res.json({ 
-      status: 'OK', 
-      endpoint: 'admin',
+// GET /admin/health - System health check
+router.get('/health', async (req: express.Request, res: express.Response) => {
+  try {
+    // Check database connection
+    const { data, error } = await supabase
+      .from('users')
+      .select('count', { count: 'exact', head: true });
+
+    if (error) {
+      logger.error('Database health check failed', { error });
+      return res.status(500).json({ 
+        status: 'unhealthy',
+        database: 'disconnected',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const healthStatus = {
+      status: 'healthy',
+      database: 'connected',
       timestamp: new Date().toISOString(),
-      adminId: req.user?.supabase_user_id
+      adminUserId: req.user!.supabase_user_id
+    };
+
+    logger.info('Admin health check passed', { adminUserId: req.user!.supabase_user_id });
+    res.json(healthStatus);
+    return; // Add explicit return
+  } catch (error) {
+    logger.error('Unexpected error during health check', { error });
+    res.status(500).json({ 
+      status: 'unhealthy',
+      error: 'Internal server error',
+      timestamp: new Date().toISOString()
     });
+    return; // Add explicit return
+  }
 });
 
 export default router;
