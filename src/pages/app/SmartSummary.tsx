@@ -11,9 +11,10 @@ import {
   FileText,
   Phone,
   Mail,
-  AlertTriangle
+  AlertTriangle,
+  Download
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { leadsAPI } from "@/lib/api";
@@ -56,9 +57,11 @@ export default function SmartSummary() {
   const { getToken } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const contentRef = useRef<HTMLDivElement>(null);
   
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -151,6 +154,224 @@ export default function SmartSummary() {
     }
   };
 
+  const generatePDF = async () => {
+    if (!contentRef.current || !lead) {
+      toast({
+        title: "Error",
+        description: "Lead data not available for PDF generation.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      setGeneratingPDF(true);
+      
+      // Debug: Log lead data to console
+      console.log('Generating PDF for lead:', lead);
+      console.log('Lead assessment data:', lead.assessment);
+      console.log('Lead notes:', lead.notes);
+      console.log('Lead CFA data:', {
+        goals: lead.cfa_goals,
+        minInvestment: lead.cfa_min_investment,
+        horizon: lead.cfa_investment_horizon
+      });
+      
+      // Dynamic import of html2pdf to avoid SSR issues
+      const html2pdf = (await import('html2pdf.js')).default;
+      
+      // Create a clean HTML structure for PDF with safe data access
+      const pdfContent = document.createElement('div');
+      
+      // Safely access lead properties with fallbacks
+      const leadName = lead.full_name || 'Unknown Lead';
+      const leadEmail = lead.email || 'Not provided';
+      const leadPhone = lead.phone || 'Not provided';
+      const leadAge = lead.age || 'Not provided';
+      const leadStatus = lead.status ? lead.status.replace('_', ' ') : 'Unknown';
+      const leadCreatedAt = lead.created_at ? new Date(lead.created_at).toLocaleDateString() : 'Unknown';
+      const leadRiskCategory = lead.risk_category || 'Not assessed';
+      const leadRiskScore = lead.risk_score || 'Not assessed';
+      const leadNotes = lead.notes || '';
+      
+      // Check if assessment data exists
+      const hasAssessment = lead.assessment && lead.assessment.mappedAnswers;
+      const mappedAnswers = hasAssessment ? lead.assessment.mappedAnswers : [];
+      const isCFA = lead.assessment?.assessment?.framework === 'CFA';
+      pdfContent.innerHTML = `
+        <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: white; color: black;">
+          <!-- Header -->
+          <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #e5e7eb; padding-bottom: 20px;">
+            <h1 style="font-size: 28px; font-weight: bold; color: #111827; margin: 0 0 10px 0;">Smart Summary</h1>
+            <p style="font-size: 16px; color: #6b7280; margin: 0;">Comprehensive overview for ${leadName}</p>
+            <p style="font-size: 14px; color: #9ca3af; margin: 10px 0 0 0;">Generated on ${new Date().toLocaleDateString()}</p>
+          </div>
+
+          <!-- Lead Overview -->
+          <div style="margin-bottom: 30px;">
+            <h2 style="font-size: 20px; font-weight: bold; color: #111827; margin: 0 0 15px 0; padding: 10px; background: #f9fafb; border-left: 4px solid #3b82f6;">Lead Overview</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+              <div>
+                <p style="margin: 8px 0; font-size: 14px;"><strong>Name:</strong> ${leadName}</p>
+                <p style="margin: 8px 0; font-size: 14px;"><strong>Email:</strong> ${leadEmail}</p>
+                <p style="margin: 8px 0; font-size: 14px;"><strong>Phone:</strong> ${leadPhone}</p>
+              </div>
+              <div>
+                <p style="margin: 8px 0; font-size: 14px;"><strong>Age:</strong> ${leadAge}</p>
+                <p style="margin: 8px 0; font-size: 14px;"><strong>Status:</strong> ${leadStatus}</p>
+                <p style="margin: 8px 0; font-size: 14px;"><strong>Added on:</strong> ${leadCreatedAt}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Risk Profile -->
+          <div style="margin-bottom: 30px;">
+            <h2 style="font-size: 20px; font-weight: bold; color: #111827; margin: 0 0 15px 0; padding: 10px; background: #f9fafb; border-left: 4px solid #10b981;">Risk Profile</h2>
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 15px;">
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Risk Category:</strong> ${leadRiskCategory}</p>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Risk Score:</strong> ${leadRiskScore}</p>
+            </div>
+          </div>
+
+          <!-- Investment Preference -->
+          ${mappedAnswers.length > 0 ? `
+            <div style="margin-bottom: 30px;">
+              <h2 style="font-size: 20px; font-weight: bold; color: #111827; margin: 0 0 15px 0; padding: 10px; background: #f9fafb; border-left: 4px solid #f59e0b;">Investment Preference</h2>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                ${mappedAnswers.slice(0, 3).map((answer: any, index: number) => `
+                  <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 15px;">
+                    <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold; color: #92400e;">${answer.question || 'Question not available'}</p>
+                    <p style="margin: 0; font-size: 14px; color: #78350f;">${answer.answer || 'Answer not available'}</p>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Risk Assessment -->
+          ${mappedAnswers.length > 3 ? `
+            <div style="margin-bottom: 30px;">
+              <h2 style="margin: 0 0 15px 0; padding: 10px; background: #f9fafb; border-left: 4px solid #ef4444;">Risk Assessment</h2>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                ${mappedAnswers.slice(3).map((answer: any, index: number) => `
+                  <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 15px;">
+                    <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold; color: #991b1b;">${answer.question || 'Question not available'}</p>
+                    <p style="margin: 0; font-size: 14px; color: #7f1d1d;">${answer.answer || 'Answer not available'}</p>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Notes -->
+          ${leadNotes ? `
+            <div style="margin-bottom: 30px;">
+              <h2 style="font-size: 20px; font-weight: bold; color: #111827; margin: 0 0 15px 0; padding: 10px; background: #f9fafb; border-left: 4px solid #8b5cf6;">Notes</h2>
+              <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 6px; padding: 15px;">
+                <p style="margin: 0; font-size: 14px; color: #581c87; line-height: 1.5;">${leadNotes}</p>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- CFA Information -->
+          ${isCFA && (lead.cfa_goals || lead.cfa_min_investment || lead.cfa_investment_horizon) ? `
+            <div style="margin-bottom: 30px;">
+              <h2 style="font-size: 20px; font-weight: bold; color: #111827; margin: 0 0 15px 0; padding: 10px; background: #f9fafb; border-left: 4px solid #06b6d4;">CFA Framework Information</h2>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                ${lead.cfa_goals ? `
+                  <div style="background: #ecfeff; border: 1px solid #a5f3fc; border-radius: 6px; padding: 15px;">
+                    <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold; color: #0e7490;">Goals</p>
+                    <p style="margin: 0; font-size: 14px; color: #0c4a6e;">${lead.cfa_goals}</p>
+                  </div>
+                ` : ''}
+                ${lead.cfa_min_investment ? `
+                  <div style="background: #ecfeff; border: 1px solid #a5f3fc; border-radius: 6px; padding: 15px;">
+                    <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold; color: #0e7490;">Minimum Investment</p>
+                    <p style="margin: 0; font-size: 14px; color: #0c4a6e;">${lead.cfa_min_investment}</p>
+                  </div>
+                ` : ''}
+                ${lead.cfa_investment_horizon ? `
+                  <div style="background: #ecfeff; border: 1px solid #a5f3fc; border-radius: 6px; padding: 15px;">
+                    <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold; color: #0e7490;">Investment Horizon</p>
+                    <p style="margin: 0; font-size: 14px; color: #0c4a6e;">${lead.cfa_investment_horizon}</p>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Footer -->
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
+            <p style="font-size: 12px; color: #9ca3af; margin: 0;">Generated by OneMFin - ${new Date().toLocaleDateString()}</p>
+          </div>
+        </div>
+      `;
+      
+      // Debug: Log the generated HTML
+      console.log('Generated PDF HTML:', pdfContent.innerHTML);
+      
+      // Temporarily add to DOM for proper rendering
+      pdfContent.style.position = 'absolute';
+      pdfContent.style.left = '-9999px';
+      pdfContent.style.top = '-9999px';
+      document.body.appendChild(pdfContent);
+      
+      // Small delay to ensure proper rendering
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const opt = {
+        margin: [20, 20, 20, 20],
+        filename: `smart-summary-${lead?.full_name?.replace(/\s+/g, '-').toLowerCase() || 'lead'}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          width: 800,
+          height: 1200,
+          scrollX: 0,
+          scrollY: 0
+        },
+        jsPDF: { 
+          unit: 'mm', 
+          format: 'a4', 
+          orientation: 'portrait',
+          compress: true
+        }
+      };
+      
+      try {
+        await html2pdf().set(opt).from(pdfContent).save();
+      } catch (pdfError) {
+        console.error('Custom HTML PDF generation failed, trying with page content:', pdfError);
+        // Fallback: try with the actual page content
+        await html2pdf().set(opt).from(contentRef.current).save();
+      }
+      
+      // Clean up the temporary element
+      document.body.removeChild(pdfContent);
+      
+      toast({
+        title: "Success",
+        description: "PDF generated and downloaded successfully!",
+      });
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      // Clean up the temporary element if it exists
+      if (pdfContent.parentNode) {
+        document.body.removeChild(pdfContent);
+      }
+      setGeneratingPDF(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Helmet>
@@ -171,16 +392,25 @@ export default function SmartSummary() {
               <ArrowLeft className="h-4 w-4" />
               Back to Lead
             </Button>
-            <div className="text-right">
+            <div className="text-center flex-1">
               <h1 className="text-2xl font-semibold text-gray-900">Smart Summary</h1>
               <p className="text-sm text-gray-600 mt-1">Comprehensive overview for {lead.full_name}</p>
             </div>
+            <Button
+              onClick={generatePDF}
+              disabled={generatingPDF}
+              size="sm"
+              className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2 min-w-[140px]"
+            >
+              <Download className="w-4 h-4" />
+              {generatingPDF ? 'Generating...' : 'Save as PDF'}
+            </Button>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-6 py-8" ref={contentRef}>
         <div className="space-y-6">
           
           {/* Top Row - Lead Overview and Risk Profile Side by Side */}
