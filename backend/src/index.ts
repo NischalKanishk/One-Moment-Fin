@@ -25,11 +25,6 @@ import userAssessmentLinksRoutes from './routes/userAssessmentLinks';
 import aiRoutes from './routes/ai';
 
 import meetingsRoutes from './routes/meetings';
-import subscriptionRoutes from './routes/subscriptions';
-import webhookRoutes from './routes/webhooks';
-import clerkWebhookRoutes from './routes/clerkWebhooks';
-import adminRoutes from './routes/admin';
-
 
 
 const app = express();
@@ -85,9 +80,12 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/health',
       api: '/api',
-      webhooks: '/webhooks',
-      clerkWebhooks: '/webhooks/clerk',
-      admin: '/api/admin'
+      auth: '/api/auth',
+      leads: '/api/leads',
+      assessments: '/api/assessments',
+      publicAssessments: '/api/public-assessments',
+      ai: '/api/ai',
+      meetings: '/api/meetings'
     },
     documentation: 'Check /health for server status'
   });
@@ -110,11 +108,6 @@ app.use('/api/public-assessments', publicAssessmentsRoutes);
 app.use('/api/ai', aiRoutes);
 
 app.use('/api/meetings', meetingsRoutes);
-app.use('/api/subscriptions', subscriptionRoutes);
-app.use('/api/webhooks', webhookRoutes);
-app.use('/api/webhooks/clerk', clerkWebhookRoutes);
-app.use('/api/admin', adminRoutes);
-
 
 // Public assessment routes
 app.use('/a', userAssessmentLinksRoutes); // User assessment links (e.g., /a/1677811521d31-5477-4cf8-b718-78a64536e553RFEMC)
