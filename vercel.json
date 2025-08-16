@@ -13,6 +13,14 @@
       "destination": "/api/debug.js"
     },
     {
+      "source": "/api/health",
+      "destination": "/api/health.js"
+    },
+    {
+      "source": "/api/test-env",
+      "destination": "/api/test-env.js"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/[...path].js"
     },
