@@ -34,7 +34,8 @@ const PORT = process.env.PORT || 3001;
 app.use(helmet());
 app.use(cors({
   origin: [
-    process.env.FRONTEND_URL || 'http://localhost:5173',
+    process.env.FRONTEND_URL || 'https://one-moment-fin.vercel.app',
+    'http://localhost:5173', // Local development
     'http://localhost:8080', // Vite dev server
     'http://localhost:3000', // Alternative frontend port
   ],

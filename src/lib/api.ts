@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -13,7 +13,7 @@ const api = axios.create({
 // Function to create authenticated API instance
 export const createAuthenticatedApi = (token: string) => {
   const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+    baseURL: import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`

@@ -453,7 +453,7 @@ router.post('/links', authenticateUser, [
       expiresInDays
     });
 
-    const publicUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/assess/${link.token}`;
+    const publicUrl = `${process.env.FRONTEND_URL || 'https://one-moment-fin.vercel.app'}/assess/${link.token}`;
 
     return res.json({ 
       link,

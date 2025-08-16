@@ -118,3 +118,6 @@ coverage
 # Temporary files
 *.tmp
 *.temp
+
+# Backend source (not needed for Vercel)
+backend/src/

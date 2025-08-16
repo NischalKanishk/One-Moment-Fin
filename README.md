@@ -82,8 +82,8 @@ Create `.env` file in the root directory:
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_OPENAI_API_KEY=your_openai_api_key
-VITE_APP_URL=http://localhost:8080
-VITE_API_URL=http://localhost:3001
+VITE_APP_URL=https://one-moment-fin.vercel.app
+VITE_API_URL=https://one-moment-fin.vercel.app
 ```
 
 #### Backend Environment
@@ -91,7 +91,7 @@ Create `.env` file in the `backend` directory:
 ```env
 PORT=3001
 NODE_ENV=development
-FRONTEND_URL=http://localhost:8080
+FRONTEND_URL=https://one-moment-fin.vercel.app
 
 # Supabase Configuration
 SUPABASE_URL=your_supabase_url

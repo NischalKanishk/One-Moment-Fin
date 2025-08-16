@@ -7,7 +7,7 @@ import '@testing-library/jest-dom';
 // Mock environment variables
 process.env.VITE_SUPABASE_URL = 'https://test.supabase.co';
 process.env.VITE_SUPABASE_ANON_KEY = 'test-key';
-process.env.VITE_API_URL = 'http://localhost:3001';
+process.env.VITE_API_URL = 'https://one-moment-fin.vercel.app';
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {

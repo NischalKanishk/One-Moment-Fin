@@ -200,6 +200,10 @@ router.get('/', authenticateUser, [
   query('search').optional().isString().isLength({ max: 100 }).withMessage('Search term too long'),
   query('source_link').optional().isString().isLength({ max: 100 }).withMessage('Source filter too long')
 ], async (req: express.Request, res: express.Response) => {
+  console.log('🔍 Leads: Route handler reached for GET /api/leads');
+  console.log('🔍 Leads: Request headers:', req.headers);
+  console.log('🔍 Leads: Request user:', req.user);
+  
   try {
     // Validate query parameters
     const errors = validationResult(req);

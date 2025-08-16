@@ -52,6 +52,8 @@ In Vercel dashboard, set these environment variables:
 
 ## Environment Variables Required
 Make sure to set these in Vercel:
+- `VITE_API_URL`: `https://one-moment-fin.vercel.app`
+- `FRONTEND_URL`: `https://one-moment-fin.vercel.app`
 - Database connection strings
 - API keys (Clerk, Supabase, etc.)
 - Any other sensitive configuration

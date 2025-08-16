@@ -1,26 +1,28 @@
 {
-  "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
+      "source": "/api/test",
+      "destination": "/api/test.js"
     },
     {
-      "src": "api/[...path].ts",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/[...path]"
+      "source": "/api/leads-test",
+      "destination": "/api/leads-test.js"
     },
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/api/debug",
+      "destination": "/api/debug.js"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/[...path].js"
+    },
+    {
+      "source": "/assets/(.*)",
+      "destination": "/assets/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

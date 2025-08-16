@@ -189,7 +189,7 @@ export default function PublicAssessment() {
       setIsLoading(true);
       console.log('🔍 Loading assessment for slug:', assessmentSlug);
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/a/${assessmentSlug}`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/a/${assessmentSlug}`);
       
       if (!response.ok) {
         throw new Error('Failed to load assessment');
@@ -233,7 +233,7 @@ export default function PublicAssessment() {
 
     setIsVerifying(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/leads/check-existing`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/leads/check-existing`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -381,7 +381,7 @@ export default function PublicAssessment() {
           submitData.assessmentId = assessment.id;
         }
       } else if (assessmentType === 'public' && slug) {
-        submitUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/a/${slug}/submit`;
+        submitUrl = `${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/a/${slug}/submit`;
       } else {
         throw new Error('Invalid assessment configuration');
       }
