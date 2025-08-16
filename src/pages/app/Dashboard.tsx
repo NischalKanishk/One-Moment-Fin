@@ -38,6 +38,7 @@ interface Meeting {
   lead_name: string | null;
   platform: string;
   meeting_link: string | null;
+  status: string;
 }
 
 export default function Dashboard() {
@@ -52,11 +53,13 @@ export default function Dashboard() {
     thisMonth: 0
   });
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [recentLeads, setRecentLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     loadStats();
     loadMeetings();
+    loadRecentLeads();
   }, []);
 
   const loadStats = async () => {
@@ -113,6 +116,27 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Failed to load meetings:', error);
+    }
+  };
+
+  const loadRecentLeads = async () => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads?limit=5&sort=created_at&order=desc`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setRecentLeads(data.leads || []);
+      }
+    } catch (error) {
+      console.error('Failed to load recent leads:', error);
     }
   };
 
@@ -228,8 +252,8 @@ export default function Dashboard() {
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Risk Profile Distribution</CardTitle>
           </CardHeader>
-          <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+          <CardContent>
+            <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie
                   data={riskData}
@@ -237,7 +261,7 @@ export default function Dashboard() {
                   cy="50%"
                   labelLine={false}
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
+                  outerRadius={60}
                   paddingAngle={2}
                 >
                   {riskData.map((_, i) => (
@@ -379,44 +403,50 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">AI Insights</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Users className="h-5 w-5 text-blue-600" />
+              Latest Leads
+            </CardTitle>
           </CardHeader>
-          <CardContent className="text-sm space-y-4">
+          <CardContent>
             {loading ? (
-              <div className="text-center text-muted-foreground py-8">Loading insights...</div>
-            ) : stats.total === 0 ? (
-              <div className="text-center text-muted-foreground py-8">No insights available</div>
+              <div className="text-center text-muted-foreground py-8">Loading leads...</div>
+            ) : recentLeads.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">No leads available</div>
             ) : (
-              <div className="space-y-4">
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-1">Lead Conversion</h4>
-                  <p className="text-blue-700 text-xs">
-                    {stats.byStatus.converted > 0 
-                      ? `Your conversion rate is ${Math.round((stats.byStatus.converted / stats.total) * 100)}%. Consider focusing on high-quality leads.`
-                      : 'Focus on lead qualification to improve conversion rates.'
-                    }
-                  </p>
-                </div>
-                
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <h4 className="font-medium text-green-900 mb-1">Meeting Strategy</h4>
-                  <p className="text-green-700 text-xs">
-                    {stats.byStatus.meeting_scheduled > 0
-                      ? `You have ${stats.byStatus.meeting_scheduled} meetings scheduled. Great job on follow-up!`
-                      : 'Schedule follow-up meetings with qualified leads to improve conversion.'
-                    }
-                  </p>
-                </div>
-
-                <div className="p-3 bg-purple-50 rounded-lg">
-                  <h4 className="font-medium text-purple-900 mb-1">Assessment Completion</h4>
-                  <p className="text-purple-700 text-xs">
-                    {stats.byStatus.assessment_done > 0
-                      ? `${Math.round((stats.byStatus.assessment_done / stats.total) * 100)}% of leads completed assessments.`
-                      : 'Encourage leads to complete risk assessments for better qualification.'
-                    }
-                  </p>
-                </div>
+              <div className="space-y-3">
+                {recentLeads.map((lead, index) => (
+                  <div key={lead.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-semibold text-blue-600">
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{lead.full_name || 'Unknown'}</p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {lead.email || lead.phone || 'No contact info'}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge 
+                        variant="outline" 
+                        className="text-xs px-2 py-1"
+                      >
+                        {lead.status || 'New'}
+                      </Badge>
+                      <p className="text-xs text-gray-400">
+                        {new Date(lead.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/app/leads/${lead.id}`)}
+                      className="shrink-0"
+                    >
+                      View
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
           </CardContent>

@@ -54,8 +54,83 @@ router.get('/:userLink', async (req: express.Request, res: express.Response) => 
       .single();
 
     if (assessmentError || !assessment) {
-      console.log('❌ No default assessment found for user');
-      return res.status(404).json({ error: 'No assessment found for this user' });
+      console.log('❌ No default assessment found for user, trying to show framework questions directly');
+      
+      // Try to get questions from the default framework instead
+      try {
+        const { data: defaultFramework, error: frameworkError } = await supabase
+          .from('risk_framework_versions')
+          .select('id')
+          .eq('is_default', true)
+          .single();
+
+        if (frameworkError || !defaultFramework) {
+          console.log('❌ No default framework found either');
+          return res.status(404).json({ error: 'No assessment or framework found for this user' });
+        }
+
+        console.log('✅ Using default framework questions for user');
+        
+        // Get framework questions directly
+        const { data: frameworkQuestions, error: questionsError } = await supabase
+          .from('framework_question_map')
+          .select(`
+            id,
+            qkey,
+            required,
+            order_index,
+            alias,
+            transform,
+            options_override,
+            question_bank!inner (
+              label,
+              qtype,
+              options,
+              module
+            )
+          `)
+          .eq('framework_version_id', defaultFramework.id)
+          .order('order_index', { ascending: true });
+
+        if (questionsError) {
+          console.log('❌ Framework questions error:', questionsError);
+          return res.status(500).json({ error: 'Failed to load framework questions' });
+        }
+
+        console.log('✅ Framework questions found:', frameworkQuestions?.length || 0);
+        
+        // Transform to match expected format
+        const questions = frameworkQuestions?.map((q: any) => ({
+          id: q.id,
+          qkey: q.qkey,
+          label: q.question_bank?.label,
+          qtype: q.question_bank?.qtype,
+          options: q.options_override || q.question_bank?.options,
+          required: q.required,
+          order_index: q.order_index
+        })) || [];
+
+        if (questions.length === 0) {
+          return res.status(404).json({ error: 'No questions found in the default framework' });
+        }
+
+        console.log('✅ Returning framework questions directly for user');
+
+        return res.json({
+          assessment: {
+            id: 'framework-default',
+            title: 'Default Risk Assessment',
+            slug: 'default',
+            user_id: user.id,
+            user_name: user.full_name,
+            is_framework_only: true
+          },
+          questions: questions
+        });
+      } catch (error) {
+        console.log('❌ Error getting framework questions:', error);
+        return res.status(500).json({ error: 'Failed to load framework questions' });
+      }
     }
 
     console.log('✅ Assessment found:', assessment.title);

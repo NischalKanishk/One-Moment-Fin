@@ -1,16 +1,13 @@
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarSeparator } from "@/components/ui/sidebar";
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Users, ClipboardList, Boxes, Calendar, User, Target } from "lucide-react";
+import { Home, Users, ClipboardList, Boxes, Calendar, User } from "lucide-react";
 
 const nav = [
-  { title: "Action Dashboard", url: "/app/action-dashboard", icon: Target },
   { title: "Dashboard", url: "/app/dashboard", icon: Home },
   { title: "Leads", url: "/app/leads", icon: Users },
   { title: "Assessments", url: "/app/assessments", icon: ClipboardList },
   { title: "Meetings", url: "/app/meetings", icon: Calendar },
   { title: "Profile", url: "/app/profile", icon: User },
-
-  
 ];
 
 export function AppSidebar() {
@@ -30,28 +27,22 @@ export function AppSidebar() {
             <SidebarMenu>
               {nav.map((item) => {
                 const isActive = location.pathname === item.url || 
-                  (item.url !== "/app/dashboard" && item.url !== "/app/action-dashboard" && location.pathname.startsWith(item.url));
+                  (item.url !== "/app/dashboard" && location.pathname.startsWith(item.url));
                 
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild disabled={item.disabled}>
+                    <SidebarMenuButton asChild>
                       <NavLink 
                         to={item.url} 
                         end 
-                        className={`nav-item ${item.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className="nav-item"
                         data-active={isActive ? "true" : "false"}
                         aria-current={isActive ? "page" : undefined}
-                        onClick={item.disabled ? (e) => e.preventDefault() : undefined}
                       >
                         <span className="active-bar" aria-hidden="true" />
                         <item.icon className="nav-icon" aria-hidden="true" />
                         <span className="nav-label">
                           {item.title}
-                          {item.comingSoon && (
-                            <span className="ml-2 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                              Coming soon
-                            </span>
-                          )}
                         </span>
                       </NavLink>
                     </SidebarMenuButton>

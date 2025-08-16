@@ -1513,4 +1513,57 @@ router.get('/test', authenticateUser, async (req: express.Request, res: express.
   }
 });
 
+// POST /api/assessments/default - Create default assessment for current user
+router.post('/default', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    console.log('🔍 Creating default assessment for user:', req.user.supabase_user_id);
+
+    // Check if user already has a default assessment
+    const { data: existingAssessment, error: checkError } = await supabase
+      .from('assessments')
+      .select('id')
+      .eq('user_id', req.user.supabase_user_id)
+      .eq('is_default', true)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+      console.error('❌ Error checking existing assessment:', checkError);
+      return res.status(500).json({ error: 'Failed to check existing assessments' });
+    }
+
+    if (existingAssessment) {
+      return res.status(400).json({ error: 'User already has a default assessment' });
+    }
+
+    // Create default assessment using AssessmentService
+    const assessment = await AssessmentService.createDefaultAssessment(req.user.supabase_user_id);
+
+    console.log('✅ Default assessment created successfully:', assessment.id);
+
+    return res.json({ 
+      success: true, 
+      message: 'Default assessment created successfully',
+      assessment: {
+        id: assessment.id,
+        title: assessment.title,
+        framework_version_id: assessment.framework_version_id
+      }
+    });
+
+  } catch (error: any) {
+    console.error('❌ Create default assessment error:', error);
+    
+    let errorMessage = 'Failed to create default assessment';
+    if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    return res.status(500).json({ error: errorMessage });
+  }
+});
+
 export default router;

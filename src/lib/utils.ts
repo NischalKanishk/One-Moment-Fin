@@ -53,8 +53,9 @@ export function generateAssessmentLink(userId: string): string {
 export function formatSourceLink(sourceLink: string | null | undefined): string {
   if (!sourceLink) return 'N/A';
   
-  // Check if it's an assessment link (format: 5 digits + userid + 5 letters)
-  const assessmentLinkRegex = /^\d{5}[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}[A-Z]{5}$/i;
+  // Check if it's the specific assessment link format: 5 digits + "user_" + 32 alphanumeric chars
+  // Example: "44510user_31MARrS901A6oz27HnTO3psz164BANAQ"
+  const assessmentLinkRegex = /^\d{5}user_[a-zA-Z0-9]{32}$/i;
   
   if (assessmentLinkRegex.test(sourceLink)) {
     return 'Via link';

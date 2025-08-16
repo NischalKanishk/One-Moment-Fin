@@ -76,9 +76,12 @@ export default function AssessmentsV2() {
     loadData();
   }, []);
 
+  // Load framework questions when framework changes
   useEffect(() => {
     if (selectedFramework) {
       loadFrameworkQuestions(selectedFramework);
+    } else {
+      setFrameworkQuestions([]);
     }
   }, [selectedFramework]);
 
@@ -107,11 +110,41 @@ export default function AssessmentsV2() {
       setAssessments(assessmentsResponse.data.assessments || []);
       setFrameworks(frameworksResponse.data.frameworks || []);
       
-      // Set selected framework to the default assessment's framework
-      const defaultAssessment = assessmentsResponse.data.assessments?.find((a: Assessment) => a.is_default);
-      if (defaultAssessment) {
-        setSelectedFramework(defaultAssessment.framework_version_id);
+      // Only set framework if none is currently selected
+      if (!selectedFramework) {
+        // Check if there's a default assessment to use
+        const defaultAssessment = assessmentsResponse.data.assessments?.find((a: Assessment) => a.is_default);
+        
+        if (defaultAssessment) {
+          // Use the default assessment's framework
+          setSelectedFramework(defaultAssessment.framework_version_id);
+        } else {
+          // No assessments exist, use CFA Three Pillar as default
+          const cfaFramework = frameworksResponse.data.frameworks?.find((f: Framework) => 
+            f.code === 'cfa_three_pillar_v1'
+          );
+          
+          if (cfaFramework) {
+            const cfaVersion = cfaFramework.risk_framework_versions.find(v => v.is_default);
+            if (cfaVersion) {
+              setSelectedFramework(cfaVersion.id);
+            }
+          } else {
+            // Fallback to any default framework if CFA not found
+            const defaultFramework = frameworksResponse.data.frameworks?.find((f: Framework) => 
+              f.risk_framework_versions.some(v => v.is_default)
+            );
+            
+            if (defaultFramework) {
+              const defaultVersion = defaultFramework.risk_framework_versions.find(v => v.is_default);
+              if (defaultVersion) {
+                setSelectedFramework(defaultVersion.id);
+              }
+            }
+          }
+        }
       }
+      // If selectedFramework is already set, don't change it
     } catch (error: any) {
       console.error("Failed to load data:", error);
       
@@ -170,6 +203,8 @@ export default function AssessmentsV2() {
       setIsUpdating(true);
       const token = await getToken();
       
+      // console.log('🔍 updateFramework: Token retrieved, length:', token?.length || 0);
+      
       if (!token) {
         toast({
           title: "Authentication Error",
@@ -180,10 +215,15 @@ export default function AssessmentsV2() {
       }
 
       const api = createAuthenticatedApi(token);
+      // console.log('🔍 updateFramework: API instance created');
       
-      // Update the default assessment with new framework
+      // Check if there's a default assessment to update
       const defaultAssessment = assessments.find(a => a.is_default);
+      // console.log('🔍 updateFramework: Default assessment found:', !!defaultAssessment);
+      
       if (defaultAssessment) {
+        // Update existing assessment
+        // console.log('🔍 updateFramework: Updating existing assessment:', defaultAssessment.id);
         await api.patch(`/api/assessments/${defaultAssessment.id}`, {
           framework_version_id: selectedFramework
         });
@@ -192,15 +232,36 @@ export default function AssessmentsV2() {
           title: "Success",
           description: "Risk assessment framework updated successfully",
         });
+      } else {
+        // Create new default assessment since none exists
+        // console.log('🔍 updateFramework: Creating new default assessment');
+        const response = await api.post('/api/assessments/default');
+        // console.log('🔍 updateFramework: Default assessment created:', response.data);
         
-        // Reload data to get updated snapshot
-        await loadData();
+        toast({
+          title: "Success",
+          description: "Default assessment created with selected framework",
+        });
       }
+      
+      // Reload data to get updated snapshot
+      await loadData();
     } catch (error: any) {
       console.error("Failed to update framework:", error);
+      console.error("Error details:", {
+        response: error.response?.data,
+        status: error.response?.status,
+        message: error.message
+      });
+      
+      let errorMessage = "Failed to update framework. Please try again.";
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to update framework. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -361,6 +422,28 @@ export default function AssessmentsV2() {
               </Button>
             </div>
           ))}
+          
+          {/* Fallback Action Buttons when no assessments exist */}
+          {assessments.length === 0 && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => copyAssessmentLink()}
+                className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Copy Assessment Link
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => openAssessmentLink()}
+                className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                View Live Assessment Form
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Two Column Layout */}
@@ -494,6 +577,127 @@ export default function AssessmentsV2() {
                 </CardContent>
               </Card>
             ))}
+            
+            {/* Fallback: Show framework questions when no assessments exist */}
+            {assessments.length === 0 && selectedFramework && (
+              <Card className="border-0 shadow-sm">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <BarChart3 className="h-5 w-5 text-blue-600" />
+                    Framework Questions
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Questions from the selected risk framework
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <BookOpen className="h-4 w-4" />
+                      <span className="font-medium">{getFrameworkName(selectedFramework)}</span>
+                    </div>
+                    
+                    {isLoadingQuestions ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                          <p className="text-sm text-muted-foreground">Loading questions...</p>
+                        </div>
+                      </div>
+                    ) : frameworkQuestions.length > 0 ? (
+                      <>
+                        {/* Questions Summary */}
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
+                          <div className="grid grid-cols-2 gap-4 text-center">
+                            <div>
+                              <div className="text-2xl font-bold text-blue-900">{frameworkQuestions.length}</div>
+                              <div className="text-xs text-blue-700 font-medium">Total Questions</div>
+                            </div>
+                            <div>
+                              <div className="text-2xl font-bold text-blue-900">
+                                {frameworkQuestions.filter(q => q.required).length}
+                              </div>
+                              <div className="text-xs text-blue-700 font-medium">Required</div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Questions List */}
+                        <div className="space-y-4">
+                          {frameworkQuestions
+                            .sort((a, b) => a.order_index - b.order_index)
+                            .map((question, index) => (
+                            <div key={question.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow">
+                              <div className="flex items-start gap-3">
+                                <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                                  {index + 1}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-sm font-semibold text-gray-900 mb-2 leading-relaxed">
+                                    {question.label}
+                                  </h3>
+                                  
+                                  {/* Question Metadata */}
+                                  <div className="flex flex-wrap gap-2 mb-3">
+                                    <Badge 
+                                      variant="outline" 
+                                      className={`text-xs px-2 py-1 ${getQuestionTypeColor(question.qtype)}`}
+                                    >
+                                      {getQuestionTypeLabel(question.qtype)}
+                                    </Badge>
+                                    {question.required && (
+                                      <Badge variant="outline" className="text-xs px-2 py-1 bg-red-50 text-red-700 border-red-200">
+                                        Required
+                                      </Badge>
+                                    )}
+                                    {question.module && (
+                                      <Badge variant="outline" className="text-xs px-2 py-1 bg-green-50 text-green-700 border-green-200">
+                                        {question.module}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Options Display */}
+                                  {question.options && Array.isArray(question.options) && (
+                                    <div className="bg-gray-50 rounded-md p-3">
+                                      <div className="text-xs font-medium text-gray-700 mb-2">Options:</div>
+                                      <div className="space-y-1">
+                                        {question.options.map((option, optIndex) => (
+                                          <div key={optIndex} className="flex items-center gap-2 text-sm text-gray-600">
+                                            <ChevronRight className="h-3 w-3 text-gray-400" />
+                                            <span>{option}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Scale Display */}
+                                  {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && question.qtype === 'scale' && (
+                                    <div className="bg-gray-50 rounded-md p-3">
+                                      <div className="text-xs font-medium text-gray-700 mb-2">Scale Range:</div>
+                                      <div className="text-sm text-gray-600">
+                                        {question.options.min} to {question.options.max}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-12">
+                        <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p className="text-gray-500 font-medium mb-1">No questions found</p>
+                        <p className="text-sm text-gray-400">This framework doesn't have any questions configured</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Right Column - Framework Selection */}
@@ -505,10 +709,21 @@ export default function AssessmentsV2() {
                   Risk Framework Selection
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Choose the risk assessment framework for your questions
+                  CFA Three Pillar framework is selected by default. Choose a different framework if needed.
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Default Framework Note */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-blue-600" />
+                    <div className="text-sm">
+                      <p className="font-medium text-blue-900">CFA Three Pillar Framework</p>
+                      <p className="text-blue-700">This framework is selected by default and recommended for most users.</p>
+                    </div>
+                  </div>
+                </div>
+                
                 <RadioGroup
                   value={selectedFramework}
                   onValueChange={setSelectedFramework}
@@ -549,15 +764,24 @@ export default function AssessmentsV2() {
                 
                 <div className="flex justify-between items-center">
                   <p className="text-sm text-muted-foreground">
-                    Changing the framework will update your assessment questions
+                    {assessments.length === 0 
+                      ? "Create a default assessment with the CFA Three Pillar framework"
+                      : "Update your assessment to use the selected framework"
+                    }
                   </p>
                   <Button 
                     onClick={updateFramework} 
                     disabled={isUpdating || !selectedFramework}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
-                    {isUpdating ? 'Updating...' : 'Save Changes'}
+                    {isUpdating 
+                      ? 'Processing...' 
+                      : assessments.length === 0 
+                        ? 'Create Assessment' 
+                        : 'Save Changes'
+                    }
                   </Button>
+                  
                 </div>
               </CardContent>
             </Card>
