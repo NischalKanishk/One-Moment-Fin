@@ -137,9 +137,12 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  logger.info('SERVER_START', { port: PORT, health: `/health`, apiBase: `/api` });
-});
+// Start server only if not in Vercel serverless environment
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    logger.info('SERVER_START', { port: PORT, health: `/health`, apiBase: `/api` });
+  });
+}
 
+export { app };
 export default app;

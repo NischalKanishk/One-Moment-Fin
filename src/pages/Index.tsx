@@ -113,7 +113,7 @@ const Index = () => {
             <div className="relative">
               <div className="bg-gradient-to-br from-muted to-muted/50 rounded-2xl p-8 shadow-lg">
                 <img
-                  src="./public/Photo1.png"
+                  src="/Photo1.png"
                   alt="OneMFin Dashboard Preview"
                   className="w-full h-auto rounded-lg"
                 />
@@ -224,7 +224,7 @@ const Index = () => {
               </div>
               <div className="bg-card rounded-2xl p-8 shadow-lg">
                 <img
-                  src="./public/Photo2.png"
+                  src="/Photo2.png"
                   alt="Lead Capture Interface"
                   className="w-full h-auto rounded-lg"
                 />
