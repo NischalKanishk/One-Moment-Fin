@@ -6,15 +6,12 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   CheckCircle,
-  Calendar,
   Target,
-  TrendingUp,
   AlertTriangle,
   Clock,
   FileText,
   BarChart3,
   Zap,
-  Shield,
   Star,
   Mail,
   Phone,
@@ -30,7 +27,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <Helmet>
         <title>OneMFin – AI for Mutual Fund Distributors</title>
-        <meta name="description" content="AI-powered lead to investor platform: capture, assess risk, schedule meetings, suggest products, and report — fast." />
+        <meta name="description" content="AI-powered lead to investor platform: capture leads, assess risk, and manage your MFD business — fast." />
         <link rel="canonical" href={typeof window !== 'undefined' ? window.location.href : 'https://onemfin.app'} />
       </Helmet>
 
@@ -116,7 +113,7 @@ const Index = () => {
             <div className="relative">
               <div className="bg-gradient-to-br from-muted to-muted/50 rounded-2xl p-8 shadow-lg">
                 <img
-                  src="/financial-dashboard-interface.png"
+                  src="./public/Photo1.png"
                   alt="OneMFin Dashboard Preview"
                   className="w-full h-auto rounded-lg"
                 />
@@ -173,7 +170,7 @@ const Index = () => {
                 },
                 { icon: Zap, title: "Instant Onboarding", desc: "Streamlined onboarding with progress tracking" },
                 { icon: BarChart3, title: "Unified Dashboard", desc: "All client data in one powerful interface" },
-                { icon: TrendingUp, title: "Automated Follow-ups", desc: "Smart reminders and engagement tools" },
+                { icon: Clock, title: "Automated Follow-ups", desc: "Smart reminders and engagement tools" },
               ].map((solution, index) => (
                 <Card key={index} className="border-primary/20 bg-primary/5 hover:shadow-lg transition-all duration-200">
                   <CardContent className="p-6 text-center">
@@ -227,113 +224,10 @@ const Index = () => {
               </div>
               <div className="bg-card rounded-2xl p-8 shadow-lg">
                 <img
-                  src="/lead-capture-risk-form.png"
+                  src="./public/Photo2.png"
                   alt="Lead Capture Interface"
                   className="w-full h-auto rounded-lg"
                 />
-              </div>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div className="bg-card rounded-2xl p-8 shadow-lg lg:order-1">
-                <img
-                  src="/mutual-fund-recommendation-dashboard.png"
-                  alt="Product Recommendations"
-                  className="w-full h-auto rounded-lg"
-                />
-              </div>
-              <div className="space-y-6 lg:order-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-                    <TrendingUp className="h-6 w-6 text-primary-foreground" />
-                  </div>
-                  <h3 className="text-3xl font-bold text-foreground">Smart Product Recommendations</h3>
-                </div>
-                <p className="text-lg text-muted-foreground leading-relaxed">
-                  Get personalized mutual fund recommendations based on each client's risk profile, investment goals,
-                  and market conditions. Increase conversion with relevant suggestions.
-                </p>
-                <ul className="space-y-3">
-                  <li className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-foreground">Risk-matched fund suggestions</span>
-                  </li>
-                  <li className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-foreground">Goal-based recommendations</span>
-                  </li>
-                  <li className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-foreground">Performance analytics</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div className="space-y-6">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-                    <Calendar className="h-6 w-5 text-primary-foreground" />
-                  </div>
-                  <h3 className="text-3xl font-bold text-foreground">Meeting Scheduler</h3>
-                </div>
-                <p className="text-lg text-muted-foreground leading-relaxed">
-                  Seamlessly integrate with Google Calendar to let prospects book meetings directly.
-                  Automated reminders ensure no meetings are missed.
-                </p>
-                <ul className="space-y-3">
-                  <li className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-foreground">Calendar integration</span>
-                  </li>
-                  <li className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-foreground">Automated reminders</span>
-                  </li>
-                  <li className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-foreground">Meeting preparation notes</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="bg-card rounded-2xl p-8 shadow-lg">
-                <img src="/calendar-scheduling-interface.png" alt="Meeting Scheduler" className="w-full h-auto rounded-lg" />
-              </div>
-            </div>
-
-            {/* Feature 4 */}
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div className="bg-card rounded-2xl p-8 shadow-lg lg:order-1">
-                <img src="/meeting-scheduler-dashboard.png" alt="Meeting Scheduler" className="w-full h-auto rounded-lg" />
-              </div>
-              <div className="space-y-6 lg:order-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-                    <Shield className="h-6 w-5 text-primary-foreground" />
-                  </div>
-                  <h3 className="text-3xl font-bold text-foreground">Meeting Scheduler</h3>
-                </div>
-                <p className="text-lg text-muted-foreground leading-relaxed">
-                  Streamlined meeting scheduling with calendar integration. Automated reminders and follow-ups ensure
-                  smooth client communication.
-                </p>
-                <ul className="space-y-3">
-                  <li className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-foreground">Visual progress tracking</span>
-                  </li>
-                  <li className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-foreground">Document management</span>
-                  </li>
-                  <li className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-foreground">Compliance alerts</span>
-                  </li>
-                </ul>
               </div>
             </div>
           </div>
