@@ -48,18 +48,6 @@ module.exports = async function handler(req, res) {
       console.log('✅ Handling GET /api/leads request');
       
       try {
-        // Simple response for now - just return empty leads array
-        // This will help us identify if the issue is with Supabase or the response
-        const mockResponse = {
-          leads: [],
-          message: 'Leads endpoint working - returning empty array for testing',
-          timestamp: new Date().toISOString()
-        };
-        
-        console.log('✅ Returning mock response:', mockResponse);
-        return res.status(200).json(mockResponse);
-        
-        /* TODO: Uncomment this when Supabase is working
         const user = await authenticateUser(req);
         if (!user?.supabase_user_id) {
           return res.status(400).json({ error: 'User not properly authenticated' });
@@ -83,7 +71,6 @@ module.exports = async function handler(req, res) {
 
         console.log('✅ Leads fetched successfully:', leads?.length || 0);
         return res.status(200).json({ leads: leads || [] });
-        */
       } catch (error) {
         console.error('❌ Error in leads endpoint:', error);
         return res.status(500).json({ 
@@ -254,18 +241,6 @@ module.exports = async function handler(req, res) {
       console.log('✅ Handling GET /api/leads/meetings request');
       
       try {
-        // Simple response for now - just return empty meetings array
-        // This will help us identify if the issue is with Supabase or the response
-        const mockResponse = {
-          meetings: [],
-          message: 'Meetings endpoint working - returning empty array for testing',
-          timestamp: new Date().toISOString()
-        };
-        
-        console.log('✅ Returning mock response:', mockResponse);
-        return res.status(200).json(mockResponse);
-        
-        /* TODO: Uncomment this when Supabase is working
         const user = await authenticateUser(req);
         if (!user?.supabase_user_id) {
           return res.status(400).json({ error: 'User not properly authenticated' });
@@ -300,7 +275,6 @@ module.exports = async function handler(req, res) {
 
         console.log('✅ Meetings fetched successfully:', meetings?.length || 0);
         return res.status(200).json({ meetings: meetings || [] });
-        */
       } catch (error) {
         console.error('❌ Error in meetings endpoint:', error);
         return res.status(500).json({ 
