@@ -17,19 +17,7 @@ module.exports = function handler(req, res) {
     // Simple logging
     console.log(`Request: ${method} ${url}`);
     
-    // Handle leads endpoint
-    if (url && url.includes('/api/leads')) {
-      const mockLeads = [
-        { id: '1', name: 'Test User 1', status: 'lead' },
-        { id: '2', name: 'Test User 2', status: 'assessment_done' }
-      ];
-      
-      res.status(200).json({
-        leads: mockLeads,
-        message: 'Leads endpoint working'
-      });
-      return;
-    }
+    // Leads endpoints are now handled by /api/leads.js
     
     // Handle health check
     if (url && url.includes('/api/health')) {

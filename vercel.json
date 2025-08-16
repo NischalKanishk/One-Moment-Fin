@@ -21,6 +21,38 @@
       "destination": "/api/test-env.js"
     },
     {
+      "source": "/api/assessments/(.*)",
+      "destination": "/api/assessments.js"
+    },
+    {
+      "source": "/api/assessments",
+      "destination": "/api/assessments.js"
+    },
+    {
+      "source": "/api/leads/(.*)",
+      "destination": "/api/leads.js"
+    },
+    {
+      "source": "/api/leads",
+      "destination": "/api/leads.js"
+    },
+    {
+      "source": "/api/auth/(.*)",
+      "destination": "/api/auth.js"
+    },
+    {
+      "source": "/api/auth",
+      "destination": "/api/auth.js"
+    },
+    {
+      "source": "/api/ai/(.*)",
+      "destination": "/api/ai.js"
+    },
+    {
+      "source": "/api/ai",
+      "destination": "/api/ai.js"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/[...path].js"
     },

@@ -86,7 +86,7 @@ export default function AssessmentTest() {
   const loadAssessment = async (assessmentSlug: string) => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/assessments/public/${assessmentSlug}`);
+      const response = await fetch(`/api/ai/public/${assessmentSlug}`);
       
       if (!response.ok) {
         throw new Error('Assessment not found');
@@ -175,7 +175,7 @@ export default function AssessmentTest() {
         }
       };
       
-      const response = await fetch(`/api/assessments/public/${slug}/submit`, {
+      const response = await fetch(`/api/ai/public/${slug}/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

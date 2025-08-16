@@ -70,9 +70,27 @@ export default function Dashboard() {
         throw new Error('No authentication token available');
       }
       
-      const { stats: statsData } = await leadsAPI.getStats(token);
-      setStats(statsData);
+      const response = await leadsAPI.getStats(token);
+      const statsData = response?.stats || response;
+      
+      // Ensure proper structure
+      if (statsData && typeof statsData === 'object') {
+        setStats({
+          total: statsData.total || 0,
+          byStatus: {
+            lead: statsData.byStatus?.lead || 0,
+            assessment_done: statsData.byStatus?.assessment_done || 0,
+            meeting_scheduled: statsData.byStatus?.meeting_scheduled || 0,
+            converted: statsData.byStatus?.converted || 0,
+            dropped: statsData.byStatus?.dropped || 0
+          },
+          thisMonth: statsData.thisMonth || 0
+        });
+      } else {
+        throw new Error('Invalid stats data structure');
+      }
     } catch (error) {
+      console.error('Failed to load stats:', error);
       // Use empty data instead of mock data
       setStats({
         total: 0,
@@ -95,7 +113,7 @@ export default function Dashboard() {
       const token = await getToken();
       if (!token) return;
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -103,19 +121,35 @@ export default function Dashboard() {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        // Get only upcoming meetings (scheduled and in the future)
-        const upcomingMeetings = data.meetings
-          ?.filter((meeting: Meeting) => 
-            meeting.status === 'scheduled' && new Date(meeting.start_time) > new Date()
-          )
-          .sort((a: Meeting, b: Meeting) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
-          .slice(0, 3) || [];
-        
-        setMeetings(upcomingMeetings);
+        try {
+          const data = await response.json();
+          // Handle both old and new response formats
+          const meetingsData = data.meetings || data || [];
+          
+          // Ensure meetingsData is an array
+          if (Array.isArray(meetingsData)) {
+            // Get only upcoming meetings (scheduled and in the future)
+            const upcomingMeetings = meetingsData
+              ?.filter((meeting: Meeting) => 
+                meeting.status === 'scheduled' && new Date(meeting.start_time) > new Date()
+              )
+              .sort((a: Meeting, b: Meeting) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+              .slice(0, 3) || [];
+            
+            setMeetings(upcomingMeetings);
+          } else {
+            console.warn('Meetings data is not an array:', meetingsData);
+            setMeetings([]);
+          }
+        } catch (jsonError) {
+          console.error('Failed to parse meetings JSON:', jsonError);
+          setMeetings([]);
+        }
       }
     } catch (error) {
       console.error('Failed to load meetings:', error);
+      // Set empty array on error to prevent undefined errors
+      setMeetings([]);
     }
   };
 
@@ -132,11 +166,27 @@ export default function Dashboard() {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setRecentLeads(data.leads || []);
+        try {
+          const data = await response.json();
+          // Handle both old and new response formats
+          const leadsData = data.leads || data || [];
+          
+          // Ensure leadsData is an array
+          if (Array.isArray(leadsData)) {
+            setRecentLeads(leadsData);
+          } else {
+            console.warn('Leads data is not an array:', leadsData);
+            setRecentLeads([]);
+          }
+        } catch (jsonError) {
+          console.error('Failed to parse leads JSON:', jsonError);
+          setRecentLeads([]);
+        }
       }
     } catch (error) {
       console.error('Failed to load recent leads:', error);
+      // Set empty array on error to prevent undefined errors
+      setRecentLeads([]);
     }
   };
 

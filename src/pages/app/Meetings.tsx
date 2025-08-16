@@ -73,7 +73,7 @@ export default function Meetings() {
 
       console.log('🔍 Frontend: Token type check - length:', token.length, 'parts:', token.split('.').length);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -93,8 +93,15 @@ export default function Meetings() {
         }
       }
 
-      const data = await response.json();
-      setMeetings(data.meetings || []);
+      try {
+        const data = await response.json();
+        // Handle both old and new response formats
+        const meetingsData = data.meetings || data || [];
+        setMeetings(Array.isArray(meetingsData) ? meetingsData : []);
+      } catch (jsonError) {
+        console.error('Failed to parse meetings JSON:', jsonError);
+        setMeetings([]);
+      }
     } catch (error) {
       console.error('Failed to fetch meetings:', error);
       toast({
@@ -127,8 +134,15 @@ export default function Meetings() {
         return;
       }
 
-      const data = await response.json();
-      setLeads(data.leads || []);
+      try {
+        const data = await response.json();
+        // Handle both old and new response formats
+        const leadsData = data.leads || data || [];
+        setLeads(Array.isArray(leadsData) ? leadsData : []);
+      } catch (jsonError) {
+        console.error('Failed to parse leads JSON:', jsonError);
+        setLeads([]);
+      }
     } catch (error) {
       console.error('Failed to fetch leads:', error);
     }
@@ -142,7 +156,7 @@ export default function Meetings() {
 
       console.log('🔍 Frontend: Google status check - token length:', token.length);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/google-status`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings/google-status`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -171,7 +185,7 @@ export default function Meetings() {
 
       console.log('🔍 Frontend: Google auth - token length:', token.length);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/google-auth`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings/google-auth`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -214,7 +228,7 @@ export default function Meetings() {
 
       console.log('🔍 Frontend: Create meeting - token length:', token.length);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -245,7 +259,7 @@ export default function Meetings() {
 
       console.log('🔍 Frontend: Update meeting - token length:', token.length);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/${editingMeeting?.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings/${editingMeeting?.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -276,7 +290,7 @@ export default function Meetings() {
 
       console.log('🔍 Frontend: Cancel meeting - token length:', token.length);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/${meetingId}/cancel`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings/${meetingId}/cancel`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -315,7 +329,7 @@ export default function Meetings() {
 
       console.log('🔍 Frontend: Update status - token length:', token.length);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/${meetingId}/status`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings/${meetingId}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,

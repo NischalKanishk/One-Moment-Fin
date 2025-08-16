@@ -232,9 +232,39 @@ export const leadsAPI = {
   },
 
   getStats: async (token: string) => {
-    const authApi = createAuthenticatedApi(token);
-    const response = await authApi.get('/api/leads/stats');
-    return response.data;
+    try {
+      const authApi = createAuthenticatedApi(token);
+      const response = await authApi.get('/api/leads/stats');
+      return response.data;
+    } catch (error) {
+      // Fallback: calculate stats from leads data
+      console.warn('Stats endpoint not available, calculating from leads data');
+      try {
+        const leadsResponse = await leadsAPI.getAll(token);
+        const leads = leadsResponse.leads || [];
+        
+        const stats = {
+          total: leads.length,
+          byStatus: {
+            lead: leads.filter((l: any) => l.status === 'lead').length,
+            assessment_done: leads.filter((l: any) => l.status === 'assessment_done').length,
+            meeting_scheduled: leads.filter((l: any) => l.status === 'meeting_scheduled').length,
+            converted: leads.filter((l: any) => l.status === 'converted').length,
+            dropped: leads.filter((l: any) => l.status === 'dropped').length,
+          },
+          thisMonth: leads.filter((l: any) => {
+            const leadDate = new Date(l.created_at);
+            const now = new Date();
+            return leadDate.getMonth() === now.getMonth() && leadDate.getFullYear() === now.getFullYear();
+          }).length
+        };
+        
+        return { stats };
+      } catch (fallbackError) {
+        console.error('Failed to calculate stats from leads:', fallbackError);
+        throw new Error('Unable to load statistics');
+      }
+    }
   },
 
   // Admin function to get leads for any user by UUID (requires admin token)
@@ -299,7 +329,7 @@ export const assessmentsAPI = {
   },
 
   getPublicAssessment: async (referralCode: string) => {
-    const response = await api.get(`/api/assessments/public/${referralCode}`);
+    const response = await api.get(`/api/ai/public/${referralCode}`);
     return response.data;
   },
 };
@@ -342,18 +372,21 @@ export const productsAPI = {
 
 // Meetings API
 export const meetingsAPI = {
-  getAll: async () => {
-    const response = await api.get('/api/meetings');
+  getAll: async (token: string) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.get('/api/leads/meetings');
     return response.data;
   },
 
-  create: async (data: { lead_id: string; title: string; start_time: string; end_time?: string; description?: string; meeting_link?: string }) => {
-    const response = await api.post('/api/meetings/manual', data);
+  create: async (token: string, data: { lead_id: string; title: string; start_time: string; end_time?: string; description?: string; meeting_link?: string }) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.post('/api/leads/meetings', data);
     return response.data;
   },
 
-  updateStatus: async (id: string, status: string) => {
-    const response = await api.patch(`/api/meetings/${id}/status`, { status });
+  updateStatus: async (token: string, id: string, status: string) => {
+    const authApi = createAuthenticatedApi(token);
+    const response = await authApi.patch(`/api/leads/meetings/${id}/status`, { status });
     return response.data;
   },
 };
