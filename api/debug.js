@@ -19,19 +19,19 @@ module.exports = async function handler(req, res) {
       // Test 1: Check if users table exists
       const { data: users, error: usersError } = await supabase
         .from('users')
-        .select('count(*)')
+        .select('id')
         .limit(1);
 
       // Test 2: Check if leads table exists  
       const { data: leads, error: leadsError } = await supabase
         .from('leads')
-        .select('count(*)')
+        .select('id')
         .limit(1);
 
       // Test 3: Check if meetings table exists
       const { data: meetings, error: meetingsError } = await supabase
         .from('meetings')
-        .select('count(*)')
+        .select('id')
         .limit(1);
 
       const results = {
@@ -41,17 +41,17 @@ module.exports = async function handler(req, res) {
           users: {
             exists: !usersError,
             error: usersError?.message || null,
-            count: users?.[0]?.count || 0
+            count: users?.length || 0
           },
           leads: {
             exists: !leadsError,
             error: leadsError?.message || null,
-            count: leads?.[0]?.count || 0
+            count: leads?.length || 0
           },
           meetings: {
             exists: !meetingsError,
             error: meetingsError?.message || null,
-            count: meetings?.[0]?.count || 0
+            count: meetings?.length || 0
           }
         },
         overall_status: (!usersError && !leadsError && !meetingsError) ? 'SUCCESS' : 'PARTIAL_FAILURE'
