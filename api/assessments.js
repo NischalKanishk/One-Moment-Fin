@@ -545,10 +545,66 @@ module.exports = async function handler(req, res) {
           }
         }
         
-        // If no questions found in database, return empty array
+        // If no questions found in database, return default CFA questions
         if (questions.length === 0) {
           console.log('⚠️ No questions found in database for framework version:', frameworkVersionId);
-          return res.json({ questions: [] });
+          console.log('📝 Returning default CFA Three Pillar questions');
+          
+          // Return default CFA Three Pillar questions when none exist in database
+          const defaultCFAQuestions = [
+            {
+              id: '1',
+              qkey: 'risk_capacity_income',
+              label: 'What is your current annual income?',
+              qtype: 'select',
+              options: ['Below ₹50,000', '₹50,000 - ₹2,00,000', '₹2,00,000 - ₹5,00,000', '₹5,00,000 - ₹10,00,000', 'Above ₹10,00,000'],
+              required: true,
+              order_index: 1,
+              module: 'capacity'
+            },
+            {
+              id: '2',
+              qkey: 'risk_capacity_savings',
+              label: 'What percentage of your income do you save monthly?',
+              qtype: 'select',
+              options: ['Below 10%', '10% - 20%', '20% - 30%', '30% - 40%', 'Above 40%'],
+              required: true,
+              order_index: 2,
+              module: 'capacity'
+            },
+            {
+              id: '3',
+              qkey: 'risk_tolerance_loss',
+              label: 'How would you react if your investment lost 20% of its value in a month?',
+              qtype: 'select',
+              options: ['Sell immediately to prevent further losses', 'Worry but hold the investment', 'Stay calm and review the situation', 'See it as an opportunity to buy more'],
+              required: true,
+              order_index: 3,
+              module: 'tolerance'
+            },
+            {
+              id: '4',
+              qkey: 'investment_need_goal',
+              label: 'What is your primary investment goal?',
+              qtype: 'select',
+              options: ['Wealth preservation', 'Regular income generation', 'Moderate capital growth', 'Aggressive capital growth'],
+              required: true,
+              order_index: 4,
+              module: 'need'
+            },
+            {
+              id: '5',
+              qkey: 'investment_horizon',
+              label: 'What is your investment time horizon?',
+              qtype: 'select',
+              options: ['Less than 1 year', '1 - 3 years', '3 - 5 years', '5 - 10 years', 'More than 10 years'],
+              required: true,
+              order_index: 5,
+              module: 'need'
+            }
+          ];
+          
+          return res.json({ questions: defaultCFAQuestions });
         }
         
         // Transform questions to match expected frontend format
