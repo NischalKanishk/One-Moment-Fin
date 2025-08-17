@@ -6,8 +6,16 @@ export async function debugJWTToken() {
     
     console.log('🔍 Debugging JWT token generation...');
     
-    // Try to get the token
-    const token = await getToken({ template: 'supabase' });
+    // Try to get the token with supabase template, fallback to default
+    let token;
+    try {
+      token = await getToken({ template: 'supabase' });
+      console.log('✅ Using supabase JWT template');
+    } catch (templateError) {
+      console.warn('⚠️ Supabase template not found, using default token');
+      token = await getToken();
+      console.log('✅ Using default JWT token');
+    }
     
     if (token) {
       console.log('✅ JWT token generated successfully!');

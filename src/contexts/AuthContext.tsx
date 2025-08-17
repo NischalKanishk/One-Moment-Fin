@@ -49,8 +49,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       let clerkToken: string | null = null
       
       try {
-        clerkToken = await getClerkToken({ template: 'supabase' })
-        console.log('🔍 AuthContext: Got JWT token with supabase template')
+        // Try with supabase template first, fallback to default token
+        try {
+          clerkToken = await getClerkToken({ template: 'supabase' })
+          console.log('🔍 AuthContext: Got JWT token with supabase template')
+        } catch (templateError) {
+          console.warn('⚠️ AuthContext: Supabase template not found, using default token:', templateError)
+          clerkToken = await getClerkToken()
+          console.log('🔍 AuthContext: Got default JWT token')
+        }
       } catch (tokenError) {
         console.error('Failed to get Clerk JWT token:', tokenError)
         throw new Error('No Clerk JWT token available')
