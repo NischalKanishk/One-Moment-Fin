@@ -55,19 +55,18 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'User not properly authenticated' });
         }
 
-        const { title, framework_version_id, is_default } = req.body;
-        if (!title) {
-          return res.status(400).json({ error: 'Assessment title is required' });
+        const { name, description, is_active } = req.body;
+        if (!name) {
+          return res.status(400).json({ error: 'Assessment name is required' });
         }
 
         const { data: assessment, error: createError } = await supabase
           .from('assessments')
           .insert({
             user_id: user.supabase_user_id,
-            title,
-            framework_version_id,
-            is_default: is_default || false,
-            created_at: new Date().toISOString()
+            name,
+            description,
+            is_active: is_active || false
           })
           .select()
           .single();
@@ -95,13 +94,17 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'User not properly authenticated' });
         }
 
-        const { framework_version_id } = req.body;
+        const { name, description, is_active } = req.body;
+        
+        // Build update object with only fields that exist in the database
+        const updateData = {};
+        if (name !== undefined) updateData.name = name;
+        if (description !== undefined) updateData.description = description;
+        if (is_active !== undefined) updateData.is_active = is_active;
+        
         const { data: assessment, error: updateError } = await supabase
           .from('assessments')
-          .update({
-            framework_version_id,
-            updated_at: new Date().toISOString()
-          })
+          .update(updateData)
           .eq('id', assessmentId)
           .eq('user_id', user.supabase_user_id)
           .select()
@@ -128,38 +131,52 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'User not properly authenticated' });
         }
 
-        const { data: defaultFramework, error: frameworkError } = await supabase
-          .from('risk_framework_versions')
+        // Check if user already has a default assessment
+        const { data: existingAssessment, error: checkError } = await supabase
+          .from('assessments')
           .select('id')
-          .eq('is_default', true)
+          .eq('user_id', user.supabase_user_id)
+          .eq('is_active', true)
           .single();
 
-        if (frameworkError || !defaultFramework) {
-          return res.status(500).json({ error: 'No default framework available' });
+        if (existingAssessment) {
+          return res.status(200).json({ 
+            assessment: existingAssessment,
+            message: 'Default assessment already exists'
+          });
         }
 
+        // Create new default assessment
         const { data: assessment, error: createError } = await supabase
           .from('assessments')
           .insert({
             user_id: user.supabase_user_id,
-            title: 'Default Assessment',
-            framework_version_id: defaultFramework.id,
-            is_default: true,
-            created_at: new Date().toISOString()
+            name: 'Default Risk Assessment',
+            description: 'Default assessment using CFA Three Pillar framework',
+            is_active: true
           })
           .select()
           .single();
 
         if (createError) {
-          return res.status(500).json({ error: 'Failed to create default assessment' });
+          console.error('❌ Database error creating assessment:', createError);
+          return res.status(500).json({ 
+            error: 'Failed to create default assessment',
+            details: createError.message 
+          });
         }
 
+        console.log('✅ Default assessment created successfully:', assessment.id);
         return res.status(201).json({ assessment });
       } catch (error) {
+        console.error('❌ Error in default assessment endpoint:', error);
         if (error.message.includes('authorization')) {
           return res.status(401).json({ error: 'Authentication failed' });
         }
-        return res.status(500).json({ error: 'Failed to create default assessment' });
+        return res.status(500).json({ 
+          error: 'Failed to create default assessment',
+          message: error.message || 'Unknown error'
+        });
       }
     }
 
