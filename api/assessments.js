@@ -12,7 +12,10 @@ module.exports = async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
     const { method, url } = req;
-    const path = url.replace('/api/assessments', '');
+    
+    // Parse URL properly to separate path from query parameters
+    const urlObj = new URL(url, `http://localhost`);
+    const path = urlObj.pathname.replace('/api/assessments', '');
 
     // ============================================================================
     // ASSESSMENTS ENDPOINTS
@@ -161,6 +164,159 @@ module.exports = async function handler(req, res) {
     }
 
     // ============================================================================
+    // FORMS ENDPOINTS
+    // ============================================================================
+
+    // GET /api/assessments/forms - List user assessment forms
+    if (method === 'GET' && path === '/forms') {
+      try {
+        const user = await authenticateUser(req);
+        if (!user?.supabase_user_id) {
+          return res.status(400).json({ error: 'User not properly authenticated' });
+        }
+
+        const { data: forms, error: formsError } = await supabase
+          .from('assessments')
+          .select('*')
+          .eq('user_id', user.supabase_user_id);
+
+        if (formsError) {
+          console.error('❌ Database error:', formsError);
+          return res.status(500).json({ error: 'Failed to fetch forms', details: formsError.message });
+        }
+
+        console.log('✅ Forms fetched successfully:', forms?.length || 0);
+        return res.status(200).json({ forms: forms || [] });
+      } catch (error) {
+        console.error('❌ Error in forms endpoint:', error);
+        return res.status(500).json({ 
+          error: 'Failed to fetch forms',
+          message: error.message || 'Unknown error'
+        });
+      }
+    }
+
+    // POST /api/assessments/forms - Create a new assessment form
+    if (method === 'POST' && path === '/forms') {
+      try {
+        const user = await authenticateUser(req);
+        if (!user?.supabase_user_id) {
+          return res.status(400).json({ error: 'User not properly authenticated' });
+        }
+
+        const { name, description, is_active = true } = req.body;
+        if (!name) {
+          return res.status(400).json({ error: 'Form name is required' });
+        }
+
+        const { data: form, error: formError } = await supabase
+          .from('assessments')
+          .insert({
+            user_id: user.supabase_user_id,
+            name,
+            description,
+            is_active
+          })
+          .select()
+          .single();
+
+        if (formError) {
+          console.error('❌ Database error:', formError);
+          return res.status(500).json({ error: 'Failed to create form', details: formError.message });
+        }
+
+        console.log('✅ Form created successfully:', form.id);
+        return res.status(201).json({ form });
+      } catch (error) {
+        console.error('❌ Error in create form endpoint:', error);
+        return res.status(500).json({ 
+          error: 'Failed to create form',
+          message: error.message || 'Unknown error'
+        });
+      }
+    }
+
+    // PUT /api/assessments/forms/:id - Update an assessment form
+    if (method === 'PUT' && path.match(/^\/forms\/[^\/]+$/)) {
+      try {
+        const user = await authenticateUser(req);
+        if (!user?.supabase_user_id) {
+          return res.status(400).json({ error: 'User not properly authenticated' });
+        }
+
+        const formId = path.split('/')[2];
+        const { name, description, is_active } = req.body;
+
+        const updateData = {};
+        if (name !== undefined) updateData.name = name;
+        if (description !== undefined) updateData.description = description;
+        if (is_active !== undefined) updateData.is_active = is_active;
+
+        const { data: form, error: formError } = await supabase
+          .from('assessments')
+          .update(updateData)
+          .eq('id', formId)
+          .eq('user_id', user.supabase_user_id)
+          .select()
+          .single();
+
+        if (formError) {
+          if (formError.code === 'PGRST116') {
+            return res.status(404).json({ error: 'Form not found or you do not have permission to update it' });
+          }
+          console.error('❌ Database error:', formError);
+          return res.status(500).json({ error: 'Failed to update form', details: formError.message });
+        }
+
+        console.log('✅ Form updated successfully:', formId);
+        return res.status(200).json({ form });
+      } catch (error) {
+        console.error('❌ Error in update form endpoint:', error);
+        return res.status(500).json({ 
+          error: 'Failed to update form',
+          message: error.message || 'Unknown error'
+        });
+      }
+    }
+
+    // DELETE /api/assessments/forms/:id - Delete an assessment form
+    if (method === 'DELETE' && path.match(/^\/forms\/[^\/]+$/)) {
+      try {
+        const user = await authenticateUser(req);
+        if (!user?.supabase_user_id) {
+          return res.status(400).json({ error: 'User not properly authenticated' });
+        }
+
+        const formId = path.split('/')[2];
+
+        const { data: form, error: formError } = await supabase
+          .from('assessments')
+          .delete()
+          .eq('id', formId)
+          .eq('user_id', user.supabase_user_id)
+          .select()
+          .single();
+
+        if (formError) {
+          if (formError.code === 'PGRST116') {
+            return res.status(404).json({ error: 'Form not found or you do not have permission to delete it' });
+          }
+          console.error('❌ Database error:', formError);
+          return res.status(500).json({ error: 'Failed to delete form', details: formError.message });
+        }
+
+        console.log('✅ Form deleted successfully:', formId);
+        return res.status(200).json({ message: 'Form deleted successfully', form });
+      } catch (error) {
+        console.error('❌ Error in delete form endpoint:', error);
+        return res.status(500).json({ 
+          error: 'Failed to delete form',
+          message: error.message || 'Unknown error'
+        });
+      }
+    }
+
+    // ============================================================================
     // FRAMEWORKS ENDPOINTS
     // ============================================================================
 
@@ -199,10 +355,10 @@ module.exports = async function handler(req, res) {
         const frameworkVersionId = path.split('/')[2];
         
         const { data: questions, error: questionsError } = await supabase
-          .from('framework_questions')
+          .from('assessment_questions')
           .select('*')
-          .eq('framework_version_id', frameworkVersionId)
-          .order('order_index');
+          .eq('assessment_id', frameworkVersionId)
+          .order('weight');
 
         if (questionsError) {
           return res.status(500).json({ error: 'Failed to fetch questions' });
