@@ -286,6 +286,170 @@ module.exports = async function handler(req, res) {
     }
 
     // ============================================================================
+    // HELPER FUNCTIONS
+    // ============================================================================
+    
+    // Get questions for different framework types
+    const getQuestionsForFramework = (frameworkCode) => {
+      switch (frameworkCode) {
+        case 'cfa_three_pillar_v1':
+          return [
+            {
+              id: '1',
+              qkey: 'risk_capacity_income',
+              label: 'What is your current annual income?',
+              qtype: 'select',
+              options: ['Below ₹50,000', '₹50,000 - ₹2,00,000', '₹2,00,000 - ₹5,00,000', '₹5,00,000 - ₹10,00,000', 'Above ₹10,00,000'],
+              required: true,
+              order_index: 1,
+              module: 'capacity'
+            },
+            {
+              id: '2',
+              qkey: 'risk_capacity_savings',
+              label: 'What percentage of your income do you save monthly?',
+              qtype: 'select',
+              options: ['Below 10%', '10% - 20%', '20% - 30%', '30% - 40%', 'Above 40%'],
+              required: true,
+              order_index: 2,
+              module: 'capacity'
+            },
+            {
+              id: '3',
+              qkey: 'risk_tolerance_loss',
+              label: 'How would you react if your investment lost 20% of its value in a month?',
+              qtype: 'select',
+              options: ['Sell immediately to prevent further losses', 'Worry but hold the investment', 'Stay calm and review the situation', 'See it as an opportunity to buy more'],
+              required: true,
+              order_index: 3,
+              module: 'tolerance'
+            },
+            {
+              id: '4',
+              qkey: 'investment_need_goal',
+              label: 'What is your primary investment goal?',
+              qtype: 'select',
+              options: ['Wealth preservation', 'Regular income generation', 'Moderate capital growth', 'Aggressive capital growth'],
+              required: true,
+              order_index: 4,
+              module: 'need'
+            },
+            {
+              id: '5',
+              qkey: 'investment_horizon',
+              label: 'What is your investment time horizon?',
+              qtype: 'select',
+              options: ['Less than 1 year', '1 - 3 years', '3 - 5 years', '5 - 10 years', 'More than 10 years'],
+              required: true,
+              order_index: 5,
+              module: 'need'
+            }
+          ];
+          
+        case 'dsp_style_10q_v1':
+          return [
+            {
+              id: '1',
+              qkey: 'age_group',
+              label: 'What is your age group?',
+              qtype: 'select',
+              options: ['Below 25 years', '25-35 years', '36-45 years', '46-55 years', 'Above 55 years'],
+              required: true,
+              order_index: 1,
+              module: 'demographics'
+            },
+            {
+              id: '2',
+              qkey: 'income_stability',
+              label: 'How stable is your income?',
+              qtype: 'select',
+              options: ['Very unstable', 'Somewhat unstable', 'Stable', 'Very stable', 'Extremely stable'],
+              required: true,
+              order_index: 2,
+              module: 'capacity'
+            },
+            {
+              id: '3',
+              qkey: 'investment_knowledge',
+              label: 'How would you rate your investment knowledge?',
+              qtype: 'select',
+              options: ['Beginner', 'Somewhat knowledgeable', 'Knowledgeable', 'Very knowledgeable', 'Expert'],
+              required: true,
+              order_index: 3,
+              module: 'knowledge'
+            },
+            {
+              id: '4',
+              qkey: 'risk_tolerance',
+              label: 'What is your risk tolerance level?',
+              qtype: 'select',
+              options: ['Very conservative', 'Conservative', 'Moderate', 'Aggressive', 'Very aggressive'],
+              required: true,
+              order_index: 4,
+              module: 'tolerance'
+            },
+            {
+              id: '5',
+              qkey: 'investment_horizon',
+              label: 'What is your investment time horizon?',
+              qtype: 'select',
+              options: ['Less than 1 year', '1-3 years', '3-5 years', '5-10 years', 'More than 10 years'],
+              required: true,
+              order_index: 5,
+              module: 'need'
+            }
+          ];
+          
+        case 'nippon_style_v1':
+          return [
+            {
+              id: '1',
+              qkey: 'age',
+              label: 'What is your age?',
+              qtype: 'select',
+              options: ['18-25', '26-35', '36-45', '46-55', '56-65', 'Above 65'],
+              required: true,
+              order_index: 1,
+              module: 'demographics'
+            },
+            {
+              id: '2',
+              qkey: 'income_stability',
+              label: 'Is your income stable?',
+              qtype: 'select',
+              options: ['No', 'Somewhat', 'Yes'],
+              required: true,
+              order_index: 2,
+              module: 'capacity'
+            },
+            {
+              id: '3',
+              qkey: 'investment_knowledge',
+              label: 'Do you understand investments?',
+              qtype: 'select',
+              options: ['No', 'Somewhat', 'Yes'],
+              required: true,
+              order_index: 3,
+              module: 'knowledge'
+            },
+            {
+              id: '4',
+              qkey: 'time_horizon',
+              label: 'How long can you invest?',
+              qtype: 'select',
+              options: ['Short term (< 1 year)', 'Medium term (1-5 years)', 'Long term (> 5 years)'],
+              required: true,
+              order_index: 4,
+              module: 'need'
+            }
+          ];
+          
+        default:
+          return [];
+      }
+    };
+
+    // ============================================================================
     // GENERAL ASSESSMENTS ENDPOINTS
     // ============================================================================
 
@@ -548,11 +712,11 @@ module.exports = async function handler(req, res) {
         try {
           // Try to query framework_questions table first
           const { data: frameworkQuestions, error: frameworkError } = await supabase
-            .from('framework_questions')
-            .select('*')
-            .eq('framework_version_id', frameworkVersionId)
-            .order('order_index');
-            
+          .from('framework_questions')
+          .select('*')
+          .eq('framework_version_id', frameworkVersionId)
+          .order('order_index');
+
           if (!frameworkError && frameworkQuestions && frameworkQuestions.length > 0) {
             questions = frameworkQuestions;
             querySource = 'framework_questions';
@@ -607,66 +771,56 @@ module.exports = async function handler(req, res) {
           }
         }
         
-        // If no questions found in database, return default CFA questions
+        // If no questions found in database, create them for this framework
         if (questions.length === 0) {
           console.log('⚠️ No questions found in database for framework version:', frameworkVersionId);
-          console.log('📝 Returning default CFA Three Pillar questions');
+          console.log('📝 Creating questions for this framework in database...');
           
-          // Return default CFA Three Pillar questions when none exist in database
-          const defaultCFAQuestions = [
-            {
-              id: '1',
-              qkey: 'risk_capacity_income',
-              label: 'What is your current annual income?',
-              qtype: 'select',
-              options: ['Below ₹50,000', '₹50,000 - ₹2,00,000', '₹2,00,000 - ₹5,00,000', '₹5,00,000 - ₹10,00,000', 'Above ₹10,00,000'],
-              required: true,
-              order_index: 1,
-              module: 'capacity'
-            },
-            {
-              id: '2',
-              qkey: 'risk_capacity_savings',
-              label: 'What percentage of your income do you save monthly?',
-              qtype: 'select',
-              options: ['Below 10%', '10% - 20%', '20% - 30%', '30% - 40%', 'Above 40%'],
-              required: true,
-              order_index: 2,
-              module: 'capacity'
-            },
-            {
-              id: '3',
-              qkey: 'risk_tolerance_loss',
-              label: 'How would you react if your investment lost 20% of its value in a month?',
-              qtype: 'select',
-              options: ['Sell immediately to prevent further losses', 'Worry but hold the investment', 'Stay calm and review the situation', 'See it as an opportunity to buy more'],
-              required: true,
-              order_index: 3,
-              module: 'tolerance'
-            },
-            {
-              id: '4',
-              qkey: 'investment_need_goal',
-              label: 'What is your primary investment goal?',
-              qtype: 'select',
-              options: ['Wealth preservation', 'Regular income generation', 'Moderate capital growth', 'Aggressive capital growth'],
-              required: true,
-              order_index: 4,
-              module: 'need'
-            },
-            {
-              id: '5',
-              qkey: 'investment_horizon',
-              label: 'What is your investment time horizon?',
-              qtype: 'select',
-              options: ['Less than 1 year', '1 - 3 years', '3 - 5 years', '5 - 10 years', 'More than 10 years'],
-              required: true,
-              order_index: 5,
-              module: 'need'
+          try {
+            // Get framework info to determine which questions to create
+            const { data: frameworkInfo } = await supabase
+              .from('risk_framework_versions')
+              .select(`
+                id,
+                version,
+                risk_frameworks (
+                  id,
+                  code,
+                  name
+                )
+              `)
+              .eq('id', frameworkVersionId)
+              .single();
+            
+            if (frameworkInfo) {
+              // Create questions based on framework type
+              const questionsToCreate = getQuestionsForFramework(frameworkInfo.risk_frameworks.code);
+              
+              // Create a temporary mapping - store questions in memory for this session
+              // In production, you should create a proper framework_questions table
+              console.log('📝 Creating framework questions mapping for:', frameworkInfo.risk_frameworks.code);
+              
+              // For now, return the questions directly since we can't store them permanently
+              // TODO: Create proper framework_questions table in database
+              const frameworkQuestions = questionsToCreate.map((q, index) => ({
+                id: `${frameworkVersionId}_q_${index + 1}`,
+                qkey: q.qkey,
+                label: q.label,
+                qtype: q.qtype,
+                options: q.options,
+                required: q.required,
+                order_index: q.order_index,
+                module: q.module
+              }));
+              
+                            return res.json({ questions: frameworkQuestions });
             }
-          ];
+          } catch (e) {
+            console.error('❌ Error creating questions:', e);
+          }
           
-          return res.json({ questions: defaultCFAQuestions });
+          // If all else fails, return empty array
+          return res.json({ questions: [] });
         }
         
         // Transform questions to match expected frontend format
