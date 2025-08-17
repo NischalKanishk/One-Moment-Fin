@@ -144,32 +144,39 @@ module.exports = async function handler(req, res) {
           });
         }
 
-        // Get the default framework info
-        const { data: defaultFramework, error: frameworkError } = await supabase
-          .from('risk_framework_versions')
-          .select(`
-            id,
-            version,
-            risk_frameworks (
-              id,
-              code,
-              name,
-              description
-            )
-          `)
-          .eq('is_default', true)
-          .single();
-
+        // Get the default framework info - handle case where framework tables don't exist
         let frameworkInfo = 'CFA Three Pillar v1';
         let frameworkData = null;
         
-        if (!frameworkError && defaultFramework) {
-          frameworkInfo = `${defaultFramework.risk_frameworks.name} v${defaultFramework.version}`;
-          frameworkData = {
-            framework_version_id: defaultFramework.id,
-            framework_code: defaultFramework.risk_frameworks.code,
-            framework_name: defaultFramework.risk_frameworks.name
-          };
+        try {
+          // Try to query risk_framework_versions table if it exists
+          const { data: defaultFramework, error: frameworkError } = await supabase
+            .from('risk_framework_versions')
+            .select(`
+              id,
+              version,
+              risk_frameworks (
+                id,
+                code,
+                name,
+                description
+              )
+            `)
+            .eq('is_default', true)
+            .single();
+
+          if (!frameworkError && defaultFramework) {
+            frameworkInfo = `${defaultFramework.risk_frameworks.name} v${defaultFramework.version}`;
+            frameworkData = {
+              framework_version_id: defaultFramework.id,
+              framework_code: defaultFramework.risk_frameworks.code,
+              framework_name: defaultFramework.risk_frameworks.name
+            };
+          }
+        } catch (e) {
+          console.log('⚠️ Framework tables not accessible, using default info:', e.message);
+          // Use default framework info since tables don't exist
+          frameworkInfo = 'CFA Three Pillar v1';
         }
 
         // Create new default assessment (simplified - no description to avoid schema issues)
@@ -208,25 +215,51 @@ module.exports = async function handler(req, res) {
     // GET /api/assessments/default/framework - Get default framework info
     if (method === 'GET' && path === '/default/framework') {
       try {
-        const { data: defaultFramework, error: frameworkError } = await supabase
-          .from('risk_framework_versions')
-          .select(`
-            id,
-            version,
-            is_default,
-            risk_frameworks (
+        // Try to query risk_framework_versions table if it exists
+        let defaultFramework = null;
+        let frameworkError = null;
+        
+        try {
+          const result = await supabase
+            .from('risk_framework_versions')
+            .select(`
               id,
-              code,
-              name,
-              description,
-              engine
-            )
-          `)
-          .eq('is_default', true)
-          .single();
+              version,
+              is_default,
+              risk_frameworks (
+                id,
+                code,
+                name,
+                description,
+                engine
+              )
+            `)
+            .eq('is_default', true)
+            .single();
+            
+          defaultFramework = result.data;
+          frameworkError = result.error;
+        } catch (e) {
+          console.log('⚠️ Framework tables not accessible:', e.message);
+          frameworkError = new Error('Framework tables not accessible');
+        }
 
         if (frameworkError || !defaultFramework) {
-          return res.status(404).json({ error: 'No default framework found' });
+          // Return a default framework since the tables don't exist
+          return res.status(200).json({ 
+            framework: {
+              id: 'default-cfa-framework',
+              code: 'CFA',
+              name: 'CFA Three Pillar',
+              description: 'Comprehensive risk assessment framework based on CFA principles',
+              engine: 'cfa_three_pillar',
+              version: {
+                id: 'default-version-1',
+                version: 1,
+                is_default: true
+              }
+            }
+          });
         }
 
         return res.status(200).json({ 
