@@ -621,6 +621,60 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    // GET /api/leads/stats - Get leads statistics
+    if (method === 'GET' && path === '/stats') {
+      try {
+        const user = await authenticateUser(req);
+        if (!user?.supabase_user_id) {
+          return res.status(400).json({ error: 'User not properly authenticated' });
+        }
+
+        // Get all leads for the user
+        const { data: leads, error: leadsError } = await supabase
+          .from('leads')
+          .select('status, created_at')
+          .eq('user_id', user.supabase_user_id);
+
+        if (leadsError) {
+          console.error('❌ Database error:', leadsError);
+          return res.status(500).json({ error: 'Failed to fetch leads statistics', details: leadsError.message });
+        }
+
+        // Calculate statistics
+        const total = leads?.length || 0;
+        const byStatus = {
+          lead: leads?.filter(l => l.status === 'lead').length || 0,
+          assessment_done: leads?.filter(l => l.status === 'assessment_done').length || 0,
+          meeting_scheduled: leads?.filter(l => l.status === 'meeting_scheduled').length || 0,
+          converted: leads?.filter(l => l.status === 'converted').length || 0,
+          dropped: leads?.filter(l => l.status === 'dropped').length || 0,
+        };
+
+        // Calculate this month's leads
+        const now = new Date();
+        const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const thisMonth = leads?.filter(l => {
+          const leadDate = new Date(l.created_at);
+          return leadDate >= thisMonthStart;
+        }).length || 0;
+
+        const stats = {
+          total,
+          byStatus,
+          thisMonth
+        };
+
+        console.log('✅ Stats calculated successfully:', stats);
+        return res.status(200).json({ stats });
+      } catch (error) {
+        console.error('❌ Error in stats endpoint:', error);
+        return res.status(500).json({ 
+          error: 'Failed to fetch statistics',
+          message: error.message || 'Unknown error'
+        });
+      }
+    }
+
     // If we get here, no matching endpoint was found
     console.log(`❌ No matching endpoint found for ${method} ${path}`);
     return res.status(404).json({ 
@@ -631,6 +685,7 @@ module.exports = async function handler(req, res) {
         'GET /api/leads',
         'POST /api/leads',
         'GET /api/leads/search',
+        'GET /api/leads/stats',
         'POST /api/leads/create',
         'POST /api/leads/check-existing',
         'GET /api/leads/meetings',
