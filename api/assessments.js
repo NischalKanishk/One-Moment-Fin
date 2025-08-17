@@ -55,7 +55,7 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'User not properly authenticated' });
         }
 
-        const { name, description, is_active } = req.body;
+        const { name, is_active } = req.body;
         if (!name) {
           return res.status(400).json({ error: 'Assessment name is required' });
         }
@@ -65,7 +65,6 @@ module.exports = async function handler(req, res) {
           .insert({
             user_id: user.supabase_user_id,
             name,
-            description,
             is_active: is_active || false
           })
           .select()
@@ -94,12 +93,11 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'User not properly authenticated' });
         }
 
-        const { name, description, is_active } = req.body;
+        const { name, is_active } = req.body;
         
         // Build update object with only fields that exist in the database
         const updateData = {};
         if (name !== undefined) updateData.name = name;
-        if (description !== undefined) updateData.description = description;
         if (is_active !== undefined) updateData.is_active = is_active;
         
         const { data: assessment, error: updateError } = await supabase
@@ -174,13 +172,12 @@ module.exports = async function handler(req, res) {
           };
         }
 
-        // Create new default assessment with framework info stored in description
+        // Create new default assessment (simplified - no description to avoid schema issues)
         const { data: assessment, error: createError } = await supabase
           .from('assessments')
           .insert({
             user_id: user.supabase_user_id,
-            name: 'Default Risk Assessment',
-            description: `Default assessment using ${frameworkInfo}${frameworkData ? ` | Framework Data: ${JSON.stringify(frameworkData)}` : ''}`,
+            name: `Default Risk Assessment - ${frameworkInfo}`,
             is_active: true
           })
           .select()
@@ -296,7 +293,7 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'User not properly authenticated' });
         }
 
-        const { name, description, is_active = true } = req.body;
+        const { name, is_active = true } = req.body;
         if (!name) {
           return res.status(400).json({ error: 'Form name is required' });
         }
@@ -306,7 +303,6 @@ module.exports = async function handler(req, res) {
           .insert({
             user_id: user.supabase_user_id,
             name,
-            description,
             is_active
           })
           .select()
@@ -337,11 +333,10 @@ module.exports = async function handler(req, res) {
         }
 
         const formId = path.split('/')[2];
-        const { name, description, is_active } = req.body;
+        const { name, is_active } = req.body;
 
         const updateData = {};
         if (name !== undefined) updateData.name = name;
-        if (description !== undefined) updateData.description = description;
         if (is_active !== undefined) updateData.is_active = is_active;
 
         const { data: form, error: formError } = await supabase
