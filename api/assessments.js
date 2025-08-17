@@ -146,13 +146,41 @@ module.exports = async function handler(req, res) {
           });
         }
 
-        // Create new default assessment
+        // Get the default framework info
+        const { data: defaultFramework, error: frameworkError } = await supabase
+          .from('risk_framework_versions')
+          .select(`
+            id,
+            version,
+            risk_frameworks (
+              id,
+              code,
+              name,
+              description
+            )
+          `)
+          .eq('is_default', true)
+          .single();
+
+        let frameworkInfo = 'CFA Three Pillar v1';
+        let frameworkData = null;
+        
+        if (!frameworkError && defaultFramework) {
+          frameworkInfo = `${defaultFramework.risk_frameworks.name} v${defaultFramework.version}`;
+          frameworkData = {
+            framework_version_id: defaultFramework.id,
+            framework_code: defaultFramework.risk_frameworks.code,
+            framework_name: defaultFramework.risk_frameworks.name
+          };
+        }
+
+        // Create new default assessment with framework info stored in description
         const { data: assessment, error: createError } = await supabase
           .from('assessments')
           .insert({
             user_id: user.supabase_user_id,
             name: 'Default Risk Assessment',
-            description: 'Default assessment using CFA Three Pillar framework',
+            description: `Default assessment using ${frameworkInfo}${frameworkData ? ` | Framework Data: ${JSON.stringify(frameworkData)}` : ''}`,
             is_active: true
           })
           .select()
@@ -175,6 +203,53 @@ module.exports = async function handler(req, res) {
         }
         return res.status(500).json({ 
           error: 'Failed to create default assessment',
+          message: error.message || 'Unknown error'
+        });
+      }
+    }
+
+    // GET /api/assessments/default/framework - Get default framework info
+    if (method === 'GET' && path === '/default/framework') {
+      try {
+        const { data: defaultFramework, error: frameworkError } = await supabase
+          .from('risk_framework_versions')
+          .select(`
+            id,
+            version,
+            is_default,
+            risk_frameworks (
+              id,
+              code,
+              name,
+              description,
+              engine
+            )
+          `)
+          .eq('is_default', true)
+          .single();
+
+        if (frameworkError || !defaultFramework) {
+          return res.status(404).json({ error: 'No default framework found' });
+        }
+
+        return res.status(200).json({ 
+          framework: {
+            id: defaultFramework.risk_frameworks.id,
+            code: defaultFramework.risk_frameworks.code,
+            name: defaultFramework.risk_frameworks.name,
+            description: defaultFramework.risk_frameworks.description,
+            engine: defaultFramework.risk_frameworks.engine,
+            version: {
+              id: defaultFramework.id,
+              version: defaultFramework.version,
+              is_default: defaultFramework.is_default
+            }
+          }
+        });
+      } catch (error) {
+        console.error('❌ Error getting default framework:', error);
+        return res.status(500).json({ 
+          error: 'Failed to get default framework',
           message: error.message || 'Unknown error'
         });
       }
