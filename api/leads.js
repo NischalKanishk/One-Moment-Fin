@@ -20,7 +20,10 @@ module.exports = async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
     const { method, url } = req;
-    const path = url.replace('/api/leads', '');
+    
+    // Parse URL properly to separate path from query parameters
+    const urlObj = new URL(url, `http://localhost`);
+    const path = urlObj.pathname.replace('/api/leads', '');
 
     console.log(`🔍 Leads API: ${method} ${path} - URL: ${url}`);
 
@@ -53,24 +56,73 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'User not properly authenticated' });
         }
 
-        const { limit = 50, sort = 'created_at', order = 'desc' } = req.query;
-        let query = supabase.from('leads').select('*').eq('user_id', user.supabase_user_id);
+        const { 
+          page = 1, 
+          limit = 50, 
+          sort_by = 'created_at', 
+          sort_order = 'desc',
+          status,
+          search,
+          source_link,
+          risk_category 
+        } = req.query;
 
-        if (sort && order) {
-          query = query.order(sort, { ascending: order === 'asc' });
+        // Build the query
+        let query = supabase
+          .from('leads')
+          .select('*', { count: 'exact' })
+          .eq('user_id', user.supabase_user_id);
+
+        // Apply filters
+        if (status && status !== 'all') {
+          query = query.eq('status', status);
         }
-        if (limit) {
-          query = query.limit(parseInt(limit));
+        if (source_link && source_link !== 'all') {
+          query = query.eq('source_link', source_link);
+        }
+        if (risk_category && risk_category !== 'all') {
+          query = query.eq('risk_category', risk_category);
+        }
+        if (search && search.trim()) {
+          query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
         }
 
-        const { data: leads, error: leadsError } = await query;
+        // Apply sorting
+        if (sort_by && sort_order) {
+          query = query.order(sort_by, { ascending: sort_order === 'asc' });
+        }
+
+        // Apply pagination
+        const pageNum = parseInt(page) || 1;
+        const limitNum = parseInt(limit) || 50;
+        const offset = (pageNum - 1) * limitNum;
+        
+        query = query.range(offset, offset + limitNum - 1);
+
+        const { data: leads, error: leadsError, count } = await query;
         if (leadsError) {
           console.error('❌ Database error:', leadsError);
           return res.status(500).json({ error: 'Failed to fetch leads', details: leadsError.message });
         }
 
-        console.log('✅ Leads fetched successfully:', leads?.length || 0);
-        return res.status(200).json({ leads: leads || [] });
+        // Calculate pagination info
+        const total = count || 0;
+        const totalPages = Math.ceil(total / limitNum);
+        const hasNext = pageNum < totalPages;
+        const hasPrev = pageNum > 1;
+
+        console.log('✅ Leads fetched successfully:', leads?.length || 0, 'total:', total);
+        return res.status(200).json({ 
+          leads: leads || [],
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total,
+            totalPages,
+            hasNext,
+            hasPrev
+          }
+        });
       } catch (error) {
         console.error('❌ Error in leads endpoint:', error);
         return res.status(500).json({ 
@@ -168,6 +220,138 @@ module.exports = async function handler(req, res) {
         return res.status(201).json({ message: 'Lead created successfully', lead });
       } catch (error) {
         return res.status(500).json({ error: 'Lead creation failed' });
+      }
+    }
+
+    // PUT /api/leads/:id - Update a lead
+    if (method === 'PUT' && path.match(/^\/[^\/]+$/)) {
+      try {
+        const user = await authenticateUser(req);
+        if (!user?.supabase_user_id) {
+          return res.status(400).json({ error: 'User not properly authenticated' });
+        }
+
+        const leadId = path.substring(1); // Remove leading slash
+        const { full_name, email, phone, age, notes, cfa_goals, cfa_min_investment, cfa_investment_horizon } = req.body;
+
+        // Verify lead belongs to user
+        const { data: existingLead, error: checkError } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('id', leadId)
+          .eq('user_id', user.supabase_user_id)
+          .single();
+
+        if (checkError || !existingLead) {
+          return res.status(404).json({ error: 'Lead not found or you do not have permission to update it' });
+        }
+
+        // Update the lead
+        const updateData = {};
+        if (full_name !== undefined) updateData.full_name = full_name;
+        if (email !== undefined) updateData.email = email;
+        if (phone !== undefined) updateData.phone = phone;
+        if (age !== undefined) updateData.age = age;
+        if (notes !== undefined) updateData.notes = notes;
+        if (cfa_goals !== undefined) updateData.cfa_goals = cfa_goals;
+        if (cfa_min_investment !== undefined) updateData.cfa_min_investment = cfa_min_investment;
+        if (cfa_investment_horizon !== undefined) updateData.cfa_investment_horizon = cfa_investment_horizon;
+
+        const { data: updatedLead, error: updateError } = await supabase
+          .from('leads')
+          .update(updateData)
+          .eq('id', leadId)
+          .eq('user_id', user.supabase_user_id)
+          .select()
+          .single();
+
+        if (updateError) {
+          console.error('❌ Database error:', updateError);
+          return res.status(500).json({ error: 'Failed to update lead', details: updateError.message });
+        }
+
+        console.log('✅ Lead updated successfully:', leadId);
+        return res.status(200).json({ lead: updatedLead });
+      } catch (error) {
+        console.error('❌ Error in update lead endpoint:', error);
+        return res.status(500).json({ 
+          error: 'Failed to update lead',
+          message: error.message || 'Unknown error'
+        });
+      }
+    }
+
+    // DELETE /api/leads/:id - Delete a lead
+    if (method === 'DELETE' && path.match(/^\/[^\/]+$/)) {
+      try {
+        const user = await authenticateUser(req);
+        if (!user?.supabase_user_id) {
+          return res.status(400).json({ error: 'User not properly authenticated' });
+        }
+
+        const leadId = path.substring(1); // Remove leading slash
+
+        // Verify lead belongs to user and delete it
+        const { data: deletedLead, error: deleteError } = await supabase
+          .from('leads')
+          .delete()
+          .eq('id', leadId)
+          .eq('user_id', user.supabase_user_id)
+          .select()
+          .single();
+
+        if (deleteError) {
+          if (deleteError.code === 'PGRST116') {
+            return res.status(404).json({ error: 'Lead not found or you do not have permission to delete it' });
+          }
+          console.error('❌ Database error:', deleteError);
+          return res.status(500).json({ error: 'Failed to delete lead', details: deleteError.message });
+        }
+
+        console.log('✅ Lead deleted successfully:', leadId);
+        return res.status(200).json({ message: 'Lead deleted successfully', lead: deletedLead });
+      } catch (error) {
+        console.error('❌ Error in delete lead endpoint:', error);
+        return res.status(500).json({ 
+          error: 'Failed to delete lead',
+          message: error.message || 'Unknown error'
+        });
+      }
+    }
+
+    // GET /api/leads/:id - Get a specific lead
+    if (method === 'GET' && path.match(/^\/[^\/]+$/) && !path.includes('search') && !path.includes('stats') && !path.includes('meetings')) {
+      try {
+        const user = await authenticateUser(req);
+        if (!user?.supabase_user_id) {
+          return res.status(400).json({ error: 'User not properly authenticated' });
+        }
+
+        const leadId = path.substring(1); // Remove leading slash
+
+        const { data: lead, error: leadError } = await supabase
+          .from('leads')
+          .select('*')
+          .eq('id', leadId)
+          .eq('user_id', user.supabase_user_id)
+          .single();
+
+        if (leadError) {
+          if (leadError.code === 'PGRST116') {
+            return res.status(404).json({ error: 'Lead not found or you do not have permission to access it' });
+          }
+          console.error('❌ Database error:', leadError);
+          return res.status(500).json({ error: 'Failed to fetch lead', details: leadError.message });
+        }
+
+        console.log('✅ Lead fetched successfully:', leadId);
+        return res.status(200).json({ lead });
+      } catch (error) {
+        console.error('❌ Error in get lead by ID endpoint:', error);
+        return res.status(500).json({ 
+          error: 'Failed to fetch lead',
+          message: error.message || 'Unknown error'
+        });
       }
     }
 
@@ -684,6 +868,9 @@ module.exports = async function handler(req, res) {
       available_endpoints: [
         'GET /api/leads',
         'POST /api/leads',
+        'GET /api/leads/:id',
+        'PUT /api/leads/:id',
+        'DELETE /api/leads/:id',
         'GET /api/leads/search',
         'GET /api/leads/stats',
         'POST /api/leads/create',
