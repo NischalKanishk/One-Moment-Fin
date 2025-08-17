@@ -441,19 +441,97 @@ module.exports = async function handler(req, res) {
       try {
         const frameworkVersionId = path.split('/')[2];
         
-        const { data: questions, error: questionsError } = await supabase
-          .from('assessment_questions')
-          .select('*')
-          .eq('assessment_id', frameworkVersionId)
-          .order('weight');
+        // For now, return mock CFA Three Pillar questions since there's no framework_questions table
+        // TODO: Create proper framework_questions table or store questions differently
+        const mockCFAQuestions = [
+          {
+            id: '1',
+            qkey: 'risk_capacity_income',
+            label: 'What is your current annual income?',
+            qtype: 'select',
+            options: [
+              { value: 'below_50k', label: 'Below ₹50,000', score: 1 },
+              { value: '50k_2l', label: '₹50,000 - ₹2,00,000', score: 2 },
+              { value: '2l_5l', label: '₹2,00,000 - ₹5,00,000', score: 3 },
+              { value: '5l_10l', label: '₹5,00,000 - ₹10,00,000', score: 4 },
+              { value: 'above_10l', label: 'Above ₹10,00,000', score: 5 }
+            ],
+            required: true,
+            order_index: 1,
+            module: 'capacity'
+          },
+          {
+            id: '2',
+            qkey: 'risk_capacity_savings',
+            label: 'What percentage of your income do you save monthly?',
+            qtype: 'select',
+            options: [
+              { value: 'below_10', label: 'Below 10%', score: 1 },
+              { value: '10_20', label: '10% - 20%', score: 2 },
+              { value: '20_30', label: '20% - 30%', score: 3 },
+              { value: '30_40', label: '30% - 40%', score: 4 },
+              { value: 'above_40', label: 'Above 40%', score: 5 }
+            ],
+            required: true,
+            order_index: 2,
+            module: 'capacity'
+          },
+          {
+            id: '3',
+            qkey: 'risk_tolerance_loss',
+            label: 'How would you react if your investment lost 20% of its value in a month?',
+            qtype: 'select',
+            options: [
+              { value: 'sell_immediately', label: 'Sell immediately to prevent further losses', score: 1 },
+              { value: 'worry_hold', label: 'Worry but hold the investment', score: 2 },
+              { value: 'neutral', label: 'Stay calm and review the situation', score: 3 },
+              { value: 'buy_more', label: 'See it as an opportunity to buy more', score: 4 }
+            ],
+            required: true,
+            order_index: 3,
+            module: 'tolerance'
+          },
+          {
+            id: '4',
+            qkey: 'investment_need_goal',
+            label: 'What is your primary investment goal?',
+            qtype: 'select',
+            options: [
+              { value: 'wealth_preservation', label: 'Wealth preservation', score: 1 },
+              { value: 'regular_income', label: 'Regular income generation', score: 2 },
+              { value: 'moderate_growth', label: 'Moderate capital growth', score: 3 },
+              { value: 'aggressive_growth', label: 'Aggressive capital growth', score: 4 }
+            ],
+            required: true,
+            order_index: 4,
+            module: 'need'
+          },
+          {
+            id: '5',
+            qkey: 'investment_horizon',
+            label: 'What is your investment time horizon?',
+            qtype: 'select',
+            options: [
+              { value: 'less_1_year', label: 'Less than 1 year', score: 1 },
+              { value: '1_3_years', label: '1 - 3 years', score: 2 },
+              { value: '3_5_years', label: '3 - 5 years', score: 3 },
+              { value: '5_10_years', label: '5 - 10 years', score: 4 },
+              { value: 'more_10_years', label: 'More than 10 years', score: 5 }
+            ],
+            required: true,
+            order_index: 5,
+            module: 'need'
+          }
+        ];
 
-        if (questionsError) {
-          return res.status(500).json({ error: 'Failed to fetch questions' });
-        }
-
-        return res.json({ questions: questions || [] });
+        console.log('✅ Framework questions fetched (mock data):', mockCFAQuestions.length);
+        return res.json({ questions: mockCFAQuestions });
       } catch (error) {
-        return res.status(500).json({ error: 'Failed to fetch questions' });
+        console.error('❌ Error in framework questions endpoint:', error);
+        return res.status(500).json({ 
+          error: 'Failed to fetch questions',
+          message: error.message || 'Unknown error'
+        });
       }
     }
 
