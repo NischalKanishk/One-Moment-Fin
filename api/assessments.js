@@ -441,63 +441,116 @@ module.exports = async function handler(req, res) {
       try {
         const frameworkVersionId = path.split('/')[2];
         
-        // For now, return mock CFA Three Pillar questions since there's no framework_questions table
-        // TODO: Create proper framework_questions table or store questions differently
-        const mockCFAQuestions = [
-          {
-            id: '1',
-            qkey: 'risk_capacity_income',
-            label: 'What is your current annual income?',
-            qtype: 'select',
-            options: ['Below ₹50,000', '₹50,000 - ₹2,00,000', '₹2,00,000 - ₹5,00,000', '₹5,00,000 - ₹10,00,000', 'Above ₹10,00,000'],
-            required: true,
-            order_index: 1,
-            module: 'capacity'
-          },
-          {
-            id: '2',
-            qkey: 'risk_capacity_savings',
-            label: 'What percentage of your income do you save monthly?',
-            qtype: 'select',
-            options: ['Below 10%', '10% - 20%', '20% - 30%', '30% - 40%', 'Above 40%'],
-            required: true,
-            order_index: 2,
-            module: 'capacity'
-          },
-          {
-            id: '3',
-            qkey: 'risk_tolerance_loss',
-            label: 'How would you react if your investment lost 20% of its value in a month?',
-            qtype: 'select',
-            options: ['Sell immediately to prevent further losses', 'Worry but hold the investment', 'Stay calm and review the situation', 'See it as an opportunity to buy more'],
-            required: true,
-            order_index: 3,
-            module: 'tolerance'
-          },
-          {
-            id: '4',
-            qkey: 'investment_need_goal',
-            label: 'What is your primary investment goal?',
-            qtype: 'select',
-            options: ['Wealth preservation', 'Regular income generation', 'Moderate capital growth', 'Aggressive capital growth'],
-            required: true,
-            order_index: 4,
-            module: 'need'
-          },
-          {
-            id: '5',
-            qkey: 'investment_horizon',
-            label: 'What is your investment time horizon?',
-            qtype: 'select',
-            options: ['Less than 1 year', '1 - 3 years', '3 - 5 years', '5 - 10 years', 'More than 10 years'],
-            required: true,
-            order_index: 5,
-            module: 'need'
+        console.log('🔍 Fetching questions for framework version:', frameworkVersionId);
+        
+        // First, let's try to query the actual database tables to see what exists
+        // We'll try different table names that might contain framework questions
+        
+        // Try 1: Check if framework_questions table exists
+        let questions = [];
+        let querySource = 'unknown';
+        
+        try {
+          // Try to query framework_questions table first
+          const { data: frameworkQuestions, error: frameworkError } = await supabase
+            .from('framework_questions')
+            .select('*')
+            .eq('framework_version_id', frameworkVersionId)
+            .order('order_index');
+            
+          if (!frameworkError && frameworkQuestions && frameworkQuestions.length > 0) {
+            questions = frameworkQuestions;
+            querySource = 'framework_questions';
+            console.log('✅ Found questions in framework_questions table:', questions.length);
           }
-        ];
-
-        console.log('✅ Framework questions fetched (mock data):', mockCFAQuestions.length);
-        return res.json({ questions: mockCFAQuestions });
+        } catch (e) {
+          console.log('❌ framework_questions table not accessible:', e.message);
+        }
+        
+        // Try 2: Check if framework_question_map table exists
+        if (questions.length === 0) {
+          try {
+            const { data: mappedQuestions, error: mapError } = await supabase
+              .from('framework_question_map')
+              .select(`
+                *,
+                questions (*)
+              `)
+              .eq('framework_version_id', frameworkVersionId);
+              
+            if (!mapError && mappedQuestions && mappedQuestions.length > 0) {
+              questions = mappedQuestions.map(mq => mq.questions).filter(q => q);
+              querySource = 'framework_question_map';
+              console.log('✅ Found questions in framework_question_map table:', questions.length);
+            }
+          } catch (e) {
+            console.log('❌ framework_question_map table not accessible:', e.message);
+          }
+        }
+        
+        // Try 3: Check if questions are stored in risk_frameworks table
+        if (questions.length === 0) {
+          try {
+            const { data: frameworkData, error: frameworkError } = await supabase
+              .from('risk_frameworks')
+              .select(`
+                *,
+                risk_framework_versions!inner (
+                  id,
+                  questions
+                )
+              `)
+              .eq('risk_framework_versions.id', frameworkVersionId);
+              
+            if (!frameworkError && frameworkData && frameworkData[0]?.risk_framework_versions?.[0]?.questions) {
+              questions = frameworkData[0].risk_framework_versions[0].questions;
+              querySource = 'risk_frameworks.questions';
+              console.log('✅ Found questions in risk_frameworks table:', questions.length);
+            }
+          } catch (e) {
+            console.log('❌ risk_frameworks table not accessible:', e.message);
+          }
+        }
+        
+        // If no questions found in database, return empty array
+        if (questions.length === 0) {
+          console.log('⚠️ No questions found in database for framework version:', frameworkVersionId);
+          return res.json({ questions: [] });
+        }
+        
+        // Transform questions to match expected frontend format
+        const transformedQuestions = questions.map((q, index) => {
+          // Handle different possible data structures
+          if (q.question_text || q.label) {
+            return {
+              id: q.id || `q_${index + 1}`,
+              qkey: q.qkey || q.question_key || `question_${index + 1}`,
+              label: q.label || q.question_text || q.question,
+              qtype: q.qtype || q.type || 'select',
+              options: Array.isArray(q.options) ? q.options : 
+                       (q.options && typeof q.options === 'object' ? Object.values(q.options) : 
+                       (q.option_values ? q.option_values.split(',') : [])),
+              required: q.required !== undefined ? q.required : true,
+              order_index: q.order_index || q.sort_order || index + 1,
+              module: q.module || q.category || 'general'
+            };
+          }
+          
+          // If it's a simple question object
+          return {
+            id: q.id || `q_${index + 1}`,
+                         qkey: q.qkey || `question_${index + 1}`,
+             label: q.label || q.question || `Question ${index + 1}`,
+             qtype: q.qtype || q.type || 'select',
+             options: Array.isArray(q.options) ? q.options : [],
+            required: true,
+            order_index: index + 1,
+            module: 'general'
+          };
+        });
+        
+        console.log(`✅ Framework questions fetched from ${querySource}:`, transformedQuestions.length);
+        return res.json({ questions: transformedQuestions });
       } catch (error) {
         console.error('❌ Error in framework questions endpoint:', error);
         return res.status(500).json({ 
