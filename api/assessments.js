@@ -179,7 +179,7 @@ module.exports = async function handler(req, res) {
           frameworkInfo = 'CFA Three Pillar v1';
         }
 
-        // Create new default assessment (simplified - no description to avoid schema issues)
+        // Create new default assessment (using only existing columns)
         const { data: assessment, error: createError } = await supabase
           .from('assessments')
           .insert({
@@ -280,6 +280,68 @@ module.exports = async function handler(req, res) {
         console.error('❌ Error getting default framework:', error);
         return res.status(500).json({ 
           error: 'Failed to get default framework',
+          message: error.message || 'Unknown error'
+        });
+      }
+    }
+
+    // ============================================================================
+    // GENERAL ASSESSMENTS ENDPOINTS
+    // ============================================================================
+
+    // GET /api/assessments - List all user assessments with framework info
+    if (method === 'GET' && path === '') {
+      try {
+        const user = await authenticateUser(req);
+        if (!user?.supabase_user_id) {
+          return res.status(400).json({ error: 'User not properly authenticated' });
+        }
+
+        // Get user's assessments
+        const { data: userAssessments, error: assessmentsError } = await supabase
+          .from('assessments')
+          .select('*')
+          .eq('user_id', user.supabase_user_id);
+
+        if (assessmentsError) {
+          console.error('❌ Database error:', assessmentsError);
+          return res.status(500).json({ error: 'Failed to fetch assessments', details: assessmentsError.message });
+        }
+
+        // Get default framework info to mark default assessments
+        let defaultFrameworkVersionId = null;
+        try {
+          const { data: defaultFramework } = await supabase
+            .from('risk_framework_versions')
+            .select('id')
+            .eq('is_default', true)
+            .single();
+          
+          if (defaultFramework) {
+            defaultFrameworkVersionId = defaultFramework.id;
+          }
+        } catch (e) {
+          console.log('⚠️ Could not get default framework version:', e.message);
+        }
+
+        // Transform assessments to match frontend expectations
+        const transformedAssessments = (userAssessments || []).map(assessment => ({
+          id: assessment.id,
+          title: assessment.name, // Map 'name' to 'title'
+          slug: `assessment-${assessment.id}`, // Generate slug
+          framework_version_id: defaultFrameworkVersionId, // Use default framework
+          is_default: assessment.is_active, // Mark as default if active (simplified logic)
+          is_published: assessment.is_active, // Map 'is_active' to 'is_published'
+          created_at: assessment.created_at,
+          updated_at: assessment.created_at // Use created_at since updated_at doesn't exist
+        }));
+
+        console.log('✅ Assessments fetched successfully:', transformedAssessments.length);
+        return res.status(200).json({ assessments: transformedAssessments });
+      } catch (error) {
+        console.error('❌ Error in assessments endpoint:', error);
+        return res.status(500).json({ 
+          error: 'Failed to fetch assessments',
           message: error.message || 'Unknown error'
         });
       }
