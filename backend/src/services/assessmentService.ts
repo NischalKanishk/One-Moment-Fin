@@ -1,12 +1,12 @@
 import { supabase } from '../config/supabase';
-import { getFrameworkConfig, getFrameworkQuestions } from './riskScoring';
+import { getCFAFrameworkConfig, getCFAFrameworkQuestions } from './riskScoring';
 
 export interface Assessment {
   id: string;
   user_id: string;
   title: string;
   slug: string;
-  framework_version_id: string;
+  framework_id: string;
   is_default: boolean;
   is_published: boolean;
   created_at: string;
@@ -27,7 +27,7 @@ export interface AssessmentSnapshot {
 export interface AssessmentSubmission {
   id: string;
   assessment_id: string;
-  framework_version_id: string;
+  framework_id: string;
   owner_id: string;
   submitted_at: string;
   answers: Record<string, any>;
@@ -37,13 +37,13 @@ export interface AssessmentSubmission {
 
 export interface CreateAssessmentData {
   title: string;
-  framework_version_id?: string;
+  framework_id?: string;
   is_default?: boolean;
 }
 
 export interface UpdateAssessmentData {
   title?: string;
-  framework_version_id?: string;
+  framework_id?: string;
   is_published?: boolean;
 }
 
@@ -53,20 +53,15 @@ export class AssessmentService {
    */
   static async createAssessment(userId: string, data: CreateAssessmentData): Promise<Assessment> {
     try {
-      // If no framework specified, get the default one
-      let frameworkVersionId = data.framework_version_id;
-      if (!frameworkVersionId) {
-        const { data: defaultFramework } = await supabase
-          .from('risk_framework_versions')
-          .select('id')
-          .eq('is_default', true)
-          .single();
-        
-        if (defaultFramework) {
-          frameworkVersionId = defaultFramework.id;
-        } else {
-          throw new Error('No default framework found');
-        }
+      // Get the CFA framework ID
+      const { data: cfaFramework } = await supabase
+        .from('risk_frameworks')
+        .select('id')
+        .eq('code', 'cfa_three_pillar_v1')
+        .single();
+      
+      if (!cfaFramework) {
+        throw new Error('CFA framework not found');
       }
 
       // Create the assessment
@@ -76,7 +71,7 @@ export class AssessmentService {
           user_id: userId,
           title: data.title,
           slug: this.generateSlug(data.title),
-          framework_version_id: frameworkVersionId,
+          framework_id: cfaFramework.id,
           is_default: data.is_default || false,
           is_published: false
         })
@@ -85,13 +80,6 @@ export class AssessmentService {
 
       if (error || !assessment) {
         throw new Error(error?.message || 'Failed to create assessment');
-      }
-
-      // Generate snapshot from framework
-      if (frameworkVersionId) {
-        await this.generateSnapshot(assessment.id, frameworkVersionId);
-      } else {
-        throw new Error('Framework version ID is required');
       }
 
       return assessment as Assessment;
@@ -314,12 +302,12 @@ export class AssessmentService {
       
       console.log('✅ Assessment found:', assessment.title);
 
-      // Get framework config and score
-      console.log('🔍 Getting framework config for:', assessment.framework_version_id);
-      const frameworkConfig = await getFrameworkConfig(assessment.framework_version_id);
+      // Get CFA framework config and score
+      console.log('🔍 Getting CFA framework config');
+      const frameworkConfig = await getCFAFrameworkConfig();
       if (!frameworkConfig) {
-        console.error('❌ Framework config not found');
-        throw new Error('Framework configuration not found');
+        console.error('❌ CFA framework config not found');
+        throw new Error('CFA framework configuration not found');
       }
       
       console.log('✅ Framework config found, engine:', frameworkConfig.engine);
@@ -338,7 +326,7 @@ export class AssessmentService {
         .from('assessment_submissions')
         .insert({
           assessment_id: assessmentId,
-          framework_version_id: assessment.framework_version_id,
+          framework_id: assessment.framework_id,
           owner_id: assessment.user_id,
           submitted_at: new Date().toISOString(),
           answers: answers,
@@ -553,40 +541,64 @@ export class AssessmentService {
    */
   static async getDefaultAssessment(userId: string): Promise<any> {
     try {
-      // Get active assessment form
-      const { data: form, error: formError } = await supabase
-        .from('assessment_forms')
-        .select(`
-          *,
-          assessment_form_versions (
-            id,
-            version,
-            schema,
-            ui,
-            scoring,
-            created_at
-          )
-        `)
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .order('assessment_form_versions.created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (formError || !form) {
+      // Get CFA framework questions
+      const questions = await getCFAFrameworkQuestions();
+      
+      if (!questions || questions.length === 0) {
+        console.error('No CFA framework questions found');
         return null;
       }
 
-      // Get questions from the latest version
-      const latestVersion = form.assessment_form_versions?.[0];
-      if (!latestVersion) {
-        return null;
+      // Get or create default assessment for user
+      let { data: assessment, error: assessmentError } = await supabase
+        .from('assessments')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_default', true)
+        .single();
+
+      if (assessmentError || !assessment) {
+        // Create default assessment if it doesn't exist
+        const { data: cfaFramework } = await supabase
+          .from('risk_frameworks')
+          .select('id')
+          .eq('code', 'cfa_three_pillar_v1')
+          .single();
+
+        if (!cfaFramework) {
+          throw new Error('CFA framework not found');
+        }
+
+        const { data: newAssessment, error: createError } = await supabase
+          .from('assessments')
+          .insert({
+            user_id: userId,
+            title: 'CFA Three-Pillar Risk Assessment',
+            slug: 'cfa-risk-assessment',
+            framework_id: cfaFramework.id,
+            is_default: true,
+            is_published: true
+          })
+          .select()
+          .single();
+
+        if (createError || !newAssessment) {
+          throw new Error('Failed to create default assessment');
+        }
+
+        assessment = newAssessment;
       }
 
       return {
-        assessment: form,
-        questions: this.schemaToQuestions(latestVersion.schema),
-        snapshot: this.schemaToQuestions(latestVersion.schema)
+        assessment: {
+          id: assessment.id,
+          title: assessment.title,
+          slug: assessment.slug,
+          user_id: assessment.user_id,
+          framework_id: assessment.framework_id
+        },
+        questions: questions,
+        snapshot: questions
       };
     } catch (error) {
       console.error('Error fetching default assessment:', error);

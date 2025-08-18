@@ -7,6 +7,7 @@ import { AIService } from '../services/ai';
 import { LeadStatusService } from '../services/leadStatusService';
 import { AssessmentService } from '../services/assessmentService';
 import { SeedFrameworkDataService } from '../services/seedFrameworkData';
+import { getCFAFrameworkQuestions } from '../services/riskScoring';
 
 const router = express.Router();
 
@@ -51,7 +52,7 @@ router.get('/', authenticateUser, async (req: express.Request, res: express.Resp
 // POST /api/assessments - Create a new assessment
 router.post('/', authenticateUser, [
   body('title').notEmpty().withMessage('Assessment title is required'),
-  body('framework_version_id').optional().isUUID().withMessage('Framework version ID must be a valid UUID'),
+  body('framework_id').optional().isUUID().withMessage('Framework ID must be a valid UUID'),
   body('is_default').optional().isBoolean().withMessage('is_default must be a boolean')
 ], async (req: express.Request, res: express.Response) => {
   try {
@@ -64,11 +65,11 @@ router.post('/', authenticateUser, [
       return res.status(400).json({ error: 'User not properly authenticated' });
     }
 
-    const { title, framework_version_id, is_default } = req.body;
+    const { title, framework_id, is_default } = req.body;
 
     const assessment = await AssessmentService.createAssessment(req.user.supabase_user_id, {
       title,
-      framework_version_id,
+      framework_id,
       is_default
     });
 
@@ -151,6 +152,17 @@ router.post('/forms/:formId/versions', authenticateUser, [
   } catch (error) {
     console.error('Create version error:', error);
     return res.status(500).json({ error: 'Failed to create form version' });
+  }
+});
+
+// GET /api/assessments/cfa/questions - Get CFA framework questions
+router.get('/cfa/questions', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    const questions = await getCFAFrameworkQuestions();
+    return res.json({ questions });
+  } catch (error) {
+    console.error('Get CFA questions error:', error);
+    return res.status(500).json({ error: 'Failed to fetch CFA questions' });
   }
 });
 
@@ -1273,7 +1285,7 @@ router.get('/frameworks', authenticateUser, async (req: express.Request, res: ex
 // POST /api/assessments - Create new assessment
 router.post('/', authenticateUser, [
   body('title').notEmpty().withMessage('Title is required'),
-  body('framework_version_id').optional().isUUID().withMessage('Framework version ID must be valid UUID'),
+  body('framework_id').optional().isUUID().withMessage('Framework ID must be valid UUID'),
   body('is_default').optional().isBoolean().withMessage('is_default must be a boolean')
 ], async (req: express.Request, res: express.Response) => {
   try {
@@ -1286,11 +1298,11 @@ router.post('/', authenticateUser, [
       return res.status(400).json({ error: 'User not properly authenticated' });
     }
 
-    const { title, framework_version_id, is_default } = req.body;
+    const { title, framework_id, is_default } = req.body;
 
     const assessment = await AssessmentService.createAssessment(req.user.supabase_user_id, {
       title,
-      framework_version_id,
+      framework_id,
       is_default
     });
 
@@ -1611,7 +1623,7 @@ router.post('/default', authenticateUser, async (req: express.Request, res: expr
       assessment: {
         id: assessment.id,
         title: assessment.title,
-        framework_version_id: assessment.framework_version_id
+        framework_id: assessment.framework_id
       }
     });
 

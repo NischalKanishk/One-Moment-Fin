@@ -253,26 +253,34 @@ function calculatePillarScore(pillar: { inputs: any[]; weights: Record<string, n
 }
 
 /**
- * Get framework configuration by ID
+ * Get CFA framework configuration
  */
-export async function getFrameworkConfig(frameworkVersionId: string): Promise<FrameworkConfig | null> {
+export async function getCFAFrameworkConfig(): Promise<FrameworkConfig | null> {
   try {
     const { data, error } = await supabase
-      .from('risk_framework_versions')
+      .from('risk_frameworks')
       .select('config')
-      .eq('id', frameworkVersionId)
+      .eq('code', 'cfa_three_pillar_v1')
       .single();
 
     if (error || !data) {
-      console.error('Error fetching framework config:', error);
+      console.error('Error fetching CFA framework config:', error);
       return null;
     }
 
     return data.config as FrameworkConfig;
   } catch (error) {
-    console.error('Error fetching framework config:', error);
+    console.error('Error fetching CFA framework config:', error);
     return null;
   }
+}
+
+/**
+ * Get framework configuration by ID (backward compatibility)
+ */
+export async function getFrameworkConfig(frameworkVersionId: string): Promise<FrameworkConfig | null> {
+  // For now, always return CFA framework config
+  return getCFAFrameworkConfig();
 }
 
 /**
@@ -300,27 +308,36 @@ export async function getQuestionDetails(qkey: string): Promise<any | null> {
 }
 
 /**
- * Get framework questions mapping
+ * Get CFA framework questions
  */
-export async function getFrameworkQuestions(frameworkVersionId: string): Promise<any[]> {
+export async function getCFAFrameworkQuestions(): Promise<any[]> {
   try {
     const { data, error } = await supabase
-      .from('framework_question_map')
-      .select(`
-        *,
-        question_bank (*)
-      `)
-      .eq('framework_version_id', frameworkVersionId)
+      .from('framework_questions')
+      .select('*')
+      .eq('framework_id', (await supabase
+        .from('risk_frameworks')
+        .select('id')
+        .eq('code', 'cfa_three_pillar_v1')
+        .single()).data?.id)
       .order('order_index');
 
     if (error) {
-      console.error('Error fetching framework questions:', error);
+      console.error('Error fetching CFA framework questions:', error);
       return [];
     }
 
     return data || [];
   } catch (error) {
-    console.error('Error fetching framework questions:', error);
+    console.error('Error fetching CFA framework questions:', error);
     return [];
   }
+}
+
+/**
+ * Get framework questions mapping (backward compatibility)
+ */
+export async function getFrameworkQuestions(frameworkVersionId: string): Promise<any[]> {
+  // For now, always return CFA framework questions
+  return getCFAFrameworkQuestions();
 }

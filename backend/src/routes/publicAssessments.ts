@@ -206,31 +206,20 @@ router.get('/:userLink', async (req: express.Request, res: express.Response) => 
 
     console.log('✅ Assessment found:', assessment.title);
 
-    // Get the assessment questions from framework (since snapshots might not exist)
+    // Get the CFA framework questions
     let questions = [];
     
-    if (assessment.framework_version_id) {
-      try {
-        // Get framework questions
-        const { data: frameworkQuestions, error: frameworkError } = await supabase
-          .from('framework_question_map')
-          .select(`
-            id,
-            qkey,
-            required,
-            order_index,
-            alias,
-            transform,
-            options_override,
-            question_bank!inner (
-              label,
-              qtype,
-              options,
-              module
-            )
-          `)
-          .eq('framework_version_id', assessment.framework_version_id)
-          .order('order_index', { ascending: true });
+    try {
+      // Get CFA framework questions
+      const { data: frameworkQuestions, error: frameworkError } = await supabase
+        .from('framework_questions')
+        .select('*')
+        .eq('framework_id', (await supabase
+          .from('risk_frameworks')
+          .select('id')
+          .eq('code', 'cfa_three_pillar_v1')
+          .single()).data?.id)
+        .order('order_index');
 
         if (frameworkError) {
           console.log('❌ Framework questions error:', frameworkError);
@@ -241,9 +230,9 @@ router.get('/:userLink', async (req: express.Request, res: express.Response) => 
           questions = frameworkQuestions?.map((q: any) => ({
             id: q.id,
             qkey: q.qkey,
-            label: q.question_bank?.label,
-            qtype: q.question_bank?.qtype,
-            options: q.options_override || q.question_bank?.options,
+            label: q.label,
+            qtype: q.qtype,
+            options: q.options,
             required: q.required,
             order_index: q.order_index
           })) || [];
