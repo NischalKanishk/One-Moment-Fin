@@ -487,3 +487,281 @@ CREATE INDEX IF NOT EXISTS idx_users_clerk_id ON users(clerk_id);
 -- Note: Phone uniqueness is handled via a partial unique index that only applies to non-NULL values
 -- This allows multiple users to have NULL phone values while maintaining uniqueness for actual phone numbers
 -- The constraint is created in the migration script: fix-phone-constraint.sql
+
+-- ------------------------------------------------------------------
+-- Risk Assessment Framework Tables
+-- ------------------------------------------------------------------
+
+-- 12. Risk Frameworks table
+CREATE TABLE risk_frameworks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code TEXT UNIQUE NOT NULL, -- e.g., 'cfa_three_pillar', 'weighted_sum'
+    name TEXT NOT NULL,
+    description TEXT,
+    engine TEXT NOT NULL CHECK (engine IN ('three_pillar', 'weighted_sum')),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS for risk_frameworks
+ALTER TABLE risk_frameworks ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for risk_frameworks table
+-- Frameworks are public readable; writes restricted to service role
+CREATE POLICY "Anyone can view frameworks" ON risk_frameworks
+    FOR SELECT USING (true);
+
+CREATE POLICY "Service role can manage all frameworks" ON risk_frameworks
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- 13. Risk Framework Versions table
+CREATE TABLE risk_framework_versions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    framework_id UUID REFERENCES risk_frameworks(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL,
+    config JSONB NOT NULL, -- Framework configuration (scoring rules, weights, etc.)
+    is_default BOOLEAN DEFAULT false,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(framework_id, version)
+);
+
+-- Enable RLS for risk_framework_versions
+ALTER TABLE risk_framework_versions ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for risk_framework_versions table
+-- Framework versions are public readable; writes restricted to service role
+CREATE POLICY "Anyone can view framework versions" ON risk_framework_versions
+    FOR SELECT USING (true);
+
+CREATE POLICY "Service role can manage all framework versions" ON risk_framework_versions
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- 14. Question Bank table
+CREATE TABLE question_bank (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    qkey TEXT UNIQUE NOT NULL, -- Unique question identifier
+    label TEXT NOT NULL, -- Question text
+    qtype TEXT NOT NULL CHECK (qtype IN ('single', 'multi', 'scale', 'number', 'percent', 'text')),
+    options JSONB, -- Question options (for choice questions) or configuration (for scales)
+    module TEXT, -- Which module/pillar this question belongs to (e.g., 'capacity', 'tolerance', 'need')
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS for question_bank
+ALTER TABLE question_bank ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for question_bank table
+-- Question bank is public readable; writes restricted to service role
+CREATE POLICY "Anyone can view question bank" ON question_bank
+    FOR SELECT USING (true);
+
+CREATE POLICY "Service role can manage all question bank" ON question_bank
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- 15. Framework Question Map table
+CREATE TABLE framework_question_map (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    framework_version_id UUID REFERENCES risk_framework_versions(id) ON DELETE CASCADE,
+    question_id UUID REFERENCES question_bank(id) ON DELETE CASCADE,
+    qkey TEXT NOT NULL, -- Question key for this framework
+    required BOOLEAN DEFAULT true,
+    order_index INTEGER NOT NULL,
+    alias TEXT, -- Alternative question key
+    transform TEXT, -- Transformation rule (e.g., '100 - value')
+    options_override JSONB, -- Override question options for this framework
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(framework_version_id, qkey)
+);
+
+-- Enable RLS for framework_question_map
+ALTER TABLE framework_question_map ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for framework_question_map table
+-- Framework question maps are public readable; writes restricted to service role
+CREATE POLICY "Anyone can view framework question maps" ON framework_question_map
+    FOR SELECT USING (true);
+
+CREATE POLICY "Service role can manage all framework question maps" ON framework_question_map
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- 16. Assessment Question Snapshots table (for storing framework questions at assessment creation time)
+CREATE TABLE assessment_question_snapshots (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    assessment_id UUID REFERENCES assessments(id) ON DELETE CASCADE,
+    qkey TEXT NOT NULL,
+    label TEXT NOT NULL,
+    qtype TEXT NOT NULL,
+    options JSONB,
+    required BOOLEAN DEFAULT true,
+    order_index INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS for assessment_question_snapshots
+ALTER TABLE assessment_question_snapshots ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for assessment_question_snapshots table
+CREATE POLICY "Users can view own assessment snapshots" ON assessment_question_snapshots
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM assessments 
+            WHERE assessments.id = assessment_question_snapshots.assessment_id 
+            AND assessments.user_id = get_user_id_from_clerk()
+        )
+    );
+
+CREATE POLICY "Service role can manage all assessment snapshots" ON assessment_question_snapshots
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- 17. Assessment Submissions table (for storing assessment responses)
+CREATE TABLE assessment_submissions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    assessment_id UUID REFERENCES assessments(id) ON DELETE CASCADE,
+    framework_version_id UUID REFERENCES risk_framework_versions(id),
+    owner_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    lead_id UUID REFERENCES leads(id) ON DELETE SET NULL,
+    submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    answers JSONB NOT NULL, -- User responses
+    result JSONB, -- Scoring result
+    status TEXT DEFAULT 'submitted' CHECK (status IN ('submitted', 'approved', 'rejected')),
+    review_reason TEXT
+);
+
+-- Enable RLS for assessment_submissions
+ALTER TABLE assessment_submissions ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for assessment_submissions table
+CREATE POLICY "Users can view own assessment submissions" ON assessment_submissions
+    FOR SELECT USING (owner_id = get_user_id_from_clerk());
+
+CREATE POLICY "Users can insert own assessment submissions" ON assessment_submissions
+    FOR INSERT WITH CHECK (owner_id = get_user_id_from_clerk());
+
+CREATE POLICY "Users can update own assessment submissions" ON assessment_submissions
+    FOR UPDATE USING (owner_id = get_user_id_from_clerk());
+
+CREATE POLICY "Service role can manage all assessment submissions" ON assessment_submissions
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- 18. Assessment Forms table (for the new form-based system)
+CREATE TABLE assessment_forms (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT,
+    is_active BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS for assessment_forms
+ALTER TABLE assessment_forms ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for assessment_forms table
+CREATE POLICY "Users can view own assessment forms" ON assessment_forms
+    FOR SELECT USING (user_id = get_user_id_from_clerk());
+
+CREATE POLICY "Users can insert own assessment forms" ON assessment_forms
+    FOR INSERT WITH CHECK (user_id = get_user_id_from_clerk());
+
+CREATE POLICY "Users can update own assessment forms" ON assessment_forms
+    FOR UPDATE USING (user_id = get_user_id_from_clerk());
+
+CREATE POLICY "Users can delete own assessment forms" ON assessment_forms
+    FOR DELETE USING (user_id = get_user_id_from_clerk());
+
+CREATE POLICY "Service role can manage all assessment forms" ON assessment_forms
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- 19. Assessment Form Versions table
+CREATE TABLE assessment_form_versions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    form_id UUID REFERENCES assessment_forms(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL,
+    schema JSONB NOT NULL, -- Form schema (questions, validation rules)
+    ui JSONB, -- UI configuration
+    scoring JSONB, -- Scoring configuration
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(form_id, version)
+);
+
+-- Enable RLS for assessment_form_versions
+ALTER TABLE assessment_form_versions ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for assessment_form_versions table
+CREATE POLICY "Users can view own assessment form versions" ON assessment_form_versions
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM assessment_forms 
+            WHERE assessment_forms.id = assessment_form_versions.form_id 
+            AND assessment_forms.user_id = get_user_id_from_clerk()
+        )
+    );
+
+CREATE POLICY "Service role can manage all assessment form versions" ON assessment_form_versions
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- 20. Assessment Links table (for creating shareable assessment links)
+CREATE TABLE assessment_links (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    form_id UUID REFERENCES assessment_forms(id) ON DELETE CASCADE,
+    version_id UUID REFERENCES assessment_form_versions(id),
+    lead_id UUID REFERENCES leads(id) ON DELETE SET NULL,
+    token TEXT UNIQUE NOT NULL,
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'submitted', 'expired')),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    submitted_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS for assessment_links
+ALTER TABLE assessment_links ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for assessment_links table
+CREATE POLICY "Users can view own assessment links" ON assessment_links
+    FOR SELECT USING (user_id = get_user_id_from_clerk());
+
+CREATE POLICY "Users can insert own assessment links" ON assessment_links
+    FOR INSERT WITH CHECK (user_id = get_user_id_from_clerk());
+
+CREATE POLICY "Users can update own assessment links" ON assessment_links
+    FOR UPDATE USING (user_id = get_user_id_from_clerk());
+
+CREATE POLICY "Service role can manage all assessment links" ON assessment_links
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- Add indexes for better performance
+CREATE INDEX idx_risk_frameworks_code ON risk_frameworks(code);
+CREATE INDEX idx_risk_framework_versions_framework_id ON risk_framework_versions(framework_id);
+CREATE INDEX idx_risk_framework_versions_is_default ON risk_framework_versions(is_default);
+CREATE INDEX idx_question_bank_qkey ON question_bank(qkey);
+CREATE INDEX idx_question_bank_module ON question_bank(module);
+CREATE INDEX idx_framework_question_map_framework_version_id ON framework_question_map(framework_version_id);
+CREATE INDEX idx_framework_question_map_order_index ON framework_question_map(order_index);
+CREATE INDEX idx_assessment_question_snapshots_assessment_id ON assessment_question_snapshots(assessment_id);
+CREATE INDEX idx_assessment_submissions_assessment_id ON assessment_submissions(assessment_id);
+CREATE INDEX idx_assessment_submissions_owner_id ON assessment_submissions(owner_id);
+CREATE INDEX idx_assessment_submissions_lead_id ON assessment_submissions(lead_id);
+CREATE INDEX idx_assessment_forms_user_id ON assessment_forms(user_id);
+CREATE INDEX idx_assessment_form_versions_form_id ON assessment_form_versions(form_id);
+CREATE INDEX idx_assessment_links_token ON assessment_links(token);
+CREATE INDEX idx_assessment_links_user_id ON assessment_links(user_id);
+
+-- Add trigger for updated_at columns
+CREATE TRIGGER update_risk_frameworks_updated_at BEFORE UPDATE ON risk_frameworks
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_risk_framework_versions_updated_at BEFORE UPDATE ON risk_framework_versions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_question_bank_updated_at BEFORE UPDATE ON question_bank
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_assessment_forms_updated_at BEFORE UPDATE ON assessment_forms
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

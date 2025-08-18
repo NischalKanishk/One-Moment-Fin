@@ -6,6 +6,7 @@ import { AssessmentFormService } from '../services/assessmentFormService';
 import { AIService } from '../services/ai';
 import { LeadStatusService } from '../services/leadStatusService';
 import { AssessmentService } from '../services/assessmentService';
+import { SeedFrameworkDataService } from '../services/seedFrameworkData';
 
 const router = express.Router();
 
@@ -1440,6 +1441,66 @@ router.get('/frameworks/:frameworkId/questions', authenticateUser, async (req: e
   } catch (error) {
     console.error('❌ Get framework questions error:', error);
     return res.status(500).json({ error: 'Failed to fetch framework questions' });
+  }
+});
+
+// GET /api/assessments/debug/frameworks - Debug endpoint to check framework data
+router.get('/debug/frameworks', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    console.log('🔍 Debug frameworks endpoint called');
+
+    // Check what's in the framework tables
+    const [
+      { data: frameworks, error: frameworksError },
+      { data: frameworkVersions, error: versionsError },
+      { data: questionBank, error: questionBankError },
+      { data: frameworkQuestionMap, error: mapError }
+    ] = await Promise.all([
+      supabase.from('risk_frameworks').select('*'),
+      supabase.from('risk_framework_versions').select('*'),
+      supabase.from('question_bank').select('*'),
+      supabase.from('framework_question_map').select('*')
+    ]);
+
+    return res.json({
+      frameworks: frameworks || [],
+      frameworkVersions: frameworkVersions || [],
+      questionBank: questionBank || [],
+      frameworkQuestionMap: frameworkQuestionMap || [],
+      errors: {
+        frameworks: frameworksError?.message,
+        versions: versionsError?.message,
+        questionBank: questionBankError?.message,
+        map: mapError?.message
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Debug frameworks error:', error);
+    return res.status(500).json({ error: 'Failed to debug frameworks' });
+  }
+});
+
+// POST /api/assessments/seed-frameworks - Seed CFA framework data
+router.post('/seed-frameworks', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    const result = await SeedFrameworkDataService.seedCFAThreePillarFramework();
+    if (result.success) {
+      return res.json({ message: result.message });
+    } else {
+      return res.status(500).json({ error: result.message });
+    }
+  } catch (error) {
+    console.error('Seed frameworks error:', error);
+    return res.status(500).json({ error: 'Failed to seed frameworks' });
   }
 });
 

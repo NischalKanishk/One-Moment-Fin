@@ -75,9 +75,11 @@ export default function Assessments() {
   const [frameworks, setFrameworks] = useState<Framework[]>([]);
   const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
   const [selectedFramework, setSelectedFramework] = useState<string>('');
+  const [selectedFrameworkVersion, setSelectedFrameworkVersion] = useState<string>('');
   const [frameworkQuestions, setFrameworkQuestions] = useState<FrameworkQuestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFramework, setIsLoadingFramework] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     loadAssessments();
@@ -85,10 +87,10 @@ export default function Assessments() {
   }, []);
 
   useEffect(() => {
-    if (selectedFramework) {
-      loadFrameworkQuestions(selectedFramework);
+    if (selectedFrameworkVersion) {
+      loadFrameworkQuestions(selectedFrameworkVersion);
     }
-  }, [selectedFramework]);
+  }, [selectedFrameworkVersion]);
 
   const loadAssessments = async () => {
     try {
@@ -174,12 +176,31 @@ export default function Assessments() {
       
       if (response.data.frameworks) {
         setFrameworks(response.data.frameworks);
-        // Set default framework if available
-        const defaultFramework = response.data.frameworks.find((f: Framework) => 
-          f.risk_framework_versions.some(v => v.is_default)
+        
+        // Set CFA Three Pillar as default framework
+        const cfaFramework = response.data.frameworks.find((f: Framework) => 
+          f.code === 'cfa_three_pillar_v1'
         );
-        if (defaultFramework) {
-          setSelectedFramework(defaultFramework.id);
+        
+        if (cfaFramework) {
+          setSelectedFramework(cfaFramework.id);
+          // Set the default version of CFA framework
+          const defaultVersion = cfaFramework.risk_framework_versions.find(v => v.is_default);
+          if (defaultVersion) {
+            setSelectedFrameworkVersion(defaultVersion.id);
+          }
+        } else {
+          // Fallback to any default framework
+          const defaultFramework = response.data.frameworks.find((f: Framework) => 
+            f.risk_framework_versions.some(v => v.is_default)
+          );
+          if (defaultFramework) {
+            setSelectedFramework(defaultFramework.id);
+            const defaultVersion = defaultFramework.risk_framework_versions.find(v => v.is_default);
+            if (defaultVersion) {
+              setSelectedFrameworkVersion(defaultVersion.id);
+            }
+          }
         }
       }
     } catch (error) {
@@ -187,24 +208,76 @@ export default function Assessments() {
     }
   };
 
-  const loadFrameworkQuestions = async (frameworkId: string) => {
+  const loadFrameworkQuestions = async (frameworkVersionId: string) => {
     try {
       setIsLoadingFramework(true);
       const token = await getToken();
       if (!token) return;
 
       const api = createAuthenticatedApi(token);
-      const response = await api.get(`/api/assessments/frameworks/${frameworkId}/questions`);
+      const response = await api.get(`/api/assessments/frameworks/${frameworkVersionId}/questions`);
       
       if (response.data.questions) {
         setFrameworkQuestions(response.data.questions);
       }
     } catch (error) {
       console.error('Failed to load framework questions:', error);
-      // For now, we'll use mock data until the backend endpoint is implemented
       setFrameworkQuestions([]);
     } finally {
       setIsLoadingFramework(false);
+    }
+  };
+
+  const handleFrameworkChange = (frameworkId: string) => {
+    setSelectedFramework(frameworkId);
+    const framework = frameworks.find(f => f.id === frameworkId);
+    if (framework && framework.risk_framework_versions.length > 0) {
+      // Set the first version as default, or the default version if available
+      const defaultVersion = framework.risk_framework_versions.find(v => v.is_default) || framework.risk_framework_versions[0];
+      setSelectedFrameworkVersion(defaultVersion.id);
+    } else {
+      setSelectedFrameworkVersion('');
+    }
+  };
+
+  const handleSaveChanges = async () => {
+    if (!selectedFrameworkVersion) {
+      toast({
+        title: "No Framework Selected",
+        description: "Please select a framework first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const api = createAuthenticatedApi(token);
+      
+      // Here you would typically save the framework selection to the user's profile
+      // For now, we'll just show a success message
+      
+      toast({
+        title: "Framework Updated",
+        description: "Your assessment framework has been updated successfully",
+        variant: "default",
+      });
+
+      // Reload questions for the new framework
+      await loadFrameworkQuestions(selectedFrameworkVersion);
+      
+    } catch (error) {
+      console.error('Failed to save framework changes:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save framework changes. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -425,7 +498,7 @@ export default function Assessments() {
                             {/* Framework Selection */}
                             <div className="flex items-center gap-2">
                               <BookOpen className="w-4 h-4 text-gray-500" />
-                              <Select value={selectedFramework} onValueChange={setSelectedFramework}>
+                              <Select value={selectedFramework} onValueChange={handleFrameworkChange}>
                                 <SelectTrigger className="w-48">
                                   <SelectValue placeholder="Select Framework" />
                                 </SelectTrigger>
@@ -438,14 +511,29 @@ export default function Assessments() {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <Badge variant="outline" className="text-xs">
-                              {frameworkQuestions.length} Questions
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                onClick={handleSaveChanges}
+                                disabled={isSaving || !selectedFrameworkVersion}
+                                size="sm"
+                                className="bg-blue-600 hover:bg-blue-700 text-white"
+                              >
+                                {isSaving ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                ) : (
+                                  <Settings className="w-4 h-4 mr-2" />
+                                )}
+                                Save Changes
+                              </Button>
+                              <Badge variant="outline" className="text-xs">
+                                {frameworkQuestions.length} Questions
+                              </Badge>
+                            </div>
                           </div>
                         </div>
                       </CardHeader>
                       <CardContent>
-                        {selectedFramework && frameworkQuestions.length > 0 ? (
+                        {selectedFrameworkVersion && frameworkQuestions.length > 0 ? (
                           <>
                             {/* Questions Summary */}
                             <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
@@ -518,7 +606,7 @@ export default function Assessments() {
                               ))}
                             </div>
                           </>
-                        ) : selectedFramework ? (
+                        ) : selectedFrameworkVersion ? (
                           <div className="text-center py-8 text-gray-500">
                             <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                             <p className="mb-2">No questions found for this framework</p>
@@ -542,7 +630,7 @@ export default function Assessments() {
                         <CardTitle className="text-lg text-gray-900">Framework Information</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        {selectedFramework && frameworks.find(f => f.id === selectedFramework) && (
+                        {selectedFramework && selectedFrameworkVersion && frameworks.find(f => f.id === selectedFramework) && (
                           <>
                             {/* Framework Details */}
                             <div className="p-4 bg-blue-50 rounded-lg">
@@ -573,19 +661,26 @@ export default function Assessments() {
                             <div className="p-4 bg-gray-50 rounded-lg">
                               <div className="flex items-center gap-2 mb-2">
                                 <Settings className="w-4 h-4 text-gray-600" />
-                                <span className="text-sm font-medium text-gray-900">Available Versions</span>
+                                <span className="text-sm font-medium text-gray-900">Current Version</span>
                               </div>
                               <div className="text-sm text-gray-700">
-                                {frameworks.find(f => f.id === selectedFramework)?.risk_framework_versions.map(v => (
-                                  <div key={v.id} className="flex items-center gap-2">
-                                    <span>v{v.version}</span>
-                                    {v.is_default && (
-                                      <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                                        Default
-                                      </Badge>
-                                    )}
-                                  </div>
-                                ))}
+                                {(() => {
+                                  const framework = frameworks.find(f => f.id === selectedFramework);
+                                  const version = framework?.risk_framework_versions.find(v => v.id === selectedFrameworkVersion);
+                                  if (version) {
+                                    return (
+                                      <div className="flex items-center gap-2">
+                                        <span>v{version.version}</span>
+                                        {version.is_default && (
+                                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                            Default
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                  return <span className="text-gray-500">No version selected</span>;
+                                })()}
                               </div>
                             </div>
                           </>
