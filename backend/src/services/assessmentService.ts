@@ -111,11 +111,11 @@ export class AssessmentService {
       }
 
       // If framework is changing, regenerate snapshot
-      if (data.framework_version_id && data.framework_version_id !== existingAssessment.framework_version_id) {
+      if (data.framework_id && data.framework_id !== existingAssessment.framework_id) {
         try {
-          await this.generateSnapshot(assessmentId, data.framework_version_id);
+          await this.generateSnapshot(assessmentId, data.framework_id);
         } catch (error) {
-          console.warn(`Warning: Could not generate snapshot for framework ${data.framework_version_id}:`, error);
+          console.warn(`Warning: Could not generate snapshot for framework ${data.framework_id}:`, error);
           // Continue with the update even if snapshot generation fails
         }
       }
@@ -228,15 +228,15 @@ export class AssessmentService {
   }
 
   /**
-   * Generate question snapshot from framework
+   * Generate question snapshot from CFA framework
    */
-  static async generateSnapshot(assessmentId: string, frameworkVersionId: string): Promise<void> {
+  static async generateSnapshot(assessmentId: string, frameworkId: string): Promise<void> {
     try {
-      // Get framework questions
-      const questions = await getFrameworkQuestions(frameworkVersionId);
+      // Get CFA framework questions
+      const questions = await getCFAFrameworkQuestions();
       
       if (questions.length === 0) {
-        console.warn(`Warning: No questions found for framework version ${frameworkVersionId}`);
+        console.warn(`Warning: No questions found for CFA framework`);
         // Don't throw error, just clear existing snapshot and return
         await supabase
           .from('assessment_question_snapshots')
@@ -251,13 +251,13 @@ export class AssessmentService {
         .delete()
         .eq('assessment_id', assessmentId);
 
-      // Create new snapshot
+      // Create new snapshot from CFA framework questions
       const snapshotData = questions.map(q => ({
         assessment_id: assessmentId,
         qkey: q.qkey,
-        label: q.question_bank.label,
-        qtype: q.question_bank.qtype,
-        options: q.options_override || q.question_bank.options,
+        label: q.label,
+        qtype: q.qtype,
+        options: q.options,
         required: q.required,
         order_index: q.order_index
       }));
@@ -696,7 +696,7 @@ export class AssessmentService {
       // Create default assessment
       const assessment = await this.createAssessment(userId, {
         title: 'Default Assessment',
-        framework_version_id: defaultFramework.id,
+        framework_id: defaultFramework.id,
         is_default: true
       });
 

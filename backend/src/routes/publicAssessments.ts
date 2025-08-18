@@ -1,6 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { AssessmentService } from '../services/assessmentService';
+import { getCFAFrameworkQuestions } from '../services/riskScoring';
 import { supabase } from '../config/supabase';
 
 const router = express.Router();
@@ -200,8 +201,31 @@ router.get('/:userLink', async (req: express.Request, res: express.Response) => 
       .single();
 
     if (assessmentError || !assessment) {
-      console.log('❌ No default assessment found for user');
-      return res.status(404).json({ error: 'No assessment found for this user' });
+      console.log('❌ No default assessment found for user, using CFA framework questions');
+      
+      // Use CFA framework questions directly
+      try {
+        const questions = await getCFAFrameworkQuestions();
+        
+        if (!questions || questions.length === 0) {
+          console.log('❌ No CFA framework questions found');
+          return res.status(404).json({ error: 'No assessment questions found' });
+        }
+
+        console.log('✅ Using CFA framework questions for user');
+        
+        return res.json({
+          assessment: {
+            id: 'cfa-framework',
+            title: 'CFA Three-Pillar Risk Assessment',
+            slug: 'cfa-risk-assessment'
+          },
+          questions: questions
+        });
+      } catch (error) {
+        console.error('❌ Error getting CFA framework questions:', error);
+        return res.status(500).json({ error: 'Failed to load assessment questions' });
+      }
     }
 
     console.log('✅ Assessment found:', assessment.title);
@@ -210,36 +234,18 @@ router.get('/:userLink', async (req: express.Request, res: express.Response) => 
     let questions = [];
     
     try {
-      // Get CFA framework questions
-      const { data: frameworkQuestions, error: frameworkError } = await supabase
-        .from('framework_questions')
-        .select('*')
-        .eq('framework_id', (await supabase
-          .from('risk_frameworks')
-          .select('id')
-          .eq('code', 'cfa_three_pillar_v1')
-          .single()).data?.id)
-        .order('order_index');
-
-        if (frameworkError) {
-          console.log('❌ Framework questions error:', frameworkError);
-        } else {
-          console.log('✅ Framework questions found:', frameworkQuestions?.length || 0);
-          
-          // Transform to match expected format
-          questions = frameworkQuestions?.map((q: any) => ({
-            id: q.id,
-            qkey: q.qkey,
-            label: q.label,
-            qtype: q.qtype,
-            options: q.options,
-            required: q.required,
-            order_index: q.order_index
-          })) || [];
-        }
-      } catch (error) {
-        console.log('❌ Error getting framework questions:', error);
+      // Get CFA framework questions using the service
+      questions = await getCFAFrameworkQuestions();
+      
+      if (!questions || questions.length === 0) {
+        console.log('❌ No CFA framework questions found');
+        return res.status(404).json({ error: 'No assessment questions found' });
       }
+      
+      console.log('✅ CFA framework questions found:', questions.length);
+    } catch (error) {
+      console.log('❌ Error getting CFA framework questions:', error);
+      return res.status(500).json({ error: 'Failed to load assessment questions' });
     }
 
     // If no framework questions, try to get from snapshots

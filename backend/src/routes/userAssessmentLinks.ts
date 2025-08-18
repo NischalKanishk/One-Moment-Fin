@@ -1,6 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { AssessmentService } from '../services/assessmentService';
+import { getCFAFrameworkQuestions } from '../services/riskScoring';
 import { supabase } from '../config/supabase';
 
 const router = express.Router();
@@ -54,169 +55,62 @@ router.get('/:userLink', async (req: express.Request, res: express.Response) => 
       .single();
 
     if (assessmentError || !assessment) {
-      console.log('❌ No default assessment found for user, trying to show framework questions directly');
+      console.log('❌ No default assessment found for user, using CFA framework questions');
       
-      // Try to get questions from the default framework instead
+      // Use CFA framework questions directly
       try {
-        const { data: defaultFramework, error: frameworkError } = await supabase
-          .from('risk_framework_versions')
-          .select('id')
-          .eq('is_default', true)
-          .single();
-
-        if (frameworkError || !defaultFramework) {
-          console.log('❌ No default framework found either');
-          return res.status(404).json({ error: 'No assessment or framework found for this user' });
-        }
-
-        console.log('✅ Using default framework questions for user');
+        const questions = await getCFAFrameworkQuestions();
         
-        // Get framework questions directly
-        const { data: frameworkQuestions, error: questionsError } = await supabase
-          .from('framework_question_map')
-          .select(`
-            id,
-            qkey,
-            required,
-            order_index,
-            alias,
-            transform,
-            options_override,
-            question_bank!inner (
-              label,
-              qtype,
-              options,
-              module
-            )
-          `)
-          .eq('framework_version_id', defaultFramework.id)
-          .order('order_index', { ascending: true });
-
-        if (questionsError) {
-          console.log('❌ Framework questions error:', questionsError);
-          return res.status(500).json({ error: 'Failed to load framework questions' });
+        if (!questions || questions.length === 0) {
+          console.log('❌ No CFA framework questions found');
+          return res.status(404).json({ error: 'No assessment questions found' });
         }
 
-        console.log('✅ Framework questions found:', frameworkQuestions?.length || 0);
+        console.log('✅ Using CFA framework questions for user');
         
-        // Transform to match expected format
-        const questions = frameworkQuestions?.map((q: any) => ({
-          id: q.id,
-          qkey: q.qkey,
-          label: q.question_bank?.label,
-          qtype: q.question_bank?.qtype,
-          options: q.options_override || q.question_bank?.options,
-          required: q.required,
-          order_index: q.order_index
-        })) || [];
-
-        if (questions.length === 0) {
-          return res.status(404).json({ error: 'No questions found in the default framework' });
-        }
-
-        console.log('✅ Returning framework questions directly for user');
-
         return res.json({
           assessment: {
-            id: 'framework-default',
-            title: 'Default Risk Assessment',
-            slug: 'default',
-            user_id: user.id,
-            user_name: user.full_name,
-            is_framework_only: true
+            id: 'cfa-framework',
+            title: 'CFA Three-Pillar Risk Assessment',
+            slug: 'cfa-risk-assessment'
           },
           questions: questions
         });
       } catch (error) {
-        console.log('❌ Error getting framework questions:', error);
-        return res.status(500).json({ error: 'Failed to load framework questions' });
+        console.error('❌ Error getting CFA framework questions:', error);
+        return res.status(500).json({ error: 'Failed to load assessment questions' });
       }
     }
 
-    console.log('✅ Assessment found:', assessment.title);
-
-    // Get the assessment questions from framework (since snapshots might not exist)
-    let questions = [];
+    // If assessment exists, get its questions
+    console.log('✅ Assessment found, getting questions');
     
-    if (assessment.framework_version_id) {
-      try {
-        // Get framework questions
-        const { data: frameworkQuestions, error: frameworkError } = await supabase
-          .from('framework_question_map')
-          .select(`
-            id,
-            qkey,
-            required,
-            order_index,
-            alias,
-            transform,
-            options_override,
-            question_bank!inner (
-              label,
-              qtype,
-              options,
-              module
-            )
-          `)
-          .eq('framework_version_id', assessment.framework_version_id)
-          .order('order_index', { ascending: true });
-
-        if (frameworkError) {
-          console.log('❌ Framework questions error:', frameworkError);
-        } else {
-          console.log('✅ Framework questions found:', frameworkQuestions?.length || 0);
-          
-          // Transform to match expected format
-          questions = frameworkQuestions?.map((q: any) => ({
-            id: q.id,
-            qkey: q.qkey,
-            label: q.question_bank?.label,
-            qtype: q.question_bank?.qtype,
-            options: q.options_override || q.question_bank?.options,
-            required: q.required,
-            order_index: q.order_index
-          })) || [];
-        }
-      } catch (error) {
-        console.log('❌ Error getting framework questions:', error);
+    // Get CFA framework questions for the assessment
+    try {
+      const questions = await getCFAFrameworkQuestions();
+      
+      if (!questions || questions.length === 0) {
+        console.log('❌ No CFA framework questions found');
+        return res.status(404).json({ error: 'No assessment questions found' });
       }
+
+      console.log('✅ CFA framework questions loaded:', questions.length);
+      
+      return res.json({
+        assessment: {
+          id: assessment.id,
+          title: assessment.title,
+          slug: assessment.slug
+        },
+        questions: questions
+      });
+    } catch (error) {
+      console.error('❌ Error getting CFA framework questions:', error);
+      return res.status(500).json({ error: 'Failed to load assessment questions' });
     }
-
-    // If no framework questions, try to get from snapshots
-    if (questions.length === 0) {
-      const { data: snapshots, error: snapshotError } = await supabase
-        .from('assessment_question_snapshots')
-        .select('*')
-        .eq('assessment_id', assessment.id)
-        .order('order_index');
-
-      if (!snapshotError && snapshots) {
-        questions = snapshots;
-        console.log('✅ Using question snapshots:', snapshots.length);
-      }
-    }
-
-    if (questions.length === 0) {
-      console.log('❌ No questions found for assessment');
-      return res.status(404).json({ error: 'No questions found for this assessment' });
-    }
-
-    console.log('✅ Returning assessment with', questions.length, 'questions');
-
-    return res.json({
-      assessment: {
-        id: assessment.id,
-        title: assessment.title,
-        slug: assessment.slug,
-        user_id: user.id,
-        user_name: user.full_name
-      },
-      questions: questions
-    });
-
   } catch (error) {
-    console.error('Get public assessment by user link error:', error);
-    return res.status(500).json({ error: 'Failed to fetch assessment' });
+    console.error('❌ Public assessment error:', error);
+    return res.status(500).json({ error: 'Failed to load assessment' });
   }
 });
 

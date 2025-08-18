@@ -18,7 +18,8 @@ import {
   BookOpen,
   FileText,
   ChevronRight,
-  Play
+  Play,
+  Brain
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -47,6 +48,7 @@ interface Assessment {
   is_published: boolean;
   created_at: string;
   updated_at: string;
+  is_active: boolean; // Added for active assessment
 }
 
 interface FrameworkQuestion {
@@ -65,32 +67,27 @@ export default function AssessmentsV2() {
   const { user, getToken } = useAuth();
   
   const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [frameworks, setFrameworks] = useState<Framework[]>([]);
-  const [selectedFramework, setSelectedFramework] = useState<string>('');
+  const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
   const [frameworkQuestions, setFrameworkQuestions] = useState<FrameworkQuestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
+  const [isLoadingFramework, setIsLoadingFramework] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    loadData();
+    loadAssessments();
+    loadCFAFrameworkQuestions();
   }, []);
 
-  // Load framework questions when framework changes
-  useEffect(() => {
-    if (selectedFramework) {
-      loadFrameworkQuestions(selectedFramework);
-    } else {
-      setFrameworkQuestions([]);
-    }
-  }, [selectedFramework]);
-
-  const loadData = async () => {
+  const loadAssessments = async () => {
     try {
       setIsLoading(true);
+      console.log('🔍 Frontend: Starting to load assessments...');
+      
       const token = await getToken();
+      console.log('🔍 Frontend: Got token, length:', token?.length);
       
       if (!token) {
+        console.error('❌ Frontend: No token available');
         toast({
           title: "Authentication Error",
           description: "Please sign in again to access assessments",
@@ -99,58 +96,37 @@ export default function AssessmentsV2() {
         return;
       }
 
+      console.log('🔍 Frontend: Creating authenticated API...');
       const api = createAuthenticatedApi(token);
       
-      // Load assessments and frameworks in parallel
-      const [assessmentsResponse, frameworksResponse] = await Promise.all([
-        api.get('/api/assessments'),
-        api.get('/api/assessments/frameworks')
-      ]);
+      console.log('🔍 Frontend: Making API call to /api/assessments/forms...');
+      const response = await api.get('/api/assessments/forms');
       
-      setAssessments(assessmentsResponse.data.assessments || []);
-      setFrameworks(frameworksResponse.data.frameworks || []);
+      console.log('✅ Frontend: API response received:', response);
+      const data = response.data;
+      console.log('✅ Frontend: Response data:', data);
       
-      // Only set framework if none is currently selected
-      if (!selectedFramework) {
-        // Check if there's a default assessment to use
-        const defaultAssessment = assessmentsResponse.data.assessments?.find((a: Assessment) => a.is_default);
-        
-        if (defaultAssessment) {
-          // Use the default assessment's framework
-          setSelectedFramework(defaultAssessment.framework_version_id);
-        } else {
-          // No assessments exist, use CFA Three Pillar as default
-          const cfaFramework = frameworksResponse.data.frameworks?.find((f: Framework) => 
-            f.code === 'cfa_three_pillar_v1'
-          );
-          
-          if (cfaFramework) {
-            const cfaVersion = cfaFramework.risk_framework_versions.find(v => v.is_default);
-            if (cfaVersion) {
-              setSelectedFramework(cfaVersion.id);
-            }
-          } else {
-            // Fallback to any default framework if CFA not found
-            const defaultFramework = frameworksResponse.data.frameworks?.find((f: Framework) => 
-              f.risk_framework_versions.some(v => v.is_default)
-            );
-            
-            if (defaultFramework) {
-              const defaultVersion = defaultFramework.risk_framework_versions.find(v => v.is_default);
-              if (defaultVersion) {
-                setSelectedFramework(defaultVersion.id);
-              }
-            }
-          }
-        }
+      if (!data.forms || data.forms.length === 0) {
+        console.log('ℹ️ Frontend: No forms in response, setting empty array');
+        setAssessments([]);
+        return;
       }
-      // If selectedFramework is already set, don't change it
-    } catch (error: any) {
-      console.error("Failed to load data:", error);
       
-      let errorMessage = "Failed to load data. Please try again.";
+      console.log('✅ Frontend: Setting assessments:', data.forms);
+      setAssessments(data.forms);
+      
+      // Set the first active assessment as selected, or the first one if none active
+      const activeAssessment = data.forms.find((a: Assessment) => a.is_active) || data.forms[0];
+      setSelectedAssessment(activeAssessment);
+      console.log('✅ Frontend: Selected assessment:', activeAssessment);
+      
+    } catch (error: any) {
+      console.error("❌ Frontend: Failed to load assessments:", error);
+      
+      let errorMessage = "Failed to load assessments. Please try again.";
       
       if (error.response) {
+        console.error('❌ Frontend: Error response:', error.response);
         if (error.response.status === 401) {
           errorMessage = "Authentication failed. Please sign in again.";
         } else if (error.response.status === 403) {
@@ -159,8 +135,10 @@ export default function AssessmentsV2() {
           errorMessage = error.response.data.error;
         }
       } else if (error.request) {
+        console.error('❌ Frontend: Network error:', error.request);
         errorMessage = "Network error. Please check your connection and try again.";
       } else if (error.message) {
+        console.error('❌ Frontend: Error message:', error.message);
         errorMessage = error.message;
       }
       
@@ -174,98 +152,23 @@ export default function AssessmentsV2() {
     }
   };
 
-  const loadFrameworkQuestions = async (frameworkVersionId: string) => {
+  const loadCFAFrameworkQuestions = async () => {
     try {
-      setIsLoadingQuestions(true);
+      setIsLoadingFramework(true);
       const token = await getToken();
       if (!token) return;
 
       const api = createAuthenticatedApi(token);
-      const response = await api.get(`/api/assessments/frameworks/${frameworkVersionId}/questions`);
+      const response = await api.get(`/api/assessments/cfa/questions`);
       
       if (response.data.questions) {
         setFrameworkQuestions(response.data.questions);
-      } else {
-        setFrameworkQuestions([]);
       }
     } catch (error) {
-      console.error('Failed to load framework questions:', error);
+      console.error('Failed to load CFA framework questions:', error);
       setFrameworkQuestions([]);
     } finally {
-      setIsLoadingQuestions(false);
-    }
-  };
-
-  const updateFramework = async () => {
-    if (!selectedFramework) return;
-    
-    try {
-      setIsUpdating(true);
-      const token = await getToken();
-      
-      // console.log('🔍 updateFramework: Token retrieved, length:', token?.length || 0);
-      
-      if (!token) {
-        toast({
-          title: "Authentication Error",
-          description: "Please sign in again",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const api = createAuthenticatedApi(token);
-      // console.log('🔍 updateFramework: API instance created');
-      
-      // Check if there's a default assessment to update
-      const defaultAssessment = assessments.find(a => a.is_default);
-      // console.log('🔍 updateFramework: Default assessment found:', !!defaultAssessment);
-      
-      if (defaultAssessment) {
-        // Update existing assessment
-        // console.log('🔍 updateFramework: Updating existing assessment:', defaultAssessment.id);
-        await api.patch(`/api/assessments/${defaultAssessment.id}`, {
-          framework_version_id: selectedFramework
-        });
-        
-        toast({
-          title: "Success",
-          description: "Risk assessment framework updated successfully",
-        });
-      } else {
-        // Create new default assessment since none exists
-        // console.log('🔍 updateFramework: Creating new default assessment');
-        const response = await api.post('/api/assessments/default');
-        // console.log('🔍 updateFramework: Default assessment created:', response.data);
-        
-        toast({
-          title: "Success",
-          description: "Default assessment created with selected framework",
-        });
-      }
-      
-      // Reload data to get updated snapshot
-      await loadData();
-    } catch (error: any) {
-      console.error("Failed to update framework:", error);
-      console.error("Error details:", {
-        response: error.response?.data,
-        status: error.response?.status,
-        message: error.message
-      });
-      
-      let errorMessage = "Failed to update framework. Please try again.";
-      if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      }
-      
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsUpdating(false);
+      setIsLoadingFramework(false);
     }
   };
 
@@ -312,7 +215,7 @@ export default function AssessmentsV2() {
       return;
     }
     
-    window.open(`/a/${user.assessment_link}`, '_blank');
+    window.open(`/assessment-test/${user.assessment_link}`, '_blank');
   };
 
   const openTestLiveForm = () => {
@@ -326,27 +229,6 @@ export default function AssessmentsV2() {
     }
     
     window.open(`/assessment-test/${user.assessment_link}`, '_blank');
-  };
-
-  const getFrameworkName = (frameworkVersionId: string) => {
-    for (const framework of frameworks) {
-      const version = framework.risk_framework_versions.find(v => v.id === frameworkVersionId);
-      if (version) {
-        return `${framework.name} v${version.version}`;
-      }
-    }
-    return 'Unknown Framework';
-  };
-
-  const getEngineIcon = (engine: string) => {
-    switch (engine) {
-      case 'weighted_sum':
-        return <BarChart3 className="h-4 w-4" />;
-      case 'three_pillar':
-        return <Users className="h-4 w-4" />;
-      default:
-        return <Settings className="h-4 w-4" />;
-    }
   };
 
   const getQuestionTypeLabel = (qtype: string) => {
@@ -387,17 +269,17 @@ export default function AssessmentsV2() {
   return (
     <>
       <Helmet>
-        <title>Risk Assessments | OneMFin</title>
-        <meta name="description" content="Manage your risk assessment frameworks and configurations" />
+        <title>CFA Risk Assessments | OneMFin</title>
+        <meta name="description" content="Manage your CFA Three-Pillar risk assessment framework" />
       </Helmet>
 
       <div className="space-y-6">
         {/* Header with Action Buttons */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Risk Assessments</h1>
+            <h1 className="text-3xl font-bold tracking-tight">CFA Risk Assessments</h1>
             <p className="text-muted-foreground">
-              Configure and manage your risk assessment frameworks
+              Configure and manage your CFA Three-Pillar risk assessment framework
             </p>
           </div>
           
@@ -462,14 +344,14 @@ export default function AssessmentsV2() {
                   </p>
                 </CardHeader>
                 <CardContent>
-                  {selectedFramework ? (
+                  {selectedAssessment ? (
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <BookOpen className="h-4 w-4" />
-                        <span className="font-medium">{getFrameworkName(selectedFramework)}</span>
+                        <span className="font-medium">{assessment.title}</span>
                       </div>
                       
-                      {isLoadingQuestions ? (
+                      {isLoadingFramework ? (
                         <div className="flex items-center justify-center py-12">
                           <div className="text-center">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
@@ -570,8 +452,8 @@ export default function AssessmentsV2() {
                   ) : (
                     <div className="text-center py-12">
                       <BookOpen className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                      <p className="text-gray-500 font-medium mb-1">Select a Framework</p>
-                      <p className="text-sm text-gray-400">Choose a framework from the right panel to preview its questions</p>
+                      <p className="text-gray-500 font-medium mb-1">Select an Assessment</p>
+                      <p className="text-sm text-gray-400">Choose an assessment from the left panel to preview its questions</p>
                     </div>
                   )}
                 </CardContent>
@@ -579,7 +461,7 @@ export default function AssessmentsV2() {
             ))}
             
             {/* Fallback: Show framework questions when no assessments exist */}
-            {assessments.length === 0 && selectedFramework && (
+            {assessments.length === 0 && selectedAssessment && (
               <Card className="border-0 shadow-sm">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2 text-lg">
@@ -594,10 +476,10 @@ export default function AssessmentsV2() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <BookOpen className="h-4 w-4" />
-                      <span className="font-medium">{getFrameworkName(selectedFramework)}</span>
+                      <span className="font-medium">CFA Three-Pillar Framework</span>
                     </div>
                     
-                    {isLoadingQuestions ? (
+                    {isLoadingFramework ? (
                       <div className="flex items-center justify-center py-12">
                         <div className="text-center">
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
@@ -700,88 +582,50 @@ export default function AssessmentsV2() {
             )}
           </div>
 
-          {/* Right Column - Framework Selection */}
+          {/* Right Column - CFA Framework Information */}
           <div className="space-y-4">
             <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BookOpen className="h-5 w-5 text-blue-600" />
-                  Risk Framework Selection
+                  CFA Framework
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  CFA Three Pillar framework is selected by default. Choose a different framework if needed.
+                  Using the CFA Three-Pillar risk assessment framework
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Default Framework Note */}
+                {/* CFA Framework Info */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <div className="flex items-center gap-2">
                     <BookOpen className="h-4 w-4 text-blue-600" />
                     <div className="text-sm">
-                      <p className="font-medium text-blue-900">CFA Three Pillar Framework</p>
-                      <p className="text-blue-700">This framework is selected by default and recommended for most users.</p>
+                      <p className="font-medium text-blue-900">CFA Three-Pillar Framework</p>
+                      <p className="text-blue-700">Industry-standard risk assessment framework</p>
                     </div>
                   </div>
                 </div>
                 
-                <RadioGroup
-                  value={selectedFramework}
-                  onValueChange={setSelectedFramework}
-                  className="space-y-3"
-                >
-                  {frameworks.map(framework => 
-                    framework.risk_framework_versions.map(version => (
-                      <div key={version.id} className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
-                        <RadioGroupItem value={version.id} id={version.id} className="mt-1" />
-                        <Label htmlFor={version.id} className="flex-1 cursor-pointer">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-gray-900">{framework.name}</span>
-                                <span className="text-sm text-muted-foreground">v{version.version}</span>
-                                {version.is_default && (
-                                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                                    Default
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                {getEngineIcon(framework.engine)}
-                                <span className="capitalize">{framework.engine.replace('_', ' ')}</span>
-                              </div>
-                            </div>
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                              {framework.description}
-                            </p>
-                          </div>
-                        </Label>
-                      </div>
-                    ))
-                  )}
-                </RadioGroup>
+                {/* Engine Type */}
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-4 w-4 text-purple-600" />
+                    <div className="text-sm">
+                      <p className="font-medium text-purple-900">Scoring Engine</p>
+                      <p className="text-purple-700">Three-Pillar (Capacity, Tolerance, Need)</p>
+                    </div>
+                  </div>
+                </div>
                 
-                <Separator />
-                
-                <div className="flex justify-between items-center">
-                  <p className="text-sm text-muted-foreground">
-                    {assessments.length === 0 
-                      ? "Create a default assessment with the CFA Three Pillar framework"
-                      : "Update your assessment to use the selected framework"
-                    }
-                  </p>
-                  <Button 
-                    onClick={updateFramework} 
-                    disabled={isUpdating || !selectedFramework}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    {isUpdating 
-                      ? 'Processing...' 
-                      : assessments.length === 0 
-                        ? 'Create Assessment' 
-                        : 'Save Changes'
-                    }
-                  </Button>
-                  
+                {/* Version Info */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4 text-gray-600" />
+                    <div className="text-sm">
+                      <p className="font-medium text-gray-900">Current Version</p>
+                      <p className="text-gray-700">v1.0 - Default Framework</p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -807,7 +651,7 @@ export default function AssessmentsV2() {
                     <div>
                       <p className="font-semibold text-gray-900">{assessment.title}</p>
                       <p className="text-sm text-muted-foreground">
-                        Framework: {getFrameworkName(assessment.framework_version_id)}
+                        Framework: {assessment.framework_version_id}
                       </p>
                     </div>
                     
