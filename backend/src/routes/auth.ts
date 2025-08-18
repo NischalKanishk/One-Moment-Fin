@@ -299,17 +299,27 @@ router.get('/orphaned-users', authenticateUser, async (req: express.Request, res
     return res.json(result);
   } catch (error) {
     console.error('Get orphaned users error:', error);
-    return res.status(500).json({ error: 'Failed to get orphaned users' });
+    return res.status(500).json({ error: 'Failed to fetch orphaned users' });
   }
 });
 
-// POST /api/auth/bulk-migrate (Admin endpoint to bulk migrate orphaned users)
-router.post('/bulk-migrate', authenticateUser, async (req: express.Request, res: express.Response) => {
+// POST /api/auth/bulk-migrate (Admin endpoint to bulk migrate orphaned auth users)
+router.post('/bulk-migrate', authenticateUser, [
+  body('user_ids').isArray().withMessage('User IDs must be an array'),
+  body('user_ids.*').isString().withMessage('Each user ID must be a string')
+], async (req: express.Request, res: express.Response) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
     // Check if user is admin
     if (req.user!.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
+
+    const { user_ids } = req.body;
 
     const result = await UserMigrationService.bulkMigrateOrphanedUsers();
 
@@ -319,8 +329,29 @@ router.post('/bulk-migrate', authenticateUser, async (req: express.Request, res:
 
     return res.json(result);
   } catch (error) {
-    console.error('Bulk migration error:', error);
-    return res.status(500).json({ error: 'Bulk migration failed' });
+    console.error('Bulk migrate error:', error);
+    return res.status(500).json({ error: 'Migration failed' });
+  }
+});
+
+// Debug route to catch all requests
+router.all('*', (req: express.Request, res: express.Response) => {
+  console.log('🔍 Auth route debug - Method:', req.method, 'Path:', req.path, 'URL:', req.url);
+  console.log('🔍 Auth route debug - Headers:', req.headers);
+  console.log('🔍 Auth route debug - Body:', req.body);
+  
+  if (req.method === 'OPTIONS') {
+    // Handle preflight request
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.status(200).end();
+  } else {
+    res.status(405).json({ 
+      error: 'Method not allowed',
+      method: req.method,
+      path: req.path,
+      allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
+    });
   }
 });
 

@@ -333,11 +333,3 @@ export async function getCFAFrameworkQuestions(): Promise<any[]> {
     return [];
   }
 }
-
-/**
- * Get framework questions mapping (backward compatibility)
- */
-export async function getFrameworkQuestions(frameworkVersionId: string): Promise<any[]> {
-  // For now, always return CFA framework questions
-  return getCFAFrameworkQuestions();
-}

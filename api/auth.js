@@ -119,6 +119,73 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    // PUT /api/auth/profile - Update user profile (production serverless)
+    if (method === 'PUT' && path === '/profile') {
+      try {
+        const user = await authenticateUser(req);
+        const { full_name, phone, mfd_registration_number } = req.body || {};
+
+        // Normalize phone: empty string -> null
+        const phoneValue = (phone === '' || phone === undefined || phone === null) ? null : phone;
+
+        // Ensure user exists (create if missing)
+        let { data: existingUser, error: fetchError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('clerk_id', user.clerk_id)
+          .single();
+
+        if (fetchError && fetchError.code === 'PGRST116') {
+          const { data: newUser, error: createError } = await supabase
+            .from('users')
+            .insert({
+              clerk_id: user.clerk_id,
+              full_name: full_name || user.email?.split('@')[0] || 'New User',
+              email: user.email || null,
+              phone: phoneValue || user.phone || null,
+              mfd_registration_number: mfd_registration_number || null,
+              auth_provider: 'clerk',
+              role: 'mfd',
+              referral_link: `ref_${user.clerk_id.slice(-8)}`,
+            })
+            .select()
+            .single();
+
+          if (createError) {
+            return res.status(500).json({ error: 'Failed to create user profile' });
+          }
+
+          existingUser = newUser;
+        } else if (fetchError) {
+          return res.status(500).json({ error: 'Failed to fetch user profile' });
+        }
+
+        // Prepare partial update
+        const updateData = { updated_at: new Date().toISOString() };
+        if (full_name !== undefined) updateData.full_name = full_name;
+        if (phoneValue !== undefined) updateData.phone = phoneValue;
+        if (mfd_registration_number !== undefined) updateData.mfd_registration_number = mfd_registration_number;
+
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('users')
+          .update(updateData)
+          .eq('clerk_id', user.clerk_id)
+          .select()
+          .single();
+
+        if (updateError) {
+          return res.status(500).json({ error: 'Profile update failed' });
+        }
+
+        return res.json({ user: updatedUser });
+      } catch (error) {
+        if (error?.message?.includes('authorization')) {
+          return res.status(401).json({ error: 'Authentication failed' });
+        }
+        return res.status(500).json({ error: 'Profile update failed' });
+      }
+    }
+
     return res.status(405).json({ error: 'Method not allowed' });
 
   } catch (error) {

@@ -666,7 +666,7 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
           .select(`
             id,
             assessment_id,
-            framework_version_id,
+            framework_id,
             answers,
             result,
             submitted_at
@@ -681,27 +681,25 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
             .select(`
               id,
               title,
-              framework_version_id
+              framework_id
             `)
             .eq('id', submission.assessment_id)
             .single();
 
           if (!assessmentError && assessment) {
-            // Get the framework questions to map answers
+            // Get the CFA framework questions
             const { data: frameworkQuestions, error: questionsError } = await supabase
-              .from('framework_question_map')
+              .from('framework_questions')
               .select(`
                 qkey,
                 required,
                 order_index,
-                question_bank!inner (
-                  label,
-                  qtype,
-                  options,
-                  module
-                )
+                label,
+                qtype,
+                options,
+                module
               `)
-              .eq('framework_version_id', assessment.framework_version_id)
+              .eq('framework_id', assessment.framework_id)
               .order('order_index', { ascending: true });
 
             if (!questionsError && frameworkQuestions) {
@@ -717,9 +715,9 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
                   if (!answerValue || answerValue === 'Not answered') {
                     const possibleKeys = [
                       q.qkey,
-                      q.question_bank?.label,
-                      q.question_bank?.label?.toLowerCase().replace(/\s+/g, '_'),
-                      q.question_bank?.label?.toLowerCase().replace(/\s+/g, '-'),
+                      q.label,
+                      q.label?.toLowerCase().replace(/\s+/g, '_'),
+                      q.label?.toLowerCase().replace(/\s+/g, '-'),
                       typeof q.qkey === 'number' ? q.qkey.toString() : null,
                       q.qkey?.toString().toLowerCase(),
                       q.qkey?.toString().toUpperCase()
@@ -736,7 +734,7 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
                   
                   // If still no answer, try to find any answer that might match this question
                   if (!answerValue || answerValue === 'Not answered') {
-                    const questionText = q.question_bank?.label || q.qkey;
+                    const questionText = q.label || q.qkey;
                     if (questionText) {
                       for (const [answerKey, answerVal] of Object.entries(submission.answers)) {
                         if (answerKey.toLowerCase().includes(questionText.toLowerCase()) || 
@@ -761,11 +759,11 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
                   console.log(`🔍 Final answer for ${q.qkey}: ${answerValue}`);
                   
                   return {
-                    question: q.question_bank?.label || q.qkey,
+                    question: q.label || q.qkey,
                     answer: answerValue,
-                    type: q.question_bank?.qtype,
-                    options: q.question_bank?.options,
-                    module: q.question_bank?.module
+                    type: q.qtype,
+                    options: q.options,
+                    module: q.module
                   };
                 })
               };

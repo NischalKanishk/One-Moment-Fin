@@ -649,54 +649,25 @@ export class AssessmentService {
   }
 
   /**
-   * Get available frameworks
-   */
-  static async getFrameworks(): Promise<any[]> {
-    try {
-      const { data, error } = await supabase
-        .from('risk_frameworks')
-        .select(`
-          *,
-          risk_framework_versions (
-            id,
-            version,
-            is_default,
-            created_at
-          )
-        `)
-        .order('name');
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching frameworks:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Create default assessment for new user
    */
   static async createDefaultAssessment(userId: string): Promise<Assessment> {
     try {
-      // Get default framework
-      const { data: defaultFramework, error: frameworkError } = await supabase
-        .from('risk_framework_versions')
+      // Get CFA framework
+      const { data: cfaFramework, error: frameworkError } = await supabase
+        .from('risk_frameworks')
         .select('id')
-        .eq('is_default', true)
+        .eq('code', 'cfa_three_pillar_v1')
         .single();
 
-      if (frameworkError || !defaultFramework) {
-        throw new Error('No default framework found');
+      if (frameworkError || !cfaFramework) {
+        throw new Error('CFA framework not found');
       }
 
       // Create default assessment
       const assessment = await this.createAssessment(userId, {
-        title: 'Default Assessment',
-        framework_id: defaultFramework.id,
+        title: 'CFA Three-Pillar Risk Assessment',
+        framework_id: cfaFramework.id,
         is_default: true
       });
 

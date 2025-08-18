@@ -6,7 +6,6 @@ import { AssessmentFormService } from '../services/assessmentFormService';
 import { AIService } from '../services/ai';
 import { LeadStatusService } from '../services/leadStatusService';
 import { AssessmentService } from '../services/assessmentService';
-import { SeedFrameworkDataService } from '../services/seedFrameworkData';
 import { getCFAFrameworkQuestions } from '../services/riskScoring';
 
 const router = express.Router();
@@ -152,17 +151,6 @@ router.post('/forms/:formId/versions', authenticateUser, [
   } catch (error) {
     console.error('Create version error:', error);
     return res.status(500).json({ error: 'Failed to create form version' });
-  }
-});
-
-// GET /api/assessments/cfa/questions - Get CFA framework questions
-router.get('/cfa/questions', authenticateUser, async (req: express.Request, res: express.Response) => {
-  try {
-    const questions = await getCFAFrameworkQuestions();
-    return res.json({ questions });
-  } catch (error) {
-    console.error('Get CFA questions error:', error);
-    return res.status(500).json({ error: 'Failed to fetch CFA questions' });
   }
 });
 
@@ -1267,14 +1255,28 @@ router.get('/public/:slug', async (req: express.Request, res: express.Response) 
 // RISK ASSESSMENT SYSTEM ROUTES
 // ============================================================================
 
-// GET /api/assessments/frameworks - Get available risk frameworks
+// GET /api/assessments/frameworks - Get available frameworks
 router.get('/frameworks', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
     if (!req.user?.supabase_user_id) {
       return res.status(400).json({ error: 'User not properly authenticated' });
     }
 
-    const frameworks = await AssessmentService.getFrameworks();
+    // Return CFA framework information
+    const frameworks = [{
+      id: 'cfa-framework',
+      code: 'cfa_three_pillar_v1',
+      name: 'CFA Three-Pillar (Capacity, Tolerance, Need)',
+      description: 'Industry-standard risk assessment framework',
+      engine: 'three_pillar',
+      risk_framework_versions: [{
+        id: 'cfa-v1',
+        version: 1,
+        is_default: true,
+        created_at: new Date().toISOString()
+      }]
+    }];
+    
     return res.json({ frameworks });
   } catch (error) {
     console.error('Get frameworks error:', error);
@@ -1316,7 +1318,7 @@ router.post('/', authenticateUser, [
 // PATCH /api/assessments/:id - Update assessment
 router.patch('/:id', authenticateUser, [
   body('title').optional().notEmpty().withMessage('Title cannot be empty'),
-  body('framework_version_id').optional().isUUID().withMessage('Framework version ID must be valid UUID'),
+  body('framework_id').optional().isUUID().withMessage('Framework ID must be valid UUID'),
   body('is_published').optional().isBoolean().withMessage('is_published must be a boolean')
 ], async (req: express.Request, res: express.Response) => {
   try {
@@ -1409,50 +1411,31 @@ router.get('/frameworks/:frameworkId/questions', authenticateUser, async (req: e
 
     const { frameworkId } = req.params;
 
-    // Get questions for the framework by joining framework_question_map with question_bank
-    const { data: questions, error: questionsError } = await supabase
-      .from('framework_question_map')
-      .select(`
-        id,
-        qkey,
-        required,
-        order_index,
-        alias,
-        transform,
-        options_override,
-        question_bank!inner (
-          label,
-          qtype,
-          options,
-          module
-        )
-      `)
-      .eq('framework_version_id', frameworkId)
-      .order('order_index', { ascending: true });
-
-    if (questionsError) {
-      console.error('❌ Error fetching framework questions:', questionsError);
-      return res.status(500).json({ error: 'Failed to fetch framework questions' });
+    // For now, always return CFA framework questions since we only support CFA
+    const questions = await getCFAFrameworkQuestions();
+    
+    if (!questions || questions.length === 0) {
+      console.error('❌ No CFA framework questions found');
+      return res.status(500).json({ error: 'No questions found for this framework' });
     }
 
-    // Transform the data to match the expected format
-    const transformedQuestions = questions?.map((q: any) => ({
-      id: q.id,
-      qkey: q.qkey,
-      label: q.question_bank?.label,
-      qtype: q.question_bank?.qtype,
-      options: q.options_override || q.question_bank?.options,
-      required: q.required,
-      order_index: q.order_index,
-      module: q.question_bank?.module
-    })) || [];
-
-    console.log(`✅ Found ${transformedQuestions.length} questions for framework ${frameworkId}`);
-    return res.json({ questions: transformedQuestions });
+    console.log(`✅ Found ${questions.length} questions for framework ${frameworkId}`);
+    return res.json({ questions });
 
   } catch (error) {
     console.error('❌ Get framework questions error:', error);
     return res.status(500).json({ error: 'Failed to fetch framework questions' });
+  }
+});
+
+// GET /api/assessments/cfa/questions - Get CFA framework questions
+router.get('/cfa/questions', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    const questions = await getCFAFrameworkQuestions();
+    return res.json({ questions });
+  } catch (error) {
+    console.error('Get CFA questions error:', error);
+    return res.status(500).json({ error: 'Failed to fetch CFA questions' });
   }
 });
 
@@ -1494,25 +1477,6 @@ router.get('/debug/frameworks', authenticateUser, async (req: express.Request, r
   } catch (error) {
     console.error('❌ Debug frameworks error:', error);
     return res.status(500).json({ error: 'Failed to debug frameworks' });
-  }
-});
-
-// POST /api/assessments/seed-frameworks - Seed CFA framework data
-router.post('/seed-frameworks', authenticateUser, async (req: express.Request, res: express.Response) => {
-  try {
-    if (!req.user?.supabase_user_id) {
-      return res.status(400).json({ error: 'User not properly authenticated' });
-    }
-
-    const result = await SeedFrameworkDataService.seedCFAThreePillarFramework();
-    if (result.success) {
-      return res.json({ message: result.message });
-    } else {
-      return res.status(500).json({ error: result.message });
-    }
-  } catch (error) {
-    console.error('Seed frameworks error:', error);
-    return res.status(500).json({ error: 'Failed to seed frameworks' });
   }
 });
 
