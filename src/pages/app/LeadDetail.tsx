@@ -129,6 +129,9 @@ export default function LeadDetail() {
   const { toast } = useToast();
   const navigate = useNavigate();
   
+  // 🔧 DEBUG: This is the LeadDetail component that should show the red button
+  console.log('🔧 LeadDetail component rendered with ID:', id);
+  
   // Helper function to safely get assessment data
   const getAssessmentData = (lead: Lead) => {
     if (!lead.assessment_submissions || lead.assessment_submissions.length === 0) {
@@ -514,6 +517,10 @@ export default function LeadDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* 🔧 DEBUG: This should be visible if the component is updated */}
+      <div className="bg-red-500 text-white p-4 text-center font-bold text-xl mb-4">
+        🔧 LEAD DETAIL COMPONENT UPDATED - RED BUTTON SHOULD BE VISIBLE BELOW
+      </div>
       <Helmet>
         <title>{lead.full_name} – OneMFin</title>
         <meta name="description" content="Lead summary, risk assessment, meetings and AI suggestions." />
