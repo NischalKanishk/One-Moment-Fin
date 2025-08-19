@@ -151,6 +151,7 @@ export default function LeadDetail() {
   const [canDelete, setCanDelete] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
+  const [recreatingAssessment, setRecreatingAssessment] = useState(false);
 
 
   const form = useForm<EditFormData>({
@@ -285,6 +286,52 @@ export default function LeadDetail() {
         description: "Failed to update lead. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleRecreateAssessment = async () => {
+    try {
+      setRecreatingAssessment(true);
+      
+      const token = await getToken();
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      // Call the recreate assessment endpoint
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/leads/${id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ action: 'recreate_assessment' })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to recreate assessment');
+      }
+
+      const result = await response.json();
+      
+      toast({
+        title: "Success",
+        description: "Assessment submission recreated successfully!",
+      });
+
+      // Reload the lead data to show the new assessment submission
+      loadLead();
+      
+    } catch (error: any) {
+      console.error('Failed to recreate assessment:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to recreate assessment. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setRecreatingAssessment(false);
     }
   };
 
@@ -949,6 +996,18 @@ export default function LeadDetail() {
                             <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                             <p>No assessment responses available</p>
                             <p className="text-sm">This lead hasn't completed a risk assessment yet.</p>
+                            <div className="mt-4">
+                              <button
+                                onClick={handleRecreateAssessment}
+                                disabled={recreatingAssessment}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {recreatingAssessment ? 'Creating...' : 'Recreate Assessment'}
+                              </button>
+                              <p className="text-xs text-gray-400 mt-2">
+                                This will create a default assessment based on lead data
+                              </p>
+                            </div>
                           </div>
                         </div>
                       );

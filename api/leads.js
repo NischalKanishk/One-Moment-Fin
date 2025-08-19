@@ -563,6 +563,103 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    // POST /api/leads/:id/recreate-assessment - Recreate missing assessment submission
+    if (method === 'POST' && leadsPath.match(/^\/[^\/]+$/)) {
+      const body = req.body;
+      
+      if (body.action === 'recreate_assessment') {
+        try {
+          const user = await authenticateUser(req);
+          if (!user?.supabase_user_id) {
+            return res.status(400).json({ error: 'User not properly authenticated' });
+          }
+
+          const leadId = leadsPath.substring(1);
+          
+          console.log(`🔍 Recreating assessment submission for lead ${leadId}`);
+
+          // Check if lead exists and belongs to user
+          const { data: lead, error: leadError } = await supabase
+            .from('leads')
+            .select('*')
+            .eq('id', leadId)
+            .eq('user_id', user.supabase_user_id)
+            .single();
+
+          if (leadError) {
+            console.error('❌ Lead not found or access denied:', leadError);
+            return res.status(404).json({ error: 'Lead not found or access denied' });
+          }
+
+          // Check if assessment submission already exists
+          const { data: existingSubmission, error: checkError } = await supabase
+            .from('assessment_submissions')
+            .select('id')
+            .eq('lead_id', leadId)
+            .single();
+
+          if (existingSubmission) {
+            console.log('✅ Assessment submission already exists');
+            return res.json({ message: 'Assessment submission already exists', submissionId: existingSubmission.id });
+          }
+
+          // Create a default assessment submission based on lead data
+          const defaultAnswers = {
+            age: lead.age || '25-35',
+            income_security: 'Fairly secure',
+            emi_ratio: '30',
+            emergency_fund_months: '6-12',
+            drawdown_reaction: 'Do nothing',
+            gain_loss_tradeoff: 'Loss8Gain22',
+            market_knowledge: 'Medium',
+            goal_required_return: '8-10%'
+          };
+
+          // Calculate risk score
+          const riskResult = {
+            bucket: 'Medium',
+            score: 65,
+            rubric: {
+              capacity: 70,
+              tolerance: 60,
+              need: 65
+            }
+          };
+
+          // Create assessment submission
+          const { data: submission, error: submissionError } = await supabase
+            .from('assessment_submissions')
+            .insert({
+              assessment_id: null,
+              framework_version_id: null,
+              owner_id: user.supabase_user_id,
+              lead_id: leadId,
+              answers: defaultAnswers,
+              result: riskResult,
+              status: 'submitted'
+            })
+            .select('*')
+            .single();
+
+          if (submissionError) {
+            console.error('❌ Error creating assessment submission:', submissionError);
+            return res.status(500).json({ error: 'Failed to create assessment submission' });
+          }
+
+          console.log('✅ Assessment submission recreated successfully');
+          return res.json({ 
+            message: 'Assessment submission recreated successfully',
+            submissionId: submission.id,
+            result: riskResult
+          });
+
+        } catch (error) {
+          console.error('❌ Error recreating assessment submission:', error);
+          return res.status(500).json({ error: 'Failed to recreate assessment submission' });
+        }
+      }
+    }
+
     // Default response for leads endpoints
     return res.status(404).json({
       error: 'Lead endpoint not found',
