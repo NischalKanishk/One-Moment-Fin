@@ -985,12 +985,15 @@ export default function LeadDetail() {
                 </div>
               </div>
               
-              {(lead.assessment_submissions && lead.assessment_submissions.length > 0) || (lead.risk_bucket || lead.risk_score) ? (
-                <div className={`grid gap-8 ${lead.assessment_submissions && lead.assessment_submissions.length > 0 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
-                  {/* Left Side: Questions and Answers */}
-                  {(() => {
-                    const assessmentData = getAssessmentData(lead);
-                    if (!assessmentData || !assessmentData.answers) {
+              {/* Always show the assessment section, but conditionally render content */}
+              <div className="grid gap-8 grid-cols-1">
+                {/* Left Side: Questions and Answers */}
+                {(() => {
+                  const assessmentData = getAssessmentData(lead);
+                  console.log('🔍 Debug: assessmentData:', assessmentData);
+                  console.log('🔍 Debug: assessmentData?.answers:', assessmentData?.answers);
+                  
+                  if (!assessmentData || !assessmentData.answers) {
                       return (
                         <div className="space-y-4">
                           <div className="flex items-center gap-3 mb-4">
@@ -1167,17 +1170,6 @@ export default function LeadDetail() {
                     
                   </div>
                 </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <TrendingUp className="h-8 w-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Risk Assessment Completed</h3>
-                  <p className="text-gray-600 max-w-md mx-auto">
-                    This lead hasn't completed an assessment yet. Send them an assessment link to get started with risk profiling.
-                  </p>
-                </div>
-              )}
             </div>
           </TabsContent>
           
