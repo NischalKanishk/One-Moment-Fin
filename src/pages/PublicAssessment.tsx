@@ -132,6 +132,7 @@ export default function PublicAssessment() {
       setIsLoading(true);
       console.log('🔍 Loading assessment by code:', assessmentCode);
       
+      // Call the API endpoint that matches our API structure
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/assessment/${assessmentCode}`);
       
       if (!response.ok) {
@@ -237,6 +238,13 @@ export default function PublicAssessment() {
       return;
     }
 
+    // If there's no user_id, skip the existing lead check and proceed directly to questions
+    if (!assessment.user_id) {
+      console.log('⚠️ No user_id found in assessment, skipping existing lead check');
+      setCurrentStep('questions');
+      return;
+    }
+
     setIsVerifying(true);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/leads/check-existing`, {
@@ -271,6 +279,8 @@ export default function PublicAssessment() {
         description: "Failed to verify existing lead. Please try again.",
         variant: "destructive",
       });
+      // On error, proceed to questions anyway
+      setCurrentStep('questions');
     } finally {
       setIsVerifying(false);
     }

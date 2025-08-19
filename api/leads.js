@@ -427,6 +427,110 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    // POST /api/leads/check-existing - Check if a lead already exists
+    if (method === 'POST' && leadsPath === '/check-existing') {
+      try {
+        const { email, phone, user_id } = req.body;
+        
+        if (!email && !phone) {
+          return res.status(400).json({ error: 'Email or phone is required to check for existing leads' });
+        }
+
+        console.log(`🔍 Checking for existing lead with email: ${email}, phone: ${phone}, user_id: ${user_id}`);
+
+        // For public assessments, we need to check if a lead exists for the specific assessment owner
+        if (user_id) {
+          // This is a public assessment, check for leads under the assessment owner
+          let query = supabase
+            .from('leads')
+            .select('id, full_name, email, phone, status, created_at')
+            .eq('user_id', user_id);
+
+          // Check by email if provided
+          if (email && email.trim()) {
+            query = query.eq('email', email.trim());
+          }
+          // Check by phone if provided
+          else if (phone && phone.trim()) {
+            query = query.eq('phone', phone.trim());
+          }
+
+          const { data: existingLeads, error } = await query;
+
+          if (error) {
+            console.error('❌ Database error checking for existing leads:', error);
+            return res.status(500).json({ error: 'Failed to check for existing leads', details: error.message });
+          }
+
+          const existingLead = existingLeads && existingLeads.length > 0 ? existingLeads[0] : null;
+
+          if (existingLead) {
+            console.log(`✅ Found existing lead: ${existingLead.full_name} (${existingLead.email || existingLead.phone})`);
+            return res.json({
+              exists: true,
+              lead: existingLead
+            });
+          } else {
+            console.log('✅ No existing lead found');
+            return res.json({
+              exists: false,
+              lead: null
+            });
+          }
+        } else {
+          // This is an authenticated request, require user authentication
+          const user = await authenticateUser(req);
+          if (!user?.supabase_user_id) {
+            return res.status(400).json({ error: 'User not properly authenticated' });
+          }
+
+          console.log(`🔍 Checking for existing lead for authenticated user: ${user.supabase_user_id}`);
+
+          // Build query to check for existing leads
+          let query = supabase
+            .from('leads')
+            .select('id, full_name, email, phone, status, created_at')
+            .eq('user_id', user.supabase_user_id);
+
+          // Check by email if provided
+          if (email && email.trim()) {
+            query = query.eq('email', email.trim());
+          }
+          // Check by phone if provided
+          else if (phone && phone.trim()) {
+            query = query.eq('phone', phone.trim());
+          }
+
+          const { data: existingLeads, error } = await query;
+
+          if (error) {
+            console.error('❌ Database error checking for existing leads:', error);
+            return res.status(500).json({ error: 'Failed to check for existing leads', details: error.message });
+          }
+
+          const existingLead = existingLeads && existingLeads.length > 0 ? existingLeads[0] : null;
+
+          if (existingLead) {
+            console.log(`✅ Found existing lead: ${existingLead.full_name} (${existingLead.email || existingLead.phone})`);
+            return res.json({
+              exists: true,
+              lead: existingLead
+            });
+          } else {
+            console.log('✅ No existing lead found');
+            return res.json({
+              exists: false,
+              lead: null
+            });
+          }
+        }
+
+      } catch (error) {
+        console.error('❌ Error checking for existing leads:', error);
+        return res.status(500).json({ error: 'Failed to check for existing leads', details: error.message });
+      }
+    }
+
     // Default response for leads endpoints
     return res.status(404).json({
       error: 'Lead endpoint not found',
