@@ -1285,8 +1285,9 @@ export default function LeadDetail() {
                 </div>
               </div>
 
-              {/* CFA Framework Questions - Only show if CFA framework is selected */}
-              {lead.assessment?.assessment?.framework === 'CFA' && (
+              {/* CFA Framework Questions - Only show if CFA data exists */}
+              {(lead.cfa_goals || lead.cfa_min_investment || lead.cfa_investment_horizon || 
+                (lead.assessment_submissions && lead.assessment_submissions.length > 0)) && (
                 <div className="space-y-4 pt-6 border-t border-gray-200">
                   <h4 className="font-semibold text-gray-900">CFA Framework Questions</h4>
                   
@@ -1328,16 +1329,16 @@ export default function LeadDetail() {
                     </select>
                   </div>
 
-                                        <div className="flex justify-end">
-                        <Button 
-                          onClick={handleSaveCFAInfo}
-                          size="sm"
-                          disabled={savingNotes}
-                          className="bg-green-600 hover:bg-green-700 text-white"
-                        >
-                          {savingNotes ? 'Saving...' : 'Save CFA Information'}
-                        </Button>
-                      </div>
+                  <div className="flex justify-end">
+                    <Button 
+                      onClick={handleSaveCFAInfo}
+                      size="sm"
+                      disabled={savingNotes}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      {savingNotes ? 'Saving...' : 'Save CFA Information'}
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
