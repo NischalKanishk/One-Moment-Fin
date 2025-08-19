@@ -389,8 +389,22 @@ export default function PublicAssessment() {
         }
       };
 
-      if (assessmentType === 'assessment' && assessmentCode) {
-        submitUrl = `/api/assessment/${assessmentCode}/submit`;
+      if (assessmentType === 'assessment') {
+        // For assessment type, we need to determine the correct submission URL
+        if (assessmentCode) {
+          // Direct assessment code from URL params
+          submitUrl = `/api/assessment/${assessmentCode}/submit`;
+        } else if (location.pathname.startsWith('/a/')) {
+          // User assessment link - extract code from pathname
+          const pathCode = location.pathname.split('/')[2];
+          if (pathCode) {
+            submitUrl = `${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/assessment/${pathCode}/submit`;
+          } else {
+            throw new Error('Assessment code not found in URL');
+          }
+        } else {
+          throw new Error('Assessment code not available');
+        }
       } else if (assessmentType === 'referral' && referralCode) {
         submitUrl = `/api/r/referral/${referralCode}/submit`;
         if (assessment?.id) {
@@ -401,6 +415,15 @@ export default function PublicAssessment() {
       } else {
         throw new Error('Invalid assessment configuration');
       }
+      
+      console.log('🔍 Submitting assessment with data:', {
+        submitUrl,
+        submitData,
+        assessmentType,
+        assessmentCode,
+        slug,
+        pathname: location.pathname
+      });
       
       const response = await fetch(submitUrl, {
         method: 'POST',
