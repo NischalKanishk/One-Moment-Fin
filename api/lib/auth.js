@@ -22,12 +22,20 @@ const authenticateUser = async (req) => {
         console.log('🔍 Auth: JWT payload decoded:', payload);
         
         // Extract Clerk user ID from the token
-        const clerkUserId = payload.sub || payload.user_id || payload.clerk_id;
+        // Clerk tokens use 'sub' as the standard claim for user ID
+        const clerkUserId = payload.sub;
         
         if (!clerkUserId) {
-          console.error('❌ Auth: JWT token missing user ID field');
-          throw new Error('Invalid JWT token: missing user ID');
+          console.error('❌ Auth: JWT token missing "sub" field');
+          console.log('🔍 Available payload fields:', Object.keys(payload));
+          throw new Error('Invalid JWT token: missing user ID (sub)');
         }
+        
+        // Log additional Clerk-specific fields for debugging
+        if (payload.iss) console.log('🔍 Token issuer:', payload.iss);
+        if (payload.aud) console.log('🔍 Token audience:', payload.aud);
+        if (payload.iat) console.log('🔍 Token issued at:', new Date(payload.iat * 1000));
+        if (payload.exp) console.log('🔍 Token expires at:', new Date(payload.exp * 1000));
         
         console.log('🔍 Auth: Looking up user with clerk_id:', clerkUserId);
         
@@ -92,7 +100,15 @@ const authenticateUser = async (req) => {
         };
       } catch (error) {
         console.error('❌ Auth: JWT decode error:', error);
-        throw new Error('Invalid JWT token');
+        
+        // Provide more specific error messages for common JWT issues
+        if (error.message.includes('Unexpected token')) {
+          throw new Error('Invalid JWT token format: malformed payload');
+        } else if (error.message.includes('Unexpected end')) {
+          throw new Error('Invalid JWT token format: incomplete payload');
+        } else {
+          throw new Error(`Invalid JWT token: ${error.message}`);
+        }
       }
     } else {
       throw new Error('Invalid JWT format');
