@@ -20,7 +20,12 @@ import {
   Zap,
   Shield,
   Star,
-  BookOpen
+  BookOpen,
+  TrendingUp,
+  Users,
+  Target as TargetIcon,
+  Lightbulb,
+  Lock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -64,6 +69,7 @@ interface FrameworkQuestion {
   options: any;
   required: boolean;
   order_index: number;
+  module: string;
 }
 
 export default function Assessments() {
@@ -177,7 +183,6 @@ export default function Assessments() {
     }
   };
 
-
   const handleEditForm = (assessment: Assessment) => {
     navigate('/app/assessment/forms', { state: { assessmentId: assessment.id } });
   };
@@ -262,6 +267,59 @@ export default function Assessments() {
     }
   };
 
+  const getModuleIcon = (module: string) => {
+    switch (module) {
+      case 'profile': return <Users className="w-4 h-4" />;
+      case 'capacity': return <TrendingUp className="w-4 h-4" />;
+      case 'behavior': return <Brain className="w-4 h-4" />;
+      case 'knowledge': return <Lightbulb className="w-4 h-4" />;
+      case 'need': return <TargetIcon className="w-4 h-4" />;
+      case 'constraints': return <Lock className="w-4 h-4" />;
+      default: return <FileText className="w-4 h-4" />;
+    }
+  };
+
+  const getModuleLabel = (module: string) => {
+    switch (module) {
+      case 'profile': return 'Profile & Goals';
+      case 'capacity': return 'Financial Capacity';
+      case 'behavior': return 'Risk Tolerance';
+      case 'knowledge': return 'Market Knowledge';
+      case 'need': return 'Return Requirements';
+      case 'constraints': return 'Investment Constraints';
+      default: return module.charAt(0).toUpperCase() + module.slice(1);
+    }
+  };
+
+  const getModuleColor = (module: string) => {
+    switch (module) {
+      case 'profile': return 'bg-blue-50 border-blue-200 text-blue-800';
+      case 'capacity': return 'bg-green-50 border-green-200 text-green-800';
+      case 'behavior': return 'bg-purple-50 border-purple-200 text-purple-800';
+      case 'knowledge': return 'bg-orange-50 border-orange-200 text-orange-800';
+      case 'need': return 'bg-red-50 border-red-200 text-red-800';
+      case 'constraints': return 'bg-gray-50 border-gray-200 text-gray-800';
+      default: return 'bg-gray-50 border-gray-200 text-gray-800';
+    }
+  };
+
+  const groupQuestionsByModule = (questions: FrameworkQuestion[]) => {
+    const grouped: { [key: string]: FrameworkQuestion[] } = {};
+    questions.forEach(q => {
+      if (!grouped[q.module]) {
+        grouped[q.module] = [];
+      }
+      grouped[q.module].push(q);
+    });
+    
+    // Sort questions within each module by order_index
+    Object.keys(grouped).forEach(module => {
+      grouped[module].sort((a, b) => a.order_index - b.order_index);
+    });
+    
+    return grouped;
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -272,6 +330,8 @@ export default function Assessments() {
       </div>
     );
   }
+
+  const groupedQuestions = groupQuestionsByModule(frameworkQuestions);
 
   return (
     <>
@@ -329,6 +389,53 @@ export default function Assessments() {
 
         {/* Main Content */}
         <div className="max-w-7xl mx-auto px-6 py-8">
+          {/* CFA Framework Information Card */}
+          <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 shadow-sm mb-8">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <BookOpen className="w-6 h-6 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold text-blue-900 mb-2">CFA Three-Pillar Risk Assessment Framework</h2>
+                  <p className="text-blue-800 mb-4">
+                    Industry-standard framework that evaluates financial capacity, risk tolerance, and return requirements 
+                    to determine optimal investment strategies for clients.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <TrendingUp className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-blue-900">Capacity</div>
+                        <div className="text-xs text-blue-700">Financial ability to take risk</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                        <Brain className="w-4 h-4 text-purple-600" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-blue-900">Tolerance</div>
+                        <div className="text-xs text-blue-700">Psychological comfort with risk</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                        <TargetIcon className="w-4 h-4 text-red-600" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-blue-900">Need</div>
+                        <div className="text-xs text-blue-700">Required returns for goals</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* No Assessments Message */}
           {assessments.length === 0 ? (
             <Card className="bg-white border-0 shadow-sm">
@@ -392,15 +499,8 @@ export default function Assessments() {
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-lg text-gray-900">Assessment Questions</CardTitle>
                           <div className="flex items-center gap-3">
-                            {/* CFA Framework Badge */}
                             <div className="flex items-center gap-2">
-                              <BookOpen className="w-4 h-4 text-gray-500" />
                               <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                                Framework: CFA Three-Pillar
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs">
                                 {frameworkQuestions.length} Questions
                               </Badge>
                             </div>
@@ -411,8 +511,8 @@ export default function Assessments() {
                         {frameworkQuestions.length > 0 ? (
                           <>
                             {/* Questions Summary */}
-                            <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                            <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                                 <div>
                                   <div className="text-lg font-semibold text-blue-900">{frameworkQuestions.length}</div>
                                   <div className="text-xs text-blue-700">Total Questions</div>
@@ -425,7 +525,7 @@ export default function Assessments() {
                                 </div>
                                 <div>
                                   <div className="text-lg font-semibold text-blue-900">
-                                    {frameworkQuestions.filter(q => q.qtype === 'text' || q.qtype === 'number').length}
+                                    {frameworkQuestions.filter(q => q.qtype === 'text' || q.qtype === 'number' || q.qtype === 'percent').length}
                                   </div>
                                   <div className="text-xs text-blue-700">Input Questions</div>
                                 </div>
@@ -438,44 +538,62 @@ export default function Assessments() {
                               </div>
                             </div>
                             
-                            {/* Questions List */}
-                            <div className="space-y-3">
-                              {frameworkQuestions
-                                .sort((a, b) => a.order_index - b.order_index)
-                                .map((question, index) => (
-                                <div key={question.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                  <div className="flex items-start gap-3">
-                                    <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
-                                      {index + 1}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium text-gray-900 mb-2">{question.label}</p>
-                                      <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-                                        <Badge variant="outline" className="text-xs px-2 py-1">
-                                          {getQuestionTypeLabel(question.qtype)}
-                                        </Badge>
-                                        {question.required && (
-                                          <Badge variant="outline" className="text-xs px-2 py-1 bg-red-50 text-red-700 border-red-200">
-                                            Required
-                                          </Badge>
-                                        )}
-                                        {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && (
-                                          <span className="text-xs text-gray-500">
-                                            {question.qtype === 'scale' ? 'Scale' : 'Options'}
-                                          </span>
-                                        )}
+                            {/* Questions by Module */}
+                            <div className="space-y-6">
+                              {Object.entries(groupedQuestions).map(([module, questions]) => (
+                                <div key={module} className="space-y-3">
+                                  <div className="flex items-center gap-2 mb-3">
+                                    {getModuleIcon(module)}
+                                    <h3 className="text-md font-semibold text-gray-900">{getModuleLabel(module)}</h3>
+                                    <Badge variant="outline" className={`text-xs ${getModuleColor(module)}`}>
+                                      {questions.length} questions
+                                    </Badge>
+                                  </div>
+                                  
+                                  <div className="space-y-3">
+                                    {questions.map((question, index) => (
+                                      <div key={question.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                        <div className="flex items-start gap-3">
+                                          <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
+                                            {question.order_index}
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-gray-900 mb-2">{question.label}</p>
+                                            <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                                              <Badge variant="outline" className="text-xs px-2 py-1">
+                                                {getQuestionTypeLabel(question.qtype)}
+                                              </Badge>
+                                              {question.required && (
+                                                <Badge variant="outline" className="text-xs px-2 py-1 bg-red-50 text-red-700 border-red-200">
+                                                  Required
+                                                </Badge>
+                                              )}
+                                            </div>
+                                            {question.options && Array.isArray(question.options) && (
+                                              <div className="mt-2 text-xs text-gray-600">
+                                                <span className="font-medium">Options:</span> {question.options.map((opt: any) => opt.label || opt.value).join(', ')}
+                                              </div>
+                                            )}
+                                            {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && question.qtype === 'scale' && (
+                                              <div className="mt-2 text-xs text-gray-600">
+                                                <span className="font-medium">Scale:</span> {question.options.min} - {question.options.max}
+                                                {question.options.labels && (
+                                                  <span className="ml-2">({question.options.labels.join(' → ')})</span>
+                                                )}
+                                              </div>
+                                            )}
+                                            {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && (question.qtype === 'number' || question.qtype === 'percent') && (
+                                              <div className="mt-2 text-xs text-gray-600">
+                                                <span className="font-medium">Range:</span> {question.options.min} - {question.options.max}
+                                                {question.options.step && (
+                                                  <span className="ml-2">(step: {question.options.step})</span>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
                                       </div>
-                                      {question.options && Array.isArray(question.options) && (
-                                        <div className="mt-2 text-xs text-gray-600">
-                                          <span className="font-medium">Options:</span> {question.options.join(', ')}
-                                        </div>
-                                      )}
-                                      {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && question.qtype === 'scale' && (
-                                        <div className="mt-2 text-xs text-gray-600">
-                                          <span className="font-medium">Scale:</span> {question.options.min} - {question.options.max}
-                                        </div>
-                                      )}
-                                    </div>
+                                    ))}
                                   </div>
                                 </div>
                               ))}
@@ -492,7 +610,7 @@ export default function Assessments() {
                     </Card>
                   </div>
 
-                  {/* Right Column - Scoring Configuration */}
+                  {/* Right Column - Framework Information */}
                   <div className="lg:col-span-1">
                     <Card className="bg-white border-0 shadow-sm">
                       <CardHeader className="pb-4">
