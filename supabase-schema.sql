@@ -187,7 +187,7 @@ CREATE POLICY "Users can delete assessment questions" ON assessment_questions
         EXISTS (
             SELECT 1 FROM assessments 
             WHERE assessments.id = assessment_questions.assessment_id 
-            AND assessments.user_id = auth.uid()
+            AND assessments.user_id = get_user_id_from_clerk()
         )
     );
 
@@ -211,16 +211,16 @@ ALTER TABLE risk_assessments ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for risk_assessments table
 CREATE POLICY "Users can view own risk assessments" ON risk_assessments
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can insert own risk assessments" ON risk_assessments
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+    FOR INSERT WITH CHECK (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can update own risk assessments" ON risk_assessments
-    FOR UPDATE USING (auth.uid() = user_id);
+    FOR UPDATE USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can delete own risk assessments" ON risk_assessments
-    FOR DELETE USING (auth.uid() = user_id);
+    FOR DELETE USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Service role can manage all risk assessments" ON risk_assessments
     FOR ALL USING (auth.role() = 'service_role');
@@ -243,7 +243,7 @@ CREATE POLICY "Users can view risk assessment answers" ON risk_assessment_answer
         EXISTS (
             SELECT 1 FROM risk_assessments 
             WHERE risk_assessments.id = risk_assessment_answers.risk_assessment_id 
-            AND risk_assessments.user_id = auth.uid()
+            AND risk_assessments.user_id = get_user_id_from_clerk()
         )
     );
 
@@ -252,7 +252,7 @@ CREATE POLICY "Users can insert risk assessment answers" ON risk_assessment_answ
         EXISTS (
             SELECT 1 FROM risk_assessments 
             WHERE risk_assessments.id = risk_assessment_answers.risk_assessment_id 
-            AND risk_assessments.user_id = auth.uid()
+            AND risk_assessments.user_id = get_user_id_from_clerk()
         )
     );
 
@@ -261,7 +261,7 @@ CREATE POLICY "Users can update risk assessment answers" ON risk_assessment_answ
         EXISTS (
             SELECT 1 FROM risk_assessments 
             WHERE risk_assessments.id = risk_assessment_answers.risk_assessment_id 
-            AND risk_assessments.user_id = auth.uid()
+            AND risk_assessments.user_id = get_user_id_from_clerk()
         )
     );
 
@@ -270,7 +270,7 @@ CREATE POLICY "Users can delete risk assessment answers" ON risk_assessment_answ
         EXISTS (
             SELECT 1 FROM risk_assessments 
             WHERE risk_assessments.id = risk_assessment_answers.risk_assessment_id 
-            AND risk_assessments.user_id = auth.uid()
+            AND risk_assessments.user_id = get_user_id_from_clerk()
         )
     );
 
@@ -296,16 +296,16 @@ ALTER TABLE product_recommendations ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for product_recommendations table
 CREATE POLICY "Users can view own products" ON product_recommendations
-    FOR SELECT USING (auth.uid() = user_id OR visibility = 'public');
+    FOR SELECT USING (user_id = get_user_id_from_clerk() OR visibility = 'public');
 
 CREATE POLICY "Users can insert own products" ON product_recommendations
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+    FOR INSERT WITH CHECK (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can update own products" ON product_recommendations
-    FOR UPDATE USING (auth.uid() = user_id);
+    FOR UPDATE USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can delete own products" ON product_recommendations
-    FOR DELETE USING (auth.uid() = user_id);
+    FOR DELETE USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Service role can manage all products" ON product_recommendations
     FOR ALL USING (auth.role() = 'service_role');
@@ -332,16 +332,16 @@ ALTER TABLE meetings ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for meetings table
 CREATE POLICY "Users can view own meetings" ON meetings
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can insert own meetings" ON meetings
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+    FOR INSERT WITH CHECK (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can update own meetings" ON meetings
-    FOR UPDATE USING (auth.uid() = user_id);
+    FOR UPDATE USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can delete own meetings" ON meetings
-    FOR DELETE USING (auth.uid() = user_id);
+    FOR DELETE USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Service role can manage all meetings" ON meetings
     FOR ALL USING (auth.role() = 'service_role');
@@ -389,13 +389,13 @@ ALTER TABLE user_subscriptions ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for user_subscriptions table
 CREATE POLICY "Users can view own user subscriptions" ON user_subscriptions
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can insert own user subscriptions" ON user_subscriptions
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+    FOR INSERT WITH CHECK (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can update own user subscriptions" ON user_subscriptions
-    FOR UPDATE USING (auth.uid() = user_id);
+    FOR UPDATE USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Service role can manage all user subscriptions" ON user_subscriptions
     FOR ALL USING (auth.role() = 'service_role');
@@ -416,13 +416,13 @@ ALTER TABLE ai_feedback ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for ai_feedback table
 CREATE POLICY "Users can view own ai feedback" ON ai_feedback
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can insert own ai feedback" ON ai_feedback
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+    FOR INSERT WITH CHECK (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can update own ai feedback" ON ai_feedback
-    FOR UPDATE USING (auth.uid() = user_id);
+    FOR UPDATE USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Service role can manage all ai feedback" ON ai_feedback
     FOR ALL USING (auth.role() = 'service_role');

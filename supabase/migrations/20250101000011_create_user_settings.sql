@@ -15,18 +15,18 @@ CREATE TABLE IF NOT EXISTS user_settings (
 -- Enable RLS
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies
+-- RLS Policies for Clerk authentication
 CREATE POLICY "Users can view own settings" ON user_settings
-  FOR SELECT USING (auth.uid()::text = user_id::text);
+  FOR SELECT USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can insert own settings" ON user_settings
-  FOR INSERT WITH CHECK (auth.uid()::text = user_id::text);
+  FOR INSERT WITH CHECK (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can update own settings" ON user_settings
-  FOR UPDATE USING (auth.uid()::text = user_id::text);
+  FOR UPDATE USING (user_id = get_user_id_from_clerk());
 
 CREATE POLICY "Users can delete own settings" ON user_settings
-  FOR DELETE USING (auth.uid()::text = user_id::text);
+  FOR DELETE USING (user_id = get_user_id_from_clerk());
 
 -- Service role policy
 CREATE POLICY "Service role can manage all user settings" ON user_settings
