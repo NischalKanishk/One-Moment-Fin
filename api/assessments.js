@@ -93,6 +93,8 @@ function getDefaultOptions(qkey) {
 
 // Risk scoring function based on CFA Three-Pillar framework
 function calculateRiskScore(answers) {
+  console.log('🔍 Risk calculation input:', answers);
+  
   let capacityScore = 0;
   let toleranceScore = 0;
   let needScore = 0;
@@ -120,23 +122,51 @@ function calculateRiskScore(answers) {
   
   // Tolerance scoring (psychological ability to handle risk)
   if (answers.drawdown_reaction) {
-    const reactionMap = { 'Sell': 20, 'Do nothing': 60, 'Buy more': 85 };
+    // Handle both formats: "Sell" and "Sell immediately"
+    const reactionMap = { 
+      'Sell': 20, 'Sell immediately': 20,
+      'Do nothing': 60, 
+      'Buy more': 85 
+    };
     toleranceScore += reactionMap[answers.drawdown_reaction] || 50;
   }
   
   if (answers.gain_loss_tradeoff) {
-    const tradeoffMap = { 'NoLossEvenIfLowGain': 20, 'Loss8Gain22': 60, 'Loss25Gain50': 85 };
+    // Handle both formats: "NoLossEvenIfLowGain" and "No loss even if low gain"
+    const tradeoffMap = { 
+      'NoLossEvenIfLowGain': 20, 'No loss even if low gain': 20,
+      'Loss8Gain22': 60, '8% loss for 22% gain': 60,
+      'Loss25Gain50': 85, '25% loss for 50% gain': 85
+    };
     toleranceScore += tradeoffMap[answers.gain_loss_tradeoff] || 50;
   }
   
   if (answers.market_knowledge) {
-    const knowledgeMap = { '1': 20, '2': 40, '3': 60, '4': 75, '5': 90 };
+    // Handle both formats: "1", "2", "3" and "Low", "Medium", "High"
+    const knowledgeMap = { 
+      '1': 20, 'Low': 20,
+      '2': 40, 'Medium': 40,
+      '3': 60, 'High': 60,
+      '4': 75,
+      '5': 90
+    };
     toleranceScore += knowledgeMap[answers.market_knowledge] || 50;
   }
   
   // Need scoring (required return for goals)
   if (answers.goal_required_return) {
-    const returnValue = parseInt(answers.goal_required_return) || 0;
+    // Handle both formats: "6" and "6-8%"
+    let returnValue = 0;
+    if (typeof answers.goal_required_return === 'string') {
+      // Extract the first number from strings like "6-8%" or "6%"
+      const match = answers.goal_required_return.match(/(\d+)/);
+      if (match) {
+        returnValue = parseInt(match[1]);
+      }
+    } else {
+      returnValue = parseInt(answers.goal_required_return) || 0;
+    }
+    
     if (returnValue <= 4) needScore = 30;
     else if (returnValue <= 6) needScore = 45;
     else if (returnValue <= 8) needScore = 60;
@@ -159,7 +189,7 @@ function calculateRiskScore(answers) {
   else if (finalScore >= 56) riskBucket = 'Growth';
   else if (finalScore >= 36) riskBucket = 'Moderate';
   
-  return {
+  const result = {
     bucket: riskBucket,
     score: Math.round(finalScore),
     rubric: {
@@ -168,6 +198,9 @@ function calculateRiskScore(answers) {
       need: Math.round(needScore)
     }
   };
+  
+  console.log('🎯 Risk calculation result:', result);
+  return result;
 }
 
 // Main handler for all assessment routes
