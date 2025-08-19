@@ -1,70 +1,6 @@
 {
   "rewrites": [
     {
-      "source": "/api/test",
-      "destination": "/api/test.js"
-    },
-    {
-      "source": "/api/leads-test",
-      "destination": "/api/leads-test.js"
-    },
-    {
-      "source": "/api/debug",
-      "destination": "/api/debug.js"
-    },
-    {
-      "source": "/api/health",
-      "destination": "/api/health.js"
-    },
-    {
-      "source": "/api/test-env",
-      "destination": "/api/test-env.js"
-    },
-    {
-      "source": "/api/assessments/(.*)",
-      "destination": "/api/assessments.js"
-    },
-    {
-      "source": "/api/assessments",
-      "destination": "/api/assessments.js"
-    },
-    {
-      "source": "/api/leads/(.*)",
-      "destination": "/api/leads.js"
-    },
-    {
-      "source": "/api/leads",
-      "destination": "/api/leads.js"
-    },
-    {
-      "source": "/api/auth/(.*)",
-      "destination": "/api/auth.js"
-    },
-    {
-      "source": "/api/auth",
-      "destination": "/api/auth.js"
-    },
-    {
-      "source": "/api/ai/(.*)",
-      "destination": "/api/ai.js"
-    },
-    {
-      "source": "/api/ai",
-      "destination": "/api/ai.js"
-    },
-    {
-      "source": "/api/meetings/(.*)",
-      "destination": "/api/meetings.js"
-    },
-    {
-      "source": "/api/meetings",
-      "destination": "/api/meetings.js"
-    },
-    {
-      "source": "/api/meetings/google-callback",
-      "destination": "/api/meetings.js"
-    },
-    {
       "source": "/api/(.*)",
       "destination": "/api/[...path].js"
     },
@@ -74,7 +10,7 @@
     },
     {
       "source": "/assessment/(.*)",
-      "destination": "/api/assessments.js"
+      "destination": "/api/[...path].js"
     },
     {
       "source": "/(.*)",
