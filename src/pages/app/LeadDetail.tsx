@@ -320,6 +320,7 @@ export default function LeadDetail() {
       }
 
       const result = await response.json();
+      console.log('🔧 API response result:', result);
       
       toast({
         title: "Success",
@@ -327,6 +328,7 @@ export default function LeadDetail() {
       });
 
       // Reload the lead data to show the new assessment submission
+      console.log('🔧 Reloading lead data to show new assessment...');
       loadLead();
       
     } catch (error: any) {
