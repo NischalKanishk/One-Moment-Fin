@@ -390,7 +390,7 @@ async function handlePublicAssessmentSubmission(slug, submissionData) {
         email: submissionData.submitterInfo.email,
         phone: submissionData.submitterInfo.phone,
         age: submissionData.submitterInfo.age,
-        source_link: `Public Assessment: ${slug}`,
+        source_link: `Assessment: ${slug}`,
         status: 'assessment_done'
       })
       .select('id')
@@ -404,11 +404,35 @@ async function handlePublicAssessmentSubmission(slug, submissionData) {
       });
     }
     
+    // Create assessment submission record
+    const { data: submission, error: submissionError } = await supabase
+      .from('assessment_submissions')
+      .insert({
+        assessment_id: null, // Public assessment, no specific form
+        framework_version_id: null, // Default framework
+        owner_id: null, // Public submission, no specific owner
+        lead_id: lead.id,
+        answers: submissionData.answers,
+        result: riskResult,
+        status: 'submitted'
+      })
+      .select('*')
+      .single();
+    
+    if (submissionError) {
+      console.error('❌ Error creating assessment submission:', submissionError);
+      // Don't fail the request, just log the error
+      console.log('⚠️ Lead created but assessment submission failed');
+    } else {
+      console.log('✅ Assessment submission created:', submission.id);
+    }
+    
     console.log('✅ Public assessment submission processed successfully');
     
     return new Response(JSON.stringify({
       success: true,
       result: riskResult,
+      submissionId: submission?.id,
       leadId: lead.id
     }), {
       status: 200,
