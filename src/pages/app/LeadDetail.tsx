@@ -293,6 +293,7 @@ export default function LeadDetail() {
   };
 
   const handleRecreateAssessment = async () => {
+    console.log('🔧 Button clicked! Starting assessment recreation...');
     try {
       setRecreatingAssessment(true);
       
@@ -302,6 +303,7 @@ export default function LeadDetail() {
       }
 
       // Call the recreate assessment endpoint
+      console.log('🔧 Making API call to recreate assessment...');
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/leads/${id}`, {
         method: 'POST',
         headers: {
@@ -310,6 +312,7 @@ export default function LeadDetail() {
         },
         body: JSON.stringify({ action: 'recreate_assessment' })
       });
+      console.log('🔧 API response status:', response.status);
 
       if (!response.ok) {
         const errorData = await response.json();
