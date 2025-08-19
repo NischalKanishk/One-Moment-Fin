@@ -1,6 +1,50 @@
 {
   "rewrites": [
     {
+      "source": "/api/assessments/(.*)",
+      "destination": "/api/assessments.js"
+    },
+    {
+      "source": "/api/assessments",
+      "destination": "/api/assessments.js"
+    },
+    {
+      "source": "/api/leads/(.*)",
+      "destination": "/api/leads.js"
+    },
+    {
+      "source": "/api/leads",
+      "destination": "/api/leads.js"
+    },
+    {
+      "source": "/api/auth/(.*)",
+      "destination": "/api/auth.js"
+    },
+    {
+      "source": "/api/auth",
+      "destination": "/api/auth.js"
+    },
+    {
+      "source": "/api/meetings/(.*)",
+      "destination": "/api/[...path].js"
+    },
+    {
+      "source": "/api/meetings",
+      "destination": "/api/[...path].js"
+    },
+    {
+      "source": "/api/ai/(.*)",
+      "destination": "/api/[...path].js"
+    },
+    {
+      "source": "/api/ai",
+      "destination": "/api/[...path].js"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/[...path].js"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/[...path].js"
     },

@@ -4,12 +4,16 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('❌ Missing required Supabase environment variables:');
+  console.error('❌ SUPABASE_URL:', supabaseUrl ? 'Present' : 'Missing');
+  console.error('❌ SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceKey ? 'Present' : 'Missing');
+  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables');
 }
 
 // Create Supabase client with service role key for backend operations
-const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey, {
+// Service role key bypasses RLS policies
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
@@ -23,16 +27,9 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey
 console.log('🔍 Supabase client configuration:');
 console.log('🔍 URL:', supabaseUrl);
 console.log('🔍 Service Role Key:', supabaseServiceKey ? 'Present' : 'Missing');
-console.log('🔍 Anon Key:', supabaseAnonKey ? 'Present' : 'Missing');
-console.log('🔍 Using key:', supabaseServiceKey ? 'Service Role' : 'Anon Key');
+console.log('🔍 Using key: Service Role (bypasses RLS)');
 
-// Create public client for auth operations
+// Create public client for auth operations (if needed)
 const supabasePublic = createClient(supabaseUrl, supabaseAnonKey);
-
-// Warn if service role key is missing
-if (!supabaseServiceKey) {
-  console.warn('WARNING: SUPABASE_SERVICE_ROLE_KEY is not set!');
-  console.warn('This will cause database operations to fail due to RLS policies.');
-}
 
 module.exports = { supabase, supabasePublic };
