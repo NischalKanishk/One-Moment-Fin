@@ -24,7 +24,8 @@ import {
   Target as TargetIcon,
   Lightbulb,
   Lock,
-  Plus
+  Plus,
+  RefreshCw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -165,6 +166,11 @@ export default function AssessmentsV2() {
       const token = await getToken();
       if (!token) {
         console.log('❌ Frontend: No token available for CFA questions');
+        toast({
+          title: "Authentication Error",
+          description: "Please sign in again to load assessment questions",
+          variant: "destructive",
+        });
         return;
       }
 
@@ -177,16 +183,28 @@ export default function AssessmentsV2() {
       console.log('✅ Frontend: CFA questions API response received:', response);
       console.log('✅ Frontend: CFA questions data:', response.data);
       
-      if (response.data.questions) {
+      if (response.data.questions && response.data.questions.length > 0) {
         console.log('✅ Frontend: Setting CFA framework questions:', response.data.questions.length);
         setFrameworkQuestions(response.data.questions);
       } else {
         console.log('⚠️ Frontend: No questions in CFA response');
         setFrameworkQuestions([]);
+        toast({
+          title: "Warning",
+          description: "No assessment questions received from the server",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('❌ Frontend: Failed to load CFA framework questions:', error);
       setFrameworkQuestions([]);
+      
+      // Show user-friendly error message
+      toast({
+        title: "Error Loading Questions",
+        description: "Failed to load assessment questions. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoadingFramework(false);
     }
@@ -424,6 +442,10 @@ export default function AssessmentsV2() {
 
   const groupedQuestions = groupQuestionsByModule(frameworkQuestions);
 
+  // Safety check: if no questions are loaded, show appropriate message
+  const hasQuestions = frameworkQuestions && frameworkQuestions.length > 0;
+  const hasGroupedQuestions = Object.keys(groupedQuestions).length > 0;
+
   return (
     <>
       <Helmet>
@@ -518,7 +540,7 @@ export default function AssessmentsV2() {
                         <p className="text-sm text-muted-foreground">Loading questions...</p>
                       </div>
                     </div>
-                  ) : frameworkQuestions.length > 0 ? (
+                  ) : hasQuestions ? (
                     <>
                       {/* Questions Summary */}
                       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
@@ -550,90 +572,106 @@ export default function AssessmentsV2() {
                       
                       {/* Questions by Module */}
                       <div className="space-y-6">
-                        {Object.entries(groupedQuestions).map(([module, questions]) => (
-                          <div key={module} className="space-y-3">
-                            <div className="flex items-center gap-2 mb-3">
-                              {getModuleIcon(module)}
-                              <h3 className="text-md font-semibold text-gray-900">{getModuleLabel(module)}</h3>
-                              <Badge variant="outline" className={`text-xs ${getModuleColor(module)}`}>
-                                {questions.length} questions
-                              </Badge>
-                            </div>
-                            
-                            <div className="space-y-3">
-                              {questions.map((question, index) => (
-                                <div key={question.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow">
-                                  <div className="flex items-start gap-3">
-                                    <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                                      {question.order_index}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <h3 className="text-sm font-semibold text-gray-900 mb-2 leading-relaxed">
-                                        {question.label}
-                                      </h3>
-                                      
-                                      {/* Question Metadata */}
-                                      <div className="flex flex-wrap gap-2 mb-3">
-                                        <Badge 
-                                          variant="outline" 
-                                          className={`text-xs px-2 py-1 ${getQuestionTypeColor(question.qtype)}`}
-                                        >
-                                          {getQuestionTypeLabel(question.qtype)}
-                                        </Badge>
-                                        {question.required && (
-                                          <Badge variant="outline" className="text-xs px-2 py-1 bg-red-50 text-red-700 border-red-200">
-                                            Required
+                        {hasGroupedQuestions ? (
+                          Object.entries(groupedQuestions).map(([module, questions]) => (
+                            <div key={module} className="space-y-3">
+                              <div className="flex items-center gap-2 mb-3">
+                                {getModuleIcon(module)}
+                                <h3 className="text-md font-semibold text-gray-900">{getModuleLabel(module)}</h3>
+                                <Badge variant="outline" className={`text-xs ${getModuleColor(module)}`}>
+                                  {questions.length} questions
+                                </Badge>
+                              </div>
+                              
+                              <div className="space-y-3">
+                                {questions.map((question, index) => (
+                                  <div key={question.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow">
+                                    <div className="flex items-start gap-3">
+                                      <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                                        {question.order_index}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <h3 className="text-sm font-semibold text-gray-900 mb-2 leading-relaxed">
+                                          {question.label}
+                                        </h3>
+                                        
+                                        {/* Question Metadata */}
+                                        <div className="flex flex-wrap gap-2 mb-3">
+                                          <Badge 
+                                            variant="outline" 
+                                            className={`text-xs px-2 py-1 ${getQuestionTypeColor(question.qtype)}`}
+                                          >
+                                            {getQuestionTypeLabel(question.qtype)}
                                           </Badge>
+                                          {question.required && (
+                                            <Badge variant="outline" className="text-xs px-2 py-1 bg-red-50 text-red-700 border-red-200">
+                                              Required
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        
+                                        {/* Options Display */}
+                                        {question.options && Array.isArray(question.options) && (
+                                          <div className="bg-gray-50 rounded-md p-3">
+                                            <div className="text-xs font-medium text-gray-700 mb-2">Options:</div>
+                                            <div className="space-y-1">
+                                              {question.options.map((option: any, optIndex: number) => (
+                                                <div key={optIndex} className="flex items-center gap-2 text-sm text-gray-600">
+                                                  <ChevronRight className="h-3 w-3 text-gray-400" />
+                                                  <span>{option.label || option.value || option}</span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        
+                                        {/* Scale Display */}
+                                        {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && question.qtype === 'scale' && (
+                                          <div className="bg-gray-50 rounded-md p-3">
+                                            <div className="text-xs font-medium text-gray-700 mb-2">Scale Range:</div>
+                                            <div className="text-sm text-gray-600">
+                                              {question.options.min} to {question.options.max}
+                                              {question.options.labels && (
+                                                <span className="ml-2">({question.options.labels.join(' → ')})</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Number/Percent Range Display */}
+                                        {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && (question.qtype === 'number' || question.qtype === 'percent') && (
+                                          <div className="bg-gray-50 rounded-md p-3">
+                                            <div className="text-xs font-medium text-gray-700 mb-2">Range:</div>
+                                            <div className="text-sm text-gray-600">
+                                              {question.options.min} - {question.options.max}
+                                              {question.options.step && (
+                                                <span className="ml-2">(step: {question.options.step})</span>
+                                              )}
+                                            </div>
+                                          </div>
                                         )}
                                       </div>
-                                      
-                                      {/* Options Display */}
-                                      {question.options && Array.isArray(question.options) && (
-                                        <div className="bg-gray-50 rounded-md p-3">
-                                          <div className="text-xs font-medium text-gray-700 mb-2">Options:</div>
-                                          <div className="space-y-1">
-                                            {question.options.map((option: any, optIndex: number) => (
-                                              <div key={optIndex} className="flex items-center gap-2 text-sm text-gray-600">
-                                                <ChevronRight className="h-3 w-3 text-gray-400" />
-                                                <span>{option.label || option.value || option}</span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
-                                      
-                                      {/* Scale Display */}
-                                      {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && question.qtype === 'scale' && (
-                                        <div className="bg-gray-50 rounded-md p-3">
-                                          <div className="text-xs font-medium text-gray-700 mb-2">Scale Range:</div>
-                                          <div className="text-sm text-gray-600">
-                                            {question.options.min} to {question.options.max}
-                                            {question.options.labels && (
-                                              <span className="ml-2">({question.options.labels.join(' → ')})</span>
-                                            )}
-                                          </div>
-                                        </div>
-                                      )}
-
-                                      {/* Number/Percent Range Display */}
-                                      {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && (question.qtype === 'number' || question.qtype === 'percent') && (
-                                        <div className="bg-gray-50 rounded-md p-3">
-                                          <div className="text-xs font-medium text-gray-700 mb-2">Range:</div>
-                                          <div className="text-sm text-gray-600">
-                                            {question.options.min} - {question.options.max}
-                                            {question.options.step && (
-                                              <span className="ml-2">(step: {question.options.step})</span>
-                                            )}
-                                          </div>
-                                        </div>
-                                      )}
                                     </div>
                                   </div>
-                                </div>
-                              ))}
+                                ))}
+                              </div>
                             </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-8 text-gray-500">
+                            <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                            <p className="mb-2">No CFA Framework Questions Available</p>
+                            <p className="text-sm text-gray-400 mb-4">The assessment questions could not be loaded</p>
+                            <Button 
+                              onClick={loadCFAFrameworkQuestions}
+                              variant="outline"
+                              size="sm"
+                            >
+                              <RefreshCw className="w-4 h-4 mr-2" />
+                              Retry Loading Questions
+                            </Button>
                           </div>
-                        ))}
+                        )}
                       </div>
                     </>
                   ) : (
