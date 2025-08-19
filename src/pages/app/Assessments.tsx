@@ -172,12 +172,23 @@ export default function Assessments() {
       const api = createAuthenticatedApi(token);
       const response = await api.get('/api/assessments/cfa/questions');
       
-      if (response.data.questions) {
+      if (response.data.questions && response.data.questions.length > 0) {
         setFrameworkQuestions(response.data.questions);
+        console.log('✅ CFA framework questions loaded:', response.data.questions.length);
+      } else {
+        console.warn('⚠️ No CFA framework questions received from API');
+        setFrameworkQuestions([]);
       }
     } catch (error) {
-      console.error('Failed to load CFA framework questions:', error);
+      console.error('❌ Failed to load CFA framework questions:', error);
       setFrameworkQuestions([]);
+      
+      // Show user-friendly error message
+      toast({
+        title: "Warning",
+        description: "Could not load assessment questions. Some features may be limited.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoadingFramework(false);
     }
@@ -332,6 +343,10 @@ export default function Assessments() {
   }
 
   const groupedQuestions = groupQuestionsByModule(frameworkQuestions);
+
+  // Safety check: if no questions are loaded, show appropriate message
+  const hasQuestions = frameworkQuestions && frameworkQuestions.length > 0;
+  const hasGroupedQuestions = Object.keys(groupedQuestions).length > 0;
 
   return (
     <>
