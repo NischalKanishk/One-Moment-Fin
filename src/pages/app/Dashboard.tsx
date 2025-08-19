@@ -113,7 +113,7 @@ export default function Dashboard() {
       const token = await getToken();
       if (!token) return;
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

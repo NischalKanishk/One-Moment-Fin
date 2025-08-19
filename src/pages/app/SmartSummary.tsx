@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   ArrowLeft,
   User,
@@ -19,6 +20,42 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { leadsAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+
+// Question mapping for better display
+const CFA_QUESTION_MAPPING: Record<string, string> = {
+  // Capacity Questions
+  'primary_goal': 'What is your primary financial goal?',
+  'investment_horizon': 'What is your investment time horizon?',
+  'age': 'What is your age?',
+  'dependents': 'How many dependents do you have?',
+  'income': 'What is your annual income?',
+  'emergency_fund': 'Do you have an emergency fund?',
+  'debt_level': 'What is your current debt level?',
+  
+  // Tolerance Questions
+  'market_experience': 'What is your experience with market investments?',
+  'volatility_comfort': 'How comfortable are you with market volatility?',
+  'loss_tolerance': 'What is your tolerance for investment losses?',
+  'drawdown_comfort': 'How would you react to a 20% portfolio decline?',
+  
+  // Need Questions
+  'return_expectation': 'What is your expected annual return?',
+  'liquidity_needs': 'How quickly might you need to access your investments?',
+  'tax_considerations': 'How important are tax considerations?',
+  'inflation_protection': 'How concerned are you about inflation?',
+  
+  // Knowledge Questions
+  'investment_knowledge': 'How would you rate your investment knowledge?',
+  'product_familiarity': 'How familiar are you with investment products?',
+  
+  // Fallback for any other questions
+  'other': 'Additional Question'
+};
+
+// Helper function to format question text
+const formatQuestionText = (questionKey: string) => {
+  return CFA_QUESTION_MAPPING[questionKey] || questionKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
 
 interface Lead {
   id: string;
@@ -196,8 +233,18 @@ export default function SmartSummary() {
       
       // Check if assessment data exists
       const hasAssessment = lead.assessment && lead.assessment.mappedAnswers;
+      const hasAssessmentSubmissions = lead.assessment_submissions && lead.assessment_submissions.length > 0;
       const mappedAnswers = hasAssessment ? lead.assessment.mappedAnswers : [];
       const isCFA = lead.assessment?.assessment?.framework === 'CFA';
+      
+      // If no mapped answers but have assessment submissions, create a basic structure for PDF
+      let pdfAnswers = mappedAnswers;
+      if (!hasAssessment && hasAssessmentSubmissions) {
+        pdfAnswers = Object.entries(lead.assessment_submissions[0].answers).map(([question, answer]) => ({
+          question: formatQuestionText(question),
+          answer: String(answer)
+        }));
+      }
       pdfContent.innerHTML = `
         <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: white; color: black;">
           <!-- Header -->
@@ -233,30 +280,15 @@ export default function SmartSummary() {
             </div>
           </div>
 
-          <!-- Investment Preference -->
-          ${mappedAnswers.length > 0 ? `
+          <!-- Assessment Questions & Answers -->
+          ${pdfAnswers.length > 0 ? `
             <div style="margin-bottom: 30px;">
-              <h2 style="font-size: 20px; font-weight: bold; color: #111827; margin: 0 0 15px 0; padding: 10px; background: #f9fafb; border-left: 4px solid #f59e0b;">Investment Preference</h2>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                ${mappedAnswers.slice(0, 3).map((answer: any, index: number) => `
-                  <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 15px;">
-                    <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold; color: #92400e;">${answer.question || 'Question not available'}</p>
-                    <p style="margin: 0; font-size: 14px; color: #78350f;">${answer.answer || 'Answer not available'}</p>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          ` : ''}
-
-          <!-- Risk Assessment -->
-          ${mappedAnswers.length > 3 ? `
-            <div style="margin-bottom: 30px;">
-              <h2 style="margin: 0 0 15px 0; padding: 10px; background: #f9fafb; border-left: 4px solid #ef4444;">Risk Assessment</h2>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                ${mappedAnswers.slice(3).map((answer: any, index: number) => `
-                  <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 15px;">
-                    <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold; color: #991b1b;">${answer.question || 'Question not available'}</p>
-                    <p style="margin: 0; font-size: 14px; color: #7f1d1d;">${answer.answer || 'Answer not available'}</p>
+              <h2 style="font-size: 20px; font-weight: bold; color: #111827; margin: 0 0 15px 0; padding: 10px; background: #f9fafb; border-left: 4px solid #3b82f6;">Assessment Questions & Answers</h2>
+              <div style="display: grid; grid-template-columns: 1fr; gap: 15px;">
+                ${pdfAnswers.map((answer: any, index: number) => `
+                  <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 15px;">
+                    <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold; color: #1e293b;">${answer.question || 'Question not available'}</p>
+                    <p style="margin: 0; font-size: 14px; color: #475569;">${answer.answer || 'Answer not available'}</p>
                   </div>
                 `).join('')}
               </div>
@@ -413,7 +445,7 @@ export default function SmartSummary() {
       <div className="max-w-7xl mx-auto px-6 py-8" ref={contentRef}>
         <div className="space-y-6">
           
-          {/* Top Row - Lead Overview and Risk Profile Side by Side */}
+          {/* Top Row - Lead Overview and Risk Factor Summary Side by Side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
             {/* Lead Overview */}
@@ -457,133 +489,203 @@ export default function SmartSummary() {
               </CardContent>
             </Card>
             
-            {/* Risk Assessment Summary */}
-            {lead.assessment && (
-              <Card className="border-0 shadow-sm bg-white">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg font-semibold text-gray-900">Risk Profile</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {/* Risk Score and Category Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <div className="text-sm text-gray-600 mb-1">Risk Score</div>
-                        <div className="text-3xl font-bold text-gray-900">{lead.risk_score || 0}</div>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <div className="text-sm text-gray-600 mb-1">Risk Category</div>
-                        <Badge className={`text-sm px-3 py-1 ${getRiskCategoryColor(lead.risk_bucket)}`}>
-                          {lead.risk_bucket || 'Not Assessed'}
-                        </Badge>
+            {/* Risk Factor Summary */}
+            <Card className="border-0 shadow-sm bg-white">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-gray-900">Risk Factor Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {/* Risk Score and Category Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <div className="text-sm text-gray-600 mb-1">Risk Score</div>
+                      <div className="text-3xl font-bold text-gray-900">{lead.risk_score || 0}</div>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <div className="text-sm text-gray-600 mb-1">Risk Category</div>
+                      <Badge className={`text-sm px-3 py-1 ${getRiskCategoryColor(lead.risk_bucket)}`}>
+                        {lead.risk_bucket || 'Not Assessed'}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  {/* Assessment Details */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="text-sm text-gray-600 mb-1">Questions Answered</div>
+                      <div className="text-lg font-semibold text-gray-900">
+                        {lead.assessment?.mappedAnswers?.length || lead.assessment_submissions?.[0]?.answers ? Object.keys(lead.assessment_submissions[0].answers).length : 0}
                       </div>
                     </div>
-                    
-                    {/* Assessment Details */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <div className="text-sm text-gray-600 mb-1">Questions Answered</div>
-                        <div className="text-lg font-semibold text-gray-900">{lead.assessment.mappedAnswers.length}</div>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <div className="text-sm text-gray-600 mb-1">Completed</div>
-                        <div className="text-lg font-semibold text-gray-900">
-                          {new Date(lead.assessment.submission.submitted_at).toLocaleDateString('en-IN', {
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="text-sm text-gray-600 mb-1">Completed</div>
+                      <div className="text-lg font-semibold text-gray-900">
+                        {lead.assessment?.submission?.submitted_at ? 
+                          new Date(lead.assessment.submission.submitted_at).toLocaleDateString('en-IN', {
                             month: 'short',
                             day: 'numeric',
                             year: 'numeric'
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Risk Insight */}
-                    <div className="p-4 bg-gray-50 rounded-lg border-l-4 border-gray-300">
-                      <div className="text-sm text-gray-700">
-                        {lead.risk_bucket === 'Conservative' && 'Low risk tolerance - suitable for stable investments'}
-                        {lead.risk_bucket === 'Moderate' && 'Balanced approach - mix of growth and stability'}
-                        {lead.risk_bucket === 'Growth' && 'Growth-oriented - comfortable with market volatility'}
-                        {lead.risk_bucket === 'Aggressive' && 'High risk tolerance - potential for higher returns'}
-                        {!lead.risk_bucket && 'Risk profile assessment completed'}
+                          }) :
+                          lead.assessment_submissions?.[0]?.submitted_at ?
+                          new Date(lead.assessment_submissions[0].submitted_at).toLocaleDateString('en-IN', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          }) :
+                          new Date(lead.created_at).toLocaleDateString('en-IN', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })
+                        }
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                  
+                  {/* Risk Insight */}
+                  <div className="p-4 bg-gray-50 rounded-lg border-l-4 border-gray-300">
+                    <div className="text-sm text-gray-700">
+                      {lead.risk_bucket === 'Conservative' && 'Low risk tolerance - suitable for stable investments'}
+                      {lead.risk_bucket === 'Moderate' && 'Balanced approach - mix of growth and stability'}
+                      {lead.risk_bucket === 'Growth' && 'Growth-oriented - comfortable with market volatility'}
+                      {lead.risk_bucket === 'Aggressive' && 'High risk tolerance - potential for higher returns'}
+                      {!lead.risk_bucket && 'Risk profile assessment completed'}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Investment Preference - First 3 Questions */}
-          {lead.assessment && lead.assessment.mappedAnswers && lead.assessment.mappedAnswers.length > 0 && (
-            <Card className="border-0 shadow-sm bg-white">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold text-gray-900">Investment Preference</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {lead.assessment.mappedAnswers.slice(0, 3).map((answer, index) => (
-                    <div key={index} className="p-4 bg-gray-50 rounded-lg border-l-4 border-gray-300">
-                      <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                          <span className="text-xs font-semibold text-gray-700">{index + 1}</span>
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-sm font-medium text-gray-800 mb-2">{answer.question}</div>
-                          <div className="text-sm text-gray-700 bg-white px-3 py-2 rounded border border-gray-200">
-                            {answer.answer}
+          {/* Tabs Section - Questions & Answers and Notes */}
+          <Card className="border-0 shadow-sm bg-white">
+            <CardContent className="p-0">
+              <Tabs defaultValue="questions" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 bg-white border-b border-gray-200 rounded-none p-0 h-14">
+                  <TabsTrigger 
+                    value="questions" 
+                    className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:border-blue-200 data-[state=active]:shadow-sm rounded-none h-14 transition-all duration-200 font-medium border-b-2 data-[state=active]:border-b-blue-500"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Questions & Answers
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="notes" 
+                    className="data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:border-amber-200 data-[state=active]:shadow-sm rounded-none h-14 transition-all duration-200 font-medium border-b-2 data-[state=active]:border-b-amber-500"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Notes
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="questions" className="p-6">
+                  {(lead.assessment?.mappedAnswers?.length > 0 || lead.assessment_submissions?.[0]?.answers) ? (
+                    <div className="space-y-6">
+                      {/* Group answers by module for better organization */}
+                      {(() => {
+                        const answers = lead.assessment?.mappedAnswers || [];
+                        const answersByModule: Record<string, Array<[string, any]>> = {};
+                        
+                        if (answers.length > 0) {
+                          // Use mapped answers if available
+                          answers.forEach((answer: any) => {
+                            let module = answer.module || 'General';
+                            if (!answersByModule[module]) {
+                              answersByModule[module] = [];
+                            }
+                            answersByModule[module].push([answer.question, answer.answer]);
+                          });
+                        } else if (lead.assessment_submissions?.[0]?.answers) {
+                          // Fallback to assessment submissions
+                          Object.entries(lead.assessment_submissions[0].answers).forEach(([questionKey, answer]) => {
+                            let module = 'General';
+                            if (questionKey.includes('primary_goal') || questionKey.includes('horizon')) module = 'Profile';
+                            if (questionKey.includes('age') || questionKey.includes('dependents') || questionKey.includes('income')) module = 'Capacity';
+                            if (questionKey.includes('market_knowledge') || questionKey.includes('experience')) module = 'Knowledge';
+                            if (questionKey.includes('drawdown') || questionKey.includes('loss')) module = 'Behavior';
+                            if (questionKey.includes('return') || questionKey.includes('liquidity')) module = 'Needs & Constraints';
+                            
+                            if (!answersByModule[module]) {
+                              answersByModule[module] = [];
+                            }
+                            answersByModule[module].push([questionKey, answer]);
+                          });
+                        }
+                        
+                        return Object.entries(answersByModule).map(([module, moduleAnswers]) => (
+                          <div key={module} className="space-y-4">
+                            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                              <h4 className="font-semibold text-blue-800 text-sm uppercase tracking-wide">{module}</h4>
+                              <div className="ml-auto text-xs text-blue-600 bg-white px-2 py-1 rounded-full">
+                                {moduleAnswers.length} question{moduleAnswers.length !== 1 ? 's' : ''}
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-4 ml-5">
+                              {moduleAnswers.map(([question, answer], index) => (
+                                <div key={index} className="bg-gradient-to-r from-gray-50 to-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200">
+                                  <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                      <span className="text-xs font-semibold text-blue-700">{index + 1}</span>
+                                    </div>
+                                    <div className="flex-1 space-y-3">
+                                      <h5 className="font-medium text-gray-900 text-sm leading-relaxed">
+                                        {typeof question === 'string' ? formatQuestionText(question) : question}
+                                      </h5>
+                                      <div className="bg-white rounded border border-gray-200 p-3">
+                                        <span className="text-sm font-medium text-gray-700">Answer:</span>
+                                        <span className="ml-2 text-sm text-gray-900 font-medium">{String(answer)}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
+                        ));
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <FileText className="h-8 w-8 text-gray-400" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No Assessment Completed</h3>
+                      <p className="text-gray-600 max-w-md mx-auto">
+                        This lead hasn't completed an assessment yet. Send them an assessment link to get started with risk profiling.
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="notes" className="p-6">
+                  {lead.notes ? (
+                    <div className="space-y-4">
+                      <div className="p-4 bg-amber-50 rounded-lg border-l-4 border-amber-300">
+                        <div className="text-sm text-amber-800 whitespace-pre-wrap">
+                          {lead.notes}
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Risk Assessment - Remaining Questions */}
-          {lead.assessment && lead.assessment.mappedAnswers && lead.assessment.mappedAnswers.length > 3 && (
-            <Card className="border-0 shadow-sm bg-white">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold text-gray-900">Risk Assessment</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {lead.assessment.mappedAnswers.slice(3).map((answer, index) => (
-                    <div key={index + 3} className="p-4 bg-gray-50 rounded-lg border-l-4 border-gray-300">
-                      <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                          <span className="text-xs font-semibold text-gray-700">{index + 4}</span>
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-sm font-medium text-gray-800 mb-2">{answer.question}</div>
-                          <div className="text-sm text-gray-700 bg-white px-3 py-2 rounded border border-gray-200">
-                            {answer.answer}
-                          </div>
-                        </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <FileText className="h-8 w-8 text-gray-400" />
                       </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No Notes Available</h3>
+                      <p className="text-gray-600 max-w-md mx-auto">
+                        No notes have been added for this lead yet. Add notes to track important information and insights.
+                      </p>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                  )}
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
 
-          {/* Notes Display */}
-          {lead.notes && (
-            <Card className="border-0 shadow-sm bg-white">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold text-gray-900">Notes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="p-4 bg-gray-50 rounded-lg border-l-4 border-gray-300">
-                  <div className="text-sm text-gray-700 whitespace-pre-wrap">
-                    {lead.notes}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+
 
           {/* CFA Information Display */}
           {(lead.cfa_goals || lead.cfa_min_investment || lead.cfa_investment_horizon) && (

@@ -115,7 +115,7 @@ export default function MeetingModal({
       const token = await getToken();
       if (!token) return;
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings/google-status`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/google-status`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -213,7 +213,7 @@ export default function MeetingModal({
       const token = await getToken();
       if (!token) return;
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings/google-auth`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/google-auth`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

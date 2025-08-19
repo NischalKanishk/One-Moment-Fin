@@ -60,6 +60,58 @@ export default function Meetings() {
     fetchMeetings();
     fetchLeads();
     checkGoogleConnection();
+    
+    // Check for OAuth callback parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const error = urlParams.get('error');
+    
+    if (success === 'google_connected') {
+      toast({
+        title: "Success",
+        description: "Google Calendar connected successfully!",
+      });
+      // Refresh Google connection status
+      checkGoogleConnection();
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    
+    if (error) {
+      let errorMessage = "Failed to connect Google Calendar";
+      switch (error) {
+        case 'oauth_failed':
+          errorMessage = "Google OAuth authentication failed";
+          break;
+        case 'invalid_callback':
+          errorMessage = "Invalid OAuth callback";
+          break;
+        case 'invalid_state':
+          errorMessage = "Invalid OAuth state";
+          break;
+        case 'token_exchange_failed':
+          errorMessage = "Failed to exchange OAuth tokens";
+          break;
+        case 'user_info_failed':
+          errorMessage = "Failed to get user information from Google";
+          break;
+        case 'storage_failed':
+          errorMessage = "Failed to store authentication tokens";
+          break;
+        case 'callback_failed':
+          errorMessage = "OAuth callback processing failed";
+          break;
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive"
+      });
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, []);
 
   const fetchMeetings = async () => {
@@ -73,7 +125,7 @@ export default function Meetings() {
 
       console.log('🔍 Frontend: Token type check - length:', token.length, 'parts:', token.split('.').length);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -94,12 +146,25 @@ export default function Meetings() {
       }
 
       try {
-        const data = await response.json();
+        const responseText = await response.text();
+        console.log('🔍 Raw response text:', responseText);
+        
+        if (!responseText) {
+          console.warn('⚠️ Empty response received');
+          setMeetings([]);
+          return;
+        }
+        
+        const data = JSON.parse(responseText);
+        console.log('🔍 Parsed data:', data);
+        
         // Handle both old and new response formats
         const meetingsData = data.meetings || data || [];
         setMeetings(Array.isArray(meetingsData) ? meetingsData : []);
       } catch (jsonError) {
         console.error('Failed to parse meetings JSON:', jsonError);
+        console.error('Response status:', response.status);
+        console.error('Response headers:', response.headers);
         setMeetings([]);
       }
     } catch (error) {
@@ -135,12 +200,25 @@ export default function Meetings() {
       }
 
       try {
-        const data = await response.json();
+        const responseText = await response.text();
+        console.log('🔍 Raw leads response text:', responseText);
+        
+        if (!responseText) {
+          console.warn('⚠️ Empty leads response received');
+          setLeads([]);
+          return;
+        }
+        
+        const data = JSON.parse(responseText);
+        console.log('🔍 Parsed leads data:', data);
+        
         // Handle both old and new response formats
         const leadsData = data.leads || data || [];
         setLeads(Array.isArray(leadsData) ? leadsData : []);
       } catch (jsonError) {
         console.error('Failed to parse leads JSON:', jsonError);
+        console.error('Leads response status:', response.status);
+        console.error('Leads response headers:', response.headers);
         setLeads([]);
       }
     } catch (error) {
@@ -156,7 +234,7 @@ export default function Meetings() {
 
       console.log('🔍 Frontend: Google status check - token length:', token.length);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings/google-status`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/google-status`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -169,8 +247,23 @@ export default function Meetings() {
         return;
       }
 
-      const status = await response.json();
-      setGoogleStatus(status);
+      try {
+        const responseText = await response.text();
+        console.log('🔍 Raw Google status response text:', responseText);
+        
+        if (!responseText) {
+          console.warn('⚠️ Empty Google status response received');
+          return;
+        }
+        
+        const status = JSON.parse(responseText);
+        console.log('🔍 Parsed Google status data:', status);
+        setGoogleStatus(status);
+      } catch (jsonError) {
+        console.error('Failed to parse Google status JSON:', jsonError);
+        console.error('Google status response status:', response.status);
+        console.error('Google status response headers:', response.headers);
+      }
     } catch (error) {
       console.error('Failed to check Google connection:', error);
     } finally {
@@ -185,7 +278,7 @@ export default function Meetings() {
 
       console.log('🔍 Frontend: Google auth - token length:', token.length);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings/google-auth`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/google-auth`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -228,7 +321,7 @@ export default function Meetings() {
 
       console.log('🔍 Frontend: Create meeting - token length:', token.length);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -259,7 +352,7 @@ export default function Meetings() {
 
       console.log('🔍 Frontend: Update meeting - token length:', token.length);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings/${editingMeeting?.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/${editingMeeting?.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -290,7 +383,7 @@ export default function Meetings() {
 
       console.log('🔍 Frontend: Cancel meeting - token length:', token.length);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings/${meetingId}/cancel`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/${meetingId}/cancel`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -329,7 +422,7 @@ export default function Meetings() {
 
       console.log('🔍 Frontend: Update status - token length:', token.length);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/leads/meetings/${meetingId}/status`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/${meetingId}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -374,19 +374,19 @@ export const productsAPI = {
 export const meetingsAPI = {
   getAll: async (token: string) => {
     const authApi = createAuthenticatedApi(token);
-    const response = await authApi.get('/api/leads/meetings');
+    const response = await authApi.get('/api/meetings');
     return response.data;
   },
 
   create: async (token: string, data: { lead_id: string; title: string; start_time: string; end_time?: string; description?: string; meeting_link?: string }) => {
     const authApi = createAuthenticatedApi(token);
-    const response = await authApi.post('/api/leads/meetings', data);
+    const response = await authApi.post('/api/meetings', data);
     return response.data;
   },
 
   updateStatus: async (token: string, id: string, status: string) => {
     const authApi = createAuthenticatedApi(token);
-    const response = await authApi.patch(`/api/leads/meetings/${id}/status`, { status });
+    const response = await authApi.patch(`/api/meetings/${id}/status`, { status });
     return response.data;
   },
 };

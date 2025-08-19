@@ -53,6 +53,18 @@
       "destination": "/api/ai.js"
     },
     {
+      "source": "/api/meetings/(.*)",
+      "destination": "/api/meetings.js"
+    },
+    {
+      "source": "/api/meetings",
+      "destination": "/api/meetings.js"
+    },
+    {
+      "source": "/api/meetings/google-callback",
+      "destination": "/api/meetings.js"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/[...path].js"
     },
