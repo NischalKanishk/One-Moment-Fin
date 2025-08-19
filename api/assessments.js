@@ -183,11 +183,11 @@ function calculateRiskScore(answers) {
   // Final risk score is the minimum of capacity and tolerance
   const finalScore = Math.min(capacityScore, toleranceScore);
   
-  // Determine risk bucket
-  let riskBucket = 'Conservative';
-  if (finalScore >= 76) riskBucket = 'Aggressive';
-  else if (finalScore >= 56) riskBucket = 'Growth';
-  else if (finalScore >= 36) riskBucket = 'Moderate';
+  // Determine risk bucket (mapped to frontend expectations)
+  let riskBucket = 'Low'; // Conservative
+  if (finalScore >= 76) riskBucket = 'High'; // Aggressive
+  else if (finalScore >= 56) riskBucket = 'High'; // Growth
+  else if (finalScore >= 36) riskBucket = 'Medium'; // Moderate
   
   const result = {
     bucket: riskBucket,

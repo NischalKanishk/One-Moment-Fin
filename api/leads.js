@@ -119,6 +119,7 @@ module.exports = async function handler(req, res) {
         
         console.log(`🔍 Fetching lead ${leadId} for user: ${user.supabase_user_id}`);
 
+        // First get the lead
         const { data: lead, error } = await supabase
           .from('leads')
           .select('*')
@@ -134,8 +135,34 @@ module.exports = async function handler(req, res) {
           return res.status(500).json({ error: 'Database query failed', details: error.message });
         }
 
-        console.log(`✅ Found lead: ${lead.full_name}`);
-        return res.json({ lead });
+        // Then get the assessment submissions for this lead
+        const { data: assessmentSubmissions, error: submissionsError } = await supabase
+          .from('assessment_submissions')
+          .select('*')
+          .eq('lead_id', leadId)
+          .order('created_at', { ascending: false });
+
+        if (submissionsError) {
+          console.error('❌ Error fetching assessment submissions:', submissionsError);
+          // Don't fail the request, just log the error
+        }
+
+        // Combine the data
+        const leadWithSubmissions = {
+          ...lead,
+          assessment_submissions: assessmentSubmissions || []
+        };
+
+        if (error) {
+          if (error.code === 'PGRST116') {
+            return res.status(404).json({ error: 'Lead not found' });
+          }
+          console.error('❌ Database error:', error);
+          return res.status(500).json({ error: 'Database query failed', details: error.message });
+        }
+
+        console.log(`✅ Found lead: ${leadWithSubmissions.full_name} with ${leadWithSubmissions.assessment_submissions.length} assessment submissions`);
+        return res.json({ lead: leadWithSubmissions });
       } catch (error) {
         console.error('❌ Error fetching lead:', error);
         return res.status(500).json({ error: 'Failed to fetch lead', details: error.message });
