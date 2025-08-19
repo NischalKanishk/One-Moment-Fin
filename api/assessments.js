@@ -37,6 +37,109 @@ const CFA_FRAMEWORK_STRUCTURE = [
   { qkey: 'education', module: 'need', order: 16, label: 'What is your highest level of education?' }
 ];
 
+// GET /api/assessment/:code - Get assessment by code (for public assessment links)
+export async function GET(req, { params }) {
+  const { code } = params;
+  
+  if (!code) {
+    return new Response(JSON.stringify({ error: 'Assessment code is required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  try {
+    console.log('🔍 Looking up assessment by code:', code);
+    
+    // First, look up the assessment link
+    const { data: assessmentLink, error: linkError } = await supabase
+      .from('assessment_links')
+      .select(`
+        *,
+        user:user_id (
+          id,
+          email,
+          full_name
+        )
+      `)
+      .eq('token', code)
+      .eq('is_active', true)
+      .single();
+
+    if (linkError || !assessmentLink) {
+      console.log('❌ Assessment link not found for code:', code);
+      return new Response(JSON.stringify({ error: 'Assessment not found or inactive' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log('✅ Assessment link found:', assessmentLink.id);
+
+    // Get the CFA framework questions
+    const questionKeys = CFA_FRAMEWORK_STRUCTURE.map(q => q.qkey);
+    const { data: questions, error: questionsError } = await supabase
+      .from('question_bank')
+      .select('*')
+      .in('qkey', questionKeys)
+      .eq('is_active', true)
+      .order('id');
+
+    if (questionsError) {
+      console.error('❌ Error fetching questions:', questionsError);
+      return new Response(JSON.stringify({ error: 'Failed to fetch questions' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Transform questions to match the CFA framework structure
+    const transformedQuestions = questions.map((q) => {
+      const frameworkQuestion = CFA_FRAMEWORK_STRUCTURE.find(fq => fq.qkey === q.qkey);
+      return {
+        id: q.id,
+        qkey: q.qkey,
+        label: q.label || frameworkQuestion?.label || q.qkey,
+        qtype: q.qtype || 'single',
+        options: q.options || getDefaultOptions(q.qkey),
+        required: q.required !== false,
+        order_index: frameworkQuestion?.order || 999,
+        module: frameworkQuestion?.module || q.module || 'risk_assessment'
+      };
+    }).sort((a, b) => a.order_index - b.order_index);
+
+    // Prepare the assessment data
+    const assessment = {
+      id: assessmentLink.id,
+      title: 'CFA Three-Pillar Risk Assessment',
+      slug: code,
+      user_id: assessmentLink.user_id,
+      user_name: assessmentLink.user?.full_name || 'Unknown User'
+    };
+
+    console.log('✅ Assessment loaded successfully:', {
+      assessmentId: assessment.id,
+      questionsCount: transformedQuestions.length,
+      userId: assessment.user_id
+    });
+
+    return new Response(JSON.stringify({
+      assessment,
+      questions: transformedQuestions
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('❌ Error loading assessment by code:', error);
+    return new Response(JSON.stringify({ error: 'Failed to load assessment' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
 // GET /api/assessments/cfa/questions - Get CFA questions (mapped from existing database)
 export default async function handler(req, res) {
   if (req.method !== 'GET') {

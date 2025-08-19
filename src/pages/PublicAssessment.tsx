@@ -106,16 +106,16 @@ export default function PublicAssessment() {
         loadReferralAssessment(referralCode);
       }
     } else if (location.pathname.startsWith('/a/')) {
-      console.log('🔍 Assessment type: public (user assessment link)');
-      setAssessmentType('public');
-      // Extract the slug from the pathname since it's the user assessment link
-      const pathSlug = location.pathname.split('/')[2]; // /a/slug -> ['', 'a', 'slug']
-      console.log('🔍 Extracted slug from pathname:', pathSlug);
-      if (pathSlug && pathSlug.trim() !== '') {
-        console.log('🔍 Calling loadAssessment with:', pathSlug);
-        loadAssessment(pathSlug);
+      console.log('🔍 Assessment type: assessment code (user assessment link)');
+      setAssessmentType('assessment');
+      // Extract the assessment code from the pathname since it's a user assessment link
+      const pathCode = location.pathname.split('/')[2]; // /a/code -> ['', 'a', 'code']
+      console.log('🔍 Extracted assessment code from pathname:', pathCode);
+      if (pathCode && pathCode.trim() !== '') {
+        console.log('🔍 Calling loadAssessmentByCode with:', pathCode);
+        loadAssessmentByCode(pathCode);
       } else {
-        console.error('❌ No slug found in pathname or slug is empty');
+        console.error('❌ No assessment code found in pathname or code is empty');
         setIsLoading(false);
       }
     } else if (slug) {
@@ -130,13 +130,17 @@ export default function PublicAssessment() {
   const loadAssessmentByCode = async (assessmentCode: string) => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/assessment/${assessmentCode}`);
+      console.log('🔍 Loading assessment by code:', assessmentCode);
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/assessment/${assessmentCode}`);
       
       if (!response.ok) {
         throw new Error('Assessment not found');
       }
       
       const data = await response.json();
+      console.log('✅ Assessment data loaded by code:', data);
+      
       setAssessment(data.assessment);
       setQuestions(data.questions);
     } catch (error) {
