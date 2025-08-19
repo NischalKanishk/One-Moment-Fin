@@ -996,6 +996,101 @@ module.exports = async function handler(req, res) {
           return res.status(500).json({ error: 'Failed to fetch framework questions' });
         }
       }
+
+      // GET /api/assessments/forms - Get assessment forms (what frontend expects)
+      if (method === 'GET' && assessmentsPath === '/forms') {
+        try {
+          const user = await authenticateUser(req);
+          if (!user?.supabase_user_id) {
+            return res.status(400).json({ error: 'User not properly authenticated' });
+          }
+
+          // Get user's assessments and transform them to match frontend expectations
+          const { data: assessments, error } = await supabase
+            .from('assessments')
+            .select('*')
+            .eq('user_id', user.supabase_user_id);
+
+          if (error) {
+            console.error('❌ Database error:', error);
+            return res.status(500).json({ error: 'Failed to fetch assessments' });
+          }
+
+          // Transform assessments to match frontend "forms" structure
+          const forms = assessments?.map(assessment => ({
+            id: assessment.id,
+            name: assessment.name,
+            description: assessment.description,
+            is_active: assessment.is_active,
+            created_at: assessment.created_at,
+            questions: [] // Will be populated when needed
+          })) || [];
+
+          return res.json({ forms });
+        } catch (error) {
+          console.error('❌ Error fetching assessment forms:', error);
+          return res.status(500).json({ error: 'Failed to fetch assessment forms' });
+        }
+      }
+
+      // GET /api/assessments/cfa/questions - Get CFA questions (what frontend expects)
+      if (method === 'GET' && assessmentsPath === '/cfa/questions') {
+        try {
+          const user = await authenticateUser(req);
+          if (!user?.supabase_user_id) {
+            return res.status(400).json({ error: 'User not properly authenticated' });
+          }
+
+          // Return CFA framework questions
+          return res.json({ 
+            questions: [
+              {
+                id: 'q1',
+                qkey: 'investment_horizon',
+                label: 'What is your investment horizon?',
+                qtype: 'mcq',
+                options: ['Less than 1 year', '1-3 years', '3-5 years', 'More than 5 years'],
+                required: true,
+                order_index: 1,
+                module: 'risk_assessment'
+              },
+              {
+                id: 'q2',
+                qkey: 'risk_tolerance',
+                label: 'How would you react to a 20% drop in your investment value?',
+                qtype: 'mcq',
+                options: ['Sell immediately', 'Sell some', 'Hold', 'Buy more'],
+                required: true,
+                order_index: 2,
+                module: 'risk_assessment'
+              },
+              {
+                id: 'q3',
+                qkey: 'investment_goals',
+                label: 'What are your primary investment goals?',
+                qtype: 'mcq',
+                options: ['Capital preservation', 'Income generation', 'Growth', 'Tax efficiency'],
+                required: true,
+                order_index: 3,
+                module: 'investment_objectives'
+              },
+              {
+                id: 'q4',
+                qkey: 'investment_experience',
+                label: 'How would you describe your investment experience?',
+                qtype: 'mcq',
+                options: ['Beginner', 'Some experience', 'Experienced', 'Very experienced'],
+                required: true,
+                order_index: 4,
+                module: 'background'
+              }
+            ]
+          });
+        } catch (error) {
+          console.error('❌ Error fetching CFA questions:', error);
+          return res.status(500).json({ error: 'Failed to fetch CFA questions' });
+        }
+      }
     }
     
     // ============================================================================
