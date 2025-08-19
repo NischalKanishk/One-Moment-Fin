@@ -897,27 +897,33 @@ export default function PublicAssessment() {
                       
                       {questions[currentQuestionIndex].qtype === 'multi' && questions[currentQuestionIndex].options && questions[currentQuestionIndex].options.length > 0 ? (
                         <div className="space-y-3">
-                          {questions[currentQuestionIndex].options.map((option: any, optionIndex: number) => (
-                            <div key={optionIndex} className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
-                              <input
-                                type="checkbox"
-                                id={`${questions[currentQuestionIndex].qkey}-${optionIndex}`}
-                                checked={Array.isArray(answers[questions[currentQuestionIndex].qkey]) && answers[questions[currentQuestionIndex].qkey].includes(option.value)}
-                                onChange={(e) => {
-                                  const currentAnswers = Array.isArray(answers[questions[currentQuestionIndex].qkey]) ? answers[questions[currentQuestionIndex].qkey] : [];
-                                  if (e.target.checked) {
-                                    handleAnswerChange(questions[currentQuestionIndex].qkey, [...currentAnswers, option.value]);
-                                  } else {
-                                    handleAnswerChange(questions[currentQuestionIndex].qkey, currentAnswers.filter((ans: string) => ans !== option.value));
-                                  }
-                                }}
-                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                              />
-                              <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} className="text-base cursor-pointer flex-1">
-                                {option.label}
-                              </Label>
-                            </div>
-                          ))}
+                          {questions[currentQuestionIndex].options.map((option: any, optionIndex: number) => {
+                            // Handle both string and object formats
+                            const optionValue = typeof option === 'string' ? option : option.value;
+                            const optionLabel = typeof option === 'string' ? option : option.label;
+                            
+                            return (
+                              <div key={optionIndex} className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+                                <input
+                                  type="checkbox"
+                                  id={`${questions[currentQuestionIndex].qkey}-${optionIndex}`}
+                                  checked={Array.isArray(answers[questions[currentQuestionIndex].qkey]) && answers[questions[currentQuestionIndex].qkey].includes(optionValue)}
+                                  onChange={(e) => {
+                                    const currentAnswers = Array.isArray(answers[questions[currentQuestionIndex].qkey]) ? answers[questions[currentQuestionIndex].qkey] : [];
+                                    if (e.target.checked) {
+                                      handleAnswerChange(questions[currentQuestionIndex].qkey, [...currentAnswers, optionValue]);
+                                    } else {
+                                      handleAnswerChange(questions[currentQuestionIndex].qkey, currentAnswers.filter((ans: string) => ans !== optionValue));
+                                    }
+                                  }}
+                                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                />
+                                <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} className="text-base cursor-pointer flex-1">
+                                  {optionLabel}
+                                </Label>
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : questions[currentQuestionIndex].qtype === 'single' && questions[currentQuestionIndex].options && questions[currentQuestionIndex].options.length > 0 ? (
                         <RadioGroup
@@ -925,14 +931,20 @@ export default function PublicAssessment() {
                           onValueChange={(value) => handleAnswerChange(questions[currentQuestionIndex].qkey, value)}
                           className="space-y-3"
                         >
-                          {questions[currentQuestionIndex].options.map((option: any, optionIndex: number) => (
-                            <div key={optionIndex} className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
-                              <RadioGroupItem value={option.value} id={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} />
-                              <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} className="text-base cursor-pointer flex-1">
-                                {option.label}
-                              </Label>
-                            </div>
-                          ))}
+                          {questions[currentQuestionIndex].options.map((option: any, optionIndex: number) => {
+                            // Handle both string and object formats
+                            const optionValue = typeof option === 'string' ? option : option.value;
+                            const optionLabel = typeof option === 'string' ? option : option.label;
+                            
+                            return (
+                              <div key={optionIndex} className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+                                <RadioGroupItem value={optionValue} id={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} />
+                                <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} className="text-base cursor-pointer flex-1">
+                                  {optionLabel}
+                                </Label>
+                              </div>
+                            );
+                          })}
                         </RadioGroup>
                       ) : questions[currentQuestionIndex].qtype === 'number' ? (
                         <div className="space-y-3">
