@@ -637,7 +637,20 @@ ALTER TABLE assessment_submissions ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for assessment_submissions table
 CREATE POLICY "Users can view own assessment submissions" ON assessment_submissions
-    FOR SELECT USING (owner_id = get_user_id_from_clerk());
+    FOR SELECT USING (
+        owner_id = get_user_id_from_clerk() OR 
+        EXISTS (
+            SELECT 1 FROM leads 
+            WHERE leads.id = assessment_submissions.lead_id 
+            AND leads.user_id = get_user_id_from_clerk()
+        ) OR
+        -- Allow viewing submissions created by the current user (for public assessments)
+        EXISTS (
+            SELECT 1 FROM users 
+            WHERE users.clerk_id = current_setting('request.jwt.claims', true)::json->>'sub'
+            AND users.id = assessment_submissions.owner_id
+        )
+    );
 
 CREATE POLICY "Users can insert own assessment submissions" ON assessment_submissions
     FOR INSERT WITH CHECK (owner_id = get_user_id_from_clerk());
