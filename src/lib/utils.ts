@@ -61,6 +61,11 @@ export function formatSourceLink(sourceLink: string | null | undefined): string 
     return 'Via link';
   }
   
+  // Check if it's the new /a/assessment_link format
+  if (sourceLink.startsWith('/a/')) {
+    return 'Via link';
+  }
+  
   // Check if it contains common assessment-related text
   if (sourceLink.toLowerCase().includes('assessment') || 
       sourceLink.toLowerCase().includes('form') ||

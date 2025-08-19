@@ -19,7 +19,12 @@ import {
   FileText,
   ChevronRight,
   Play,
-  Brain
+  Brain,
+  TrendingUp,
+  Target as TargetIcon,
+  Lightbulb,
+  Lock,
+  Plus
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -155,17 +160,32 @@ export default function AssessmentsV2() {
   const loadCFAFrameworkQuestions = async () => {
     try {
       setIsLoadingFramework(true);
+      console.log('🔍 Frontend: Loading CFA framework questions...');
+      
       const token = await getToken();
-      if (!token) return;
+      if (!token) {
+        console.log('❌ Frontend: No token available for CFA questions');
+        return;
+      }
 
+      console.log('🔍 Frontend: Got token for CFA questions, length:', token?.length);
       const api = createAuthenticatedApi(token);
+      
+      console.log('🔍 Frontend: Making API call to /api/assessments/cfa/questions...');
       const response = await api.get(`/api/assessments/cfa/questions`);
       
+      console.log('✅ Frontend: CFA questions API response received:', response);
+      console.log('✅ Frontend: CFA questions data:', response.data);
+      
       if (response.data.questions) {
+        console.log('✅ Frontend: Setting CFA framework questions:', response.data.questions.length);
         setFrameworkQuestions(response.data.questions);
+      } else {
+        console.log('⚠️ Frontend: No questions in CFA response');
+        setFrameworkQuestions([]);
       }
     } catch (error) {
-      console.error('Failed to load CFA framework questions:', error);
+      console.error('❌ Frontend: Failed to load CFA framework questions:', error);
       setFrameworkQuestions([]);
     } finally {
       setIsLoadingFramework(false);
@@ -176,7 +196,7 @@ export default function AssessmentsV2() {
     if (!user?.assessment_link) {
       toast({
         title: "Assessment Link Not Found",
-        description: "Your assessment link is not available. Please contact support.",
+        description: "Click 'Create Link' to generate your assessment link",
         variant: "destructive",
       });
       return;
@@ -205,17 +225,100 @@ export default function AssessmentsV2() {
     }
   };
 
+  const createAssessmentLink = async () => {
+    try {
+      console.log('🔍 Frontend: Creating assessment link...');
+      const token = await getToken();
+      if (!token) {
+        toast({
+          title: "Authentication Error",
+          description: "Please sign in again to create assessment link",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const api = createAuthenticatedApi(token);
+      
+      // First create a default CFA assessment form
+      const formResponse = await api.post('/api/assessments/forms', {
+        name: 'CFA Three-Pillar Risk Assessment',
+        description: 'Default CFA framework assessment form',
+        is_active: true
+      });
+
+      if (!formResponse.data.assessment) {
+        throw new Error('Failed to create assessment form');
+      }
+
+      console.log('✅ Frontend: Assessment form created:', formResponse.data.assessment.id);
+      
+      // Then create the assessment link
+      const linkResponse = await api.post('/api/assessments/links', {
+        form_id: formResponse.data.assessment.id,
+        expires_in_days: 365
+      });
+
+      if (linkResponse.data.link) {
+        console.log('✅ Frontend: Assessment link created:', linkResponse.data.link);
+        console.log('🔍 Frontend: Link token:', linkResponse.data.link.token);
+        
+        // Update the user's assessment_link field
+        try {
+          console.log('🔍 Frontend: Updating user profile with assessment link...');
+          const updateResponse = await api.put(`/api/auth/profile`, {
+            assessment_link: linkResponse.data.link.token
+          });
+          
+          console.log('🔍 Frontend: Profile update response:', updateResponse.data);
+          
+          if (updateResponse.data.user) {
+            console.log('✅ Frontend: User profile updated with assessment link');
+            toast({
+              title: "Assessment Link Created",
+              description: "Your assessment link has been created and profile updated successfully",
+            });
+            
+            // Refresh the page to get the updated user data
+            window.location.reload();
+          } else {
+            throw new Error('Failed to update user profile');
+          }
+        } catch (updateError) {
+          console.error('❌ Frontend: Failed to update user profile:', updateError);
+          toast({
+            title: "Link Created but Profile Update Failed",
+            description: "Assessment link created but failed to update profile. Please refresh the page.",
+            variant: "destructive",
+          });
+        }
+      }
+    } catch (error) {
+      console.error('❌ Frontend: Failed to create assessment link:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create assessment link. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const openAssessmentLink = () => {
+    console.log('🔍 Frontend: Opening assessment link, user:', user);
+    console.log('🔍 Frontend: Assessment link:', user?.assessment_link);
+    
     if (!user?.assessment_link) {
       toast({
         title: "Assessment Link Not Found",
-        description: "Your assessment link is not available. Please contact support.",
+        description: "Click 'Create Link' to generate your assessment link",
         variant: "destructive",
       });
       return;
     }
     
-    window.open(`/assessment-test/${user.assessment_link}`, '_blank');
+    const link = `/a/${user.assessment_link}`;
+    console.log('🔍 Frontend: Opening link:', link);
+    window.open(link, '_blank');
   };
 
   const openTestLiveForm = () => {
@@ -227,8 +330,8 @@ export default function AssessmentsV2() {
       });
       return;
     }
-    
-    window.open(`/assessment-test/${user.assessment_link}`, '_blank');
+    // This function is now the same as openAssessmentLink, so we can call it directly
+    openAssessmentLink();
   };
 
   const getQuestionTypeLabel = (qtype: string) => {
@@ -255,6 +358,59 @@ export default function AssessmentsV2() {
     }
   };
 
+  const getModuleIcon = (module: string) => {
+    switch (module) {
+      case 'profile': return <Users className="w-4 h-4" />;
+      case 'capacity': return <TrendingUp className="w-4 h-4" />;
+      case 'behavior': return <Brain className="w-4 h-4" />;
+      case 'knowledge': return <Lightbulb className="w-4 h-4" />;
+      case 'need': return <TargetIcon className="w-4 h-4" />;
+      case 'constraints': return <Lock className="w-4 h-4" />;
+      default: return <FileText className="w-4 h-4" />;
+    }
+  };
+
+  const getModuleLabel = (module: string) => {
+    switch (module) {
+      case 'profile': return 'Profile & Goals';
+      case 'capacity': return 'Financial Capacity';
+      case 'behavior': return 'Risk Tolerance';
+      case 'knowledge': return 'Market Knowledge';
+      case 'need': return 'Return Requirements';
+      case 'constraints': return 'Investment Constraints';
+      default: return module.charAt(0).toUpperCase() + module.slice(1);
+    }
+  };
+
+  const getModuleColor = (module: string) => {
+    switch (module) {
+      case 'profile': return 'bg-blue-50 border-blue-200 text-blue-800';
+      case 'capacity': return 'bg-green-50 border-green-200 text-green-800';
+      case 'behavior': return 'bg-purple-50 border-purple-200 text-purple-800';
+      case 'knowledge': return 'bg-orange-50 border-orange-200 text-orange-800';
+      case 'need': return 'bg-red-50 border-red-200 text-red-800';
+      case 'constraints': return 'bg-gray-50 border-gray-200 text-gray-800';
+      default: return 'bg-gray-50 border-gray-200 text-gray-800';
+    }
+  };
+
+  const groupQuestionsByModule = (questions: FrameworkQuestion[]) => {
+    const grouped: { [key: string]: FrameworkQuestion[] } = {};
+    questions.forEach(q => {
+      if (!grouped[q.module || 'other']) {
+        grouped[q.module || 'other'] = [];
+      }
+      grouped[q.module || 'other'].push(q);
+    });
+    
+    // Sort questions within each module by order_index
+    Object.keys(grouped).forEach(module => {
+      grouped[module].sort((a, b) => a.order_index - b.order_index);
+    });
+    
+    return grouped;
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -266,6 +422,8 @@ export default function AssessmentsV2() {
     );
   }
 
+  const groupedQuestions = groupQuestionsByModule(frameworkQuestions);
+
   return (
     <>
       <Helmet>
@@ -274,6 +432,8 @@ export default function AssessmentsV2() {
       </Helmet>
 
       <div className="space-y-6">
+
+
         {/* Header with Action Buttons */}
         <div className="flex items-center justify-between">
           <div>
@@ -281,6 +441,21 @@ export default function AssessmentsV2() {
             <p className="text-muted-foreground">
               Configure and manage your CFA Three-Pillar risk assessment framework
             </p>
+            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <TrendingUp className="w-4 h-4 text-green-600" />
+                Capacity
+              </span>
+              <span className="flex items-center gap-1">
+                <Brain className="w-4 h-4 text-purple-600" />
+                Tolerance
+              </span>
+              <span className="flex items-center gap-1">
+                <TargetIcon className="w-4 h-4 text-red-600" />
+                Need
+              </span>
+            </div>
+
           </div>
           
           {/* Action Buttons */}
@@ -308,30 +483,42 @@ export default function AssessmentsV2() {
           {/* Fallback Action Buttons when no assessments exist */}
           {assessments.length === 0 && (
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => copyAssessmentLink()}
-                className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-              >
-                <Copy className="w-4 h-4 mr-2" />
-                Copy Assessment Link
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => openAssessmentLink()}
-                className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-              >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                View Live Assessment Form
-              </Button>
+              {user?.assessment_link ? (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => copyAssessmentLink()}
+                    className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy Assessment Link
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => openAssessmentLink()}
+                    className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View Live Assessment Form
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={() => createAssessmentLink()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Assessment Link
+                </Button>
+              )}
             </div>
           )}
         </div>
 
-        {/* Two Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column - Assessment Questions */}
-          <div className="space-y-4">
+
+
+        {/* Single Column Layout */}
+        <div className="space-y-4">
             {assessments.filter(a => a.is_default).map(assessment => (
               <Card key={`questions-${assessment.id}`} className="border-0 shadow-sm">
                 <CardHeader className="pb-4">
@@ -362,80 +549,115 @@ export default function AssessmentsV2() {
                         <>
                           {/* Questions Summary */}
                           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
-                            <div className="grid grid-cols-2 gap-4 text-center">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                               <div>
-                                <div className="text-2xl font-bold text-blue-900">{frameworkQuestions.length}</div>
-                                <div className="text-xs text-blue-700 font-medium">Total Questions</div>
+                                <div className="text-lg font-semibold text-blue-900">{frameworkQuestions.length}</div>
+                                <div className="text-xs text-blue-700">Total Questions</div>
                               </div>
                               <div>
-                                <div className="text-2xl font-bold text-blue-900">
+                                <div className="text-lg font-semibold text-blue-900">
+                                  {frameworkQuestions.filter(q => q.qtype === 'single' || q.qtype === 'multi').length}
+                                </div>
+                                <div className="text-xs text-blue-700">Choice Questions</div>
+                              </div>
+                              <div>
+                                <div className="text-lg font-semibold text-blue-900">
+                                  {frameworkQuestions.filter(q => q.qtype === 'text' || q.qtype === 'number' || q.qtype === 'percent').length}
+                                </div>
+                                <div className="text-xs text-blue-700">Input Questions</div>
+                              </div>
+                              <div>
+                                <div className="text-lg font-semibold text-blue-900">
                                   {frameworkQuestions.filter(q => q.required).length}
                                 </div>
-                                <div className="text-xs text-blue-700 font-medium">Required</div>
+                                <div className="text-xs text-blue-700">Required</div>
                               </div>
                             </div>
                           </div>
                           
-                          {/* Questions List */}
-                          <div className="space-y-4">
-                            {frameworkQuestions
-                              .sort((a, b) => a.order_index - b.order_index)
-                              .map((question, index) => (
-                              <div key={question.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow">
-                                <div className="flex items-start gap-3">
-                                  <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                                    {index + 1}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <h3 className="text-sm font-semibold text-gray-900 mb-2 leading-relaxed">
-                                      {question.label}
-                                    </h3>
-                                    
-                                    {/* Question Metadata */}
-                                    <div className="flex flex-wrap gap-2 mb-3">
-                                      <Badge 
-                                        variant="outline" 
-                                        className={`text-xs px-2 py-1 ${getQuestionTypeColor(question.qtype)}`}
-                                      >
-                                        {getQuestionTypeLabel(question.qtype)}
-                                      </Badge>
-                                      {question.required && (
-                                        <Badge variant="outline" className="text-xs px-2 py-1 bg-red-50 text-red-700 border-red-200">
-                                          Required
-                                        </Badge>
-                                      )}
-                                      {question.module && (
-                                        <Badge variant="outline" className="text-xs px-2 py-1 bg-green-50 text-green-700 border-green-200">
-                                          {question.module}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    
-                                    {/* Options Display */}
-                                    {question.options && Array.isArray(question.options) && (
-                                      <div className="bg-gray-50 rounded-md p-3">
-                                        <div className="text-xs font-medium text-gray-700 mb-2">Options:</div>
-                                        <div className="space-y-1">
-                                          {question.options.map((option, optIndex) => (
-                                            <div key={optIndex} className="flex items-center gap-2 text-sm text-gray-600">
-                                              <ChevronRight className="h-3 w-3 text-gray-400" />
-                                              <span>{option}</span>
+                          {/* Questions by Module */}
+                          <div className="space-y-6">
+                            {Object.entries(groupedQuestions).map(([module, questions]) => (
+                              <div key={module} className="space-y-3">
+                                <div className="flex items-center gap-2 mb-3">
+                                  {getModuleIcon(module)}
+                                  <h3 className="text-md font-semibold text-gray-900">{getModuleLabel(module)}</h3>
+                                  <Badge variant="outline" className={`text-xs ${getModuleColor(module)}`}>
+                                    {questions.length} questions
+                                  </Badge>
+                                </div>
+                                
+                                <div className="space-y-3">
+                                  {questions.map((question, index) => (
+                                    <div key={question.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow">
+                                      <div className="flex items-start gap-3">
+                                        <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                                          {question.order_index}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <h3 className="text-sm font-semibold text-gray-900 mb-2 leading-relaxed">
+                                            {question.label}
+                                          </h3>
+                                          
+                                          {/* Question Metadata */}
+                                          <div className="flex flex-wrap gap-2 mb-3">
+                                            <Badge 
+                                              variant="outline" 
+                                              className={`text-xs px-2 py-1 ${getQuestionTypeColor(question.qtype)}`}
+                                            >
+                                              {getQuestionTypeLabel(question.qtype)}
+                                            </Badge>
+                                            {question.required && (
+                                              <Badge variant="outline" className="text-xs px-2 py-1 bg-red-50 text-red-700 border-red-200">
+                                                Required
+                                              </Badge>
+                                            )}
+                                          </div>
+                                          
+                                          {/* Options Display */}
+                                          {question.options && Array.isArray(question.options) && (
+                                            <div className="bg-gray-50 rounded-md p-3">
+                                              <div className="text-xs font-medium text-gray-700 mb-2">Options:</div>
+                                              <div className="space-y-1">
+                                                {question.options.map((option: any, optIndex: number) => (
+                                                  <div key={optIndex} className="flex items-center gap-2 text-sm text-gray-600">
+                                                    <ChevronRight className="h-3 w-3 text-gray-400" />
+                                                    <span>{option.label || option.value || option}</span>
+                                                  </div>
+                                                ))}
+                                              </div>
                                             </div>
-                                          ))}
+                                          )}
+                                          
+                                          {/* Scale Display */}
+                                          {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && question.qtype === 'scale' && (
+                                            <div className="bg-gray-50 rounded-md p-3">
+                                              <div className="text-xs font-medium text-gray-700 mb-2">Scale Range:</div>
+                                              <div className="text-sm text-gray-600">
+                                                {question.options.min} to {question.options.max}
+                                                {question.options.labels && (
+                                                  <span className="ml-2">({question.options.labels.join(' → ')})</span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Number/Percent Range Display */}
+                                          {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && (question.qtype === 'number' || question.qtype === 'percent') && (
+                                            <div className="bg-gray-50 rounded-md p-3">
+                                              <div className="text-xs font-medium text-gray-700 mb-2">Range:</div>
+                                              <div className="text-sm text-gray-600">
+                                                {question.options.min} - {question.options.max}
+                                                {question.options.step && (
+                                                  <span className="ml-2">(step: {question.options.step})</span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
-                                    )}
-                                    
-                                    {/* Scale Display */}
-                                    {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && question.qtype === 'scale' && (
-                                      <div className="bg-gray-50 rounded-md p-3">
-                                        <div className="text-xs font-medium text-gray-700 mb-2">Scale Range:</div>
-                                        <div className="text-sm text-gray-600">
-                                          {question.options.min} to {question.options.max}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
                             ))}
@@ -461,15 +683,15 @@ export default function AssessmentsV2() {
             ))}
             
             {/* Fallback: Show framework questions when no assessments exist */}
-            {assessments.length === 0 && selectedAssessment && (
+            {assessments.length === 0 && (
               <Card className="border-0 shadow-sm">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <BarChart3 className="h-5 w-5 text-blue-600" />
-                    Framework Questions
+                    Assessment Questions
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Questions from the selected risk framework
+                    CFA Three-Pillar Framework Questions
                   </p>
                 </CardHeader>
                 <CardContent>
@@ -490,80 +712,115 @@ export default function AssessmentsV2() {
                       <>
                         {/* Questions Summary */}
                         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
-                          <div className="grid grid-cols-2 gap-4 text-center">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                             <div>
-                              <div className="text-2xl font-bold text-blue-900">{frameworkQuestions.length}</div>
-                              <div className="text-xs text-blue-700 font-medium">Total Questions</div>
+                              <div className="text-lg font-semibold text-blue-900">{frameworkQuestions.length}</div>
+                              <div className="text-xs text-blue-700">Total Questions</div>
                             </div>
                             <div>
-                              <div className="text-2xl font-bold text-blue-900">
+                              <div className="text-lg font-semibold text-blue-900">
+                                {frameworkQuestions.filter(q => q.qtype === 'single' || q.qtype === 'multi').length}
+                              </div>
+                              <div className="text-xs text-blue-700">Choice Questions</div>
+                            </div>
+                            <div>
+                              <div className="text-lg font-semibold text-blue-900">
+                                {frameworkQuestions.filter(q => q.qtype === 'text' || q.qtype === 'number' || q.qtype === 'percent').length}
+                              </div>
+                              <div className="text-xs text-blue-700">Input Questions</div>
+                            </div>
+                            <div>
+                              <div className="text-lg font-semibold text-blue-900">
                                 {frameworkQuestions.filter(q => q.required).length}
                               </div>
-                              <div className="text-xs text-blue-700 font-medium">Required</div>
+                              <div className="text-xs text-blue-700">Required</div>
                             </div>
                           </div>
                         </div>
                         
-                        {/* Questions List */}
-                        <div className="space-y-4">
-                          {frameworkQuestions
-                            .sort((a, b) => a.order_index - b.order_index)
-                            .map((question, index) => (
-                            <div key={question.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow">
-                              <div className="flex items-start gap-3">
-                                <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                                  {index + 1}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <h3 className="text-sm font-semibold text-gray-900 mb-2 leading-relaxed">
-                                    {question.label}
-                                  </h3>
-                                  
-                                  {/* Question Metadata */}
-                                  <div className="flex flex-wrap gap-2 mb-3">
-                                    <Badge 
-                                      variant="outline" 
-                                      className={`text-xs px-2 py-1 ${getQuestionTypeColor(question.qtype)}`}
-                                    >
-                                      {getQuestionTypeLabel(question.qtype)}
-                                    </Badge>
-                                    {question.required && (
-                                      <Badge variant="outline" className="text-xs px-2 py-1 bg-red-50 text-red-700 border-red-200">
-                                        Required
-                                      </Badge>
-                                    )}
-                                    {question.module && (
-                                      <Badge variant="outline" className="text-xs px-2 py-1 bg-green-50 text-green-700 border-green-200">
-                                        {question.module}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  
-                                  {/* Options Display */}
-                                  {question.options && Array.isArray(question.options) && (
-                                    <div className="bg-gray-50 rounded-md p-3">
-                                      <div className="text-xs font-medium text-gray-700 mb-2">Options:</div>
-                                      <div className="space-y-1">
-                                        {question.options.map((option, optIndex) => (
-                                          <div key={optIndex} className="flex items-center gap-2 text-sm text-gray-600">
-                                            <ChevronRight className="h-3 w-3 text-gray-400" />
-                                            <span>{option}</span>
+                        {/* Questions by Module */}
+                        <div className="space-y-6">
+                          {Object.entries(groupedQuestions).map(([module, questions]) => (
+                            <div key={module} className="space-y-3">
+                              <div className="flex items-center gap-2 mb-3">
+                                {getModuleIcon(module)}
+                                <h3 className="text-md font-semibold text-gray-900">{getModuleLabel(module)}</h3>
+                                <Badge variant="outline" className={`text-xs ${getModuleColor(module)}`}>
+                                  {questions.length} questions
+                                </Badge>
+                              </div>
+                              
+                              <div className="space-y-3">
+                                {questions.map((question, index) => (
+                                  <div key={question.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow">
+                                    <div className="flex items-start gap-3">
+                                      <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                                        {question.order_index}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <h3 className="text-sm font-semibold text-gray-900 mb-2 leading-relaxed">
+                                          {question.label}
+                                        </h3>
+                                        
+                                        {/* Question Metadata */}
+                                        <div className="flex flex-wrap gap-2 mb-3">
+                                          <Badge 
+                                            variant="outline" 
+                                            className={`text-xs px-2 py-1 ${getQuestionTypeColor(question.qtype)}`}
+                                          >
+                                            {getQuestionTypeLabel(question.qtype)}
+                                          </Badge>
+                                          {question.required && (
+                                            <Badge variant="outline" className="text-xs px-2 py-1 bg-red-50 text-red-700 border-red-200">
+                                              Required
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        
+                                        {/* Options Display */}
+                                        {question.options && Array.isArray(question.options) && (
+                                          <div className="bg-gray-50 rounded-md p-3">
+                                            <div className="text-xs font-medium text-gray-700 mb-2">Options:</div>
+                                            <div className="space-y-1">
+                                              {question.options.map((option: any, optIndex: number) => (
+                                                <div key={optIndex} className="flex items-center gap-2 text-sm text-gray-600">
+                                                  <ChevronRight className="h-3 w-3 text-gray-400" />
+                                                  <span>{option.label || option.value || option}</span>
+                                                </div>
+                                              ))}
+                                            </div>
                                           </div>
-                                        ))}
+                                        )}
+                                        
+                                        {/* Scale Display */}
+                                        {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && question.qtype === 'scale' && (
+                                          <div className="bg-gray-50 rounded-md p-3">
+                                            <div className="text-xs font-medium text-gray-700 mb-2">Scale Range:</div>
+                                            <div className="text-sm text-gray-600">
+                                              {question.options.min} to {question.options.max}
+                                              {question.options.labels && (
+                                                <span className="ml-2">({question.options.labels.join(' → ')})</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Number/Percent Range Display */}
+                                        {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && (question.qtype === 'number' || question.qtype === 'percent') && (
+                                          <div className="bg-gray-50 rounded-md p-3">
+                                            <div className="text-xs font-medium text-gray-700 mb-2">Range:</div>
+                                            <div className="text-sm text-gray-600">
+                                              {question.options.min} - {question.options.max}
+                                              {question.options.step && (
+                                                <span className="ml-2">(step: {question.options.step})</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
-                                  )}
-                                  
-                                  {/* Scale Display */}
-                                  {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && question.qtype === 'scale' && (
-                                    <div className="bg-gray-50 rounded-md p-3">
-                                      <div className="text-xs font-medium text-gray-700 mb-2">Scale Range:</div>
-                                      <div className="text-sm text-gray-600">
-                                        {question.options.min} to {question.options.max}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           ))}
@@ -572,64 +829,26 @@ export default function AssessmentsV2() {
                     ) : (
                       <div className="text-center py-12">
                         <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                        <p className="text-gray-500 font-medium mb-1">No questions found</p>
-                        <p className="text-sm text-gray-400">This framework doesn't have any questions configured</p>
+                        <p className="text-gray-500 font-medium mb-1">No questions loaded</p>
+                        <p className="text-sm text-gray-400">
+                          {isLoadingFramework ? 'Loading questions...' : 'Failed to load CFA framework questions. Please refresh the page.'}
+                        </p>
+                        {!isLoadingFramework && (
+                          <Button 
+                            onClick={() => loadCFAFrameworkQuestions()} 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-3"
+                          >
+                            Retry Loading Questions
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
             )}
-          </div>
-
-          {/* Right Column - CFA Framework Information */}
-          <div className="space-y-4">
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-blue-600" />
-                  CFA Framework
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Using the CFA Three-Pillar risk assessment framework
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* CFA Framework Info */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="h-4 w-4 text-blue-600" />
-                    <div className="text-sm">
-                      <p className="font-medium text-blue-900">CFA Three-Pillar Framework</p>
-                      <p className="text-blue-700">Industry-standard risk assessment framework</p>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Engine Type */}
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                  <div className="flex items-center gap-2">
-                    <Brain className="h-4 w-4 text-purple-600" />
-                    <div className="text-sm">
-                      <p className="font-medium text-purple-900">Scoring Engine</p>
-                      <p className="text-purple-700">Three-Pillar (Capacity, Tolerance, Need)</p>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Version Info */}
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                  <div className="flex items-center gap-2">
-                    <Settings className="h-4 w-4 text-gray-600" />
-                    <div className="text-sm">
-                      <p className="font-medium text-gray-900">Current Version</p>
-                      <p className="text-gray-700">v1.0 - Default Framework</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </div>
 
         {/* Other Assessments - Full Width Below */}

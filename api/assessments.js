@@ -9,13 +9,28 @@ module.exports = async function handler(req, res) {
   try {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Max-Age', '86400');
 
     const { method, url } = req;
     
     // Parse URL properly to separate path from query parameters
     const urlObj = new URL(url, `http://localhost`);
-    const path = urlObj.pathname.replace('/api/assessments', '');
+    let path = urlObj.pathname;
+    
+    // Handle different routing scenarios
+    if (path.startsWith('/api/assessments')) {
+      // Standard API route
+      path = path.replace('/api/assessments', '');
+    } else if (path.startsWith('/a/')) {
+      // Direct /a/ route (from Vercel rewrite)
+      path = path; // Keep as is
+    } else if (path.startsWith('/assessment/')) {
+      // Direct /assessment/ route (from Vercel rewrite)
+      path = path; // Keep as is
+    }
+    
+    console.log('🔍 Request details:', { method, url, path });
 
     // ============================================================================
     // ASSESSMENTS ENDPOINTS
@@ -524,7 +539,7 @@ module.exports = async function handler(req, res) {
         }
 
         const { data: forms, error: formsError } = await supabase
-          .from('assessments')
+          .from('assessment_forms')
           .select('*')
           .eq('user_id', user.supabase_user_id);
 
@@ -558,7 +573,7 @@ module.exports = async function handler(req, res) {
         }
 
         const { data: form, error: formError } = await supabase
-          .from('assessments')
+          .from('assessment_forms')
           .insert({
             user_id: user.supabase_user_id,
             name,
@@ -599,7 +614,7 @@ module.exports = async function handler(req, res) {
         if (is_active !== undefined) updateData.is_active = is_active;
 
         const { data: form, error: formError } = await supabase
-          .from('assessments')
+          .from('assessment_forms')
           .update(updateData)
           .eq('id', formId)
           .eq('user_id', user.supabase_user_id)
@@ -636,7 +651,7 @@ module.exports = async function handler(req, res) {
         const formId = path.split('/')[2];
 
         const { data: form, error: formError } = await supabase
-          .from('assessments')
+          .from('assessment_forms')
           .delete()
           .eq('id', formId)
           .eq('user_id', user.supabase_user_id)
@@ -866,6 +881,483 @@ module.exports = async function handler(req, res) {
     }
 
     // ============================================================================
+    // DEBUG ENDPOINTS (remove in production)
+    // ============================================================================
+    
+    // GET /api/assessments/debug/links - Debug assessment links
+    if (method === 'GET' && path === '/debug/links') {
+      try {
+        console.log('🔍 Debug: Checking assessment_links table accessibility');
+        
+        // Try to query the assessment_links table
+        const { data: links, error: linksError } = await supabase
+          .from('assessment_links')
+          .select('*')
+          .limit(5);
+        
+        console.log('🔍 Debug: Assessment links query result:', { links, linksError });
+        
+        if (linksError) {
+          return res.status(500).json({ 
+            error: 'Failed to query assessment_links table',
+            details: linksError.message,
+            code: linksError.code
+          });
+        }
+        
+        return res.json({ 
+          message: 'Assessment links table is accessible',
+          count: links?.length || 0,
+          sample: links?.slice(0, 2) || []
+        });
+      } catch (error) {
+        console.error('❌ Debug endpoint error:', error);
+        return res.status(500).json({ 
+          error: 'Debug endpoint failed',
+          message: error.message 
+        });
+      }
+    }
+    
+    // GET /api/assessments/debug/forms - Debug assessment forms
+    if (method === 'GET' && path === '/debug/forms') {
+      try {
+        console.log('🔍 Debug: Checking assessment_forms table accessibility');
+        
+        // Try to query the assessment_forms table
+        const { data: forms, error: formsError } = await supabase
+          .from('assessment_forms')
+          .select('*')
+          .limit(5);
+        
+        console.log('🔍 Debug: Assessment forms query result:', { forms, formsError });
+        
+        if (formsError) {
+          return res.status(500).json({ 
+            error: 'Failed to query assessment_forms table',
+            details: formsError.message,
+            code: formsError.code
+          });
+        }
+        
+        return res.json({ 
+          message: 'Assessment forms table is accessible',
+          count: forms?.length || 0,
+          sample: forms?.slice(0, 2) || []
+        });
+      } catch (error) {
+        console.error('❌ Debug endpoint error:', error);
+        return res.status(500).json({ 
+          error: 'Debug endpoint failed',
+          message: error.message 
+        });
+      }
+    }
+
+    // ============================================================================
+    // PUBLIC ASSESSMENT ROUTES
+    // ============================================================================
+    
+    // GET /assessment/:assessmentCode - Get assessment by assessment code (backend route)
+    if (method === 'GET' && path.match(/^\/assessment\/[^\/]+$/)) {
+      try {
+        const assessmentCode = path.split('/')[2];
+        console.log('🔍 Backend assessment route called with code:', assessmentCode);
+        
+        // Get user by assessment code (matches backend logic)
+        const { data: user, error: userError } = await supabase
+          .from('users')
+          .select('id, full_name, assessment_link')
+          .eq('assessment_link', `/assessment/${assessmentCode}`)
+          .single();
+
+        if (userError || !user) {
+          console.log('❌ User not found for assessment code:', assessmentCode);
+          return res.status(404).json({ error: 'Assessment link not found' });
+        }
+
+        console.log('✅ User found for assessment code:', user.id);
+        
+        // Get CFA framework questions (since this is the default assessment)
+        let questions = [];
+        try {
+          // First get the framework ID
+          const { data: framework, error: frameworkError } = await supabase
+            .from('risk_frameworks')
+            .select('id')
+            .eq('code', 'cfa_three_pillar_v1')
+            .single();
+
+          if (frameworkError || !framework) {
+            console.log('❌ CFA framework not found');
+            return res.status(500).json({ error: 'CFA framework not found' });
+          }
+
+          // Then get the questions
+          const { data: frameworkQuestions, error: questionsError } = await supabase
+            .from('framework_questions')
+            .select('*')
+            .eq('framework_id', framework.id)
+            .order('order_index');
+
+          if (questionsError) {
+            console.log('❌ Error fetching questions, trying fallback');
+            // Try fallback to question_bank table
+            const { data: fallbackQuestions, error: fallbackError } = await supabase
+              .from('question_bank')
+              .select('*')
+              .eq('is_active', true)
+              .order('order_index');
+            
+            if (fallbackError) {
+              console.log('❌ Fallback questions also failed');
+              return res.status(500).json({ error: 'Failed to fetch assessment questions' });
+            }
+            
+            questions = fallbackQuestions || [];
+          } else {
+            questions = frameworkQuestions || [];
+          }
+        } catch (error) {
+          console.error('❌ Error in questions query:', error);
+          return res.status(500).json({ error: 'Failed to fetch assessment questions' });
+        }
+
+        // Return the assessment data (matches backend format)
+        return res.json({
+          assessment: {
+            id: `assessment_${assessmentCode}`,
+            title: 'CFA Three-Pillar Risk Assessment',
+            slug: `assessment/${assessmentCode}`,
+            user_id: user.id,
+            user_name: user.full_name
+          },
+          questions: questions,
+          assessment_code: assessmentCode
+        });
+
+      } catch (error) {
+        console.error('❌ Backend assessment route error:', error);
+        return res.status(500).json({ 
+          error: 'Internal server error',
+          message: error.message 
+        });
+      }
+    }
+
+    // POST /assessment/:assessmentCode/submit - Submit assessment by assessment code
+    if (method === 'POST' && path.match(/^\/assessment\/[^\/]+\/submit$/)) {
+      try {
+        const assessmentCode = path.split('/')[2];
+        console.log('🔍 Assessment submission endpoint called with code:', assessmentCode);
+        
+        const { answers, submitterInfo } = req.body;
+        
+        // Validate required fields
+        if (!answers || !submitterInfo?.full_name || !submitterInfo?.email) {
+          return res.status(400).json({ error: 'Missing required fields: answers, submitterInfo.full_name, submitterInfo.email' });
+        }
+
+        // Get user by assessment code
+        const { data: user, error: userError } = await supabase
+          .from('users')
+          .select('id, full_name, assessment_link')
+          .eq('assessment_link', `/assessment/${assessmentCode}`)
+          .single();
+
+        if (userError || !user) {
+          console.log('❌ User not found for assessment code:', assessmentCode);
+          return res.status(404).json({ error: 'Assessment link not found' });
+        }
+
+        console.log('✅ User found for assessment submission:', user.id);
+        
+        // Create lead record
+        const { data: lead, error: leadError } = await supabase
+          .from('leads')
+          .insert({
+            user_id: user.id,
+            full_name: submitterInfo.full_name,
+            email: submitterInfo.email,
+            phone: submitterInfo.phone || null,
+            age: submitterInfo.age ? parseInt(submitterInfo.age) : null,
+            source_link: `/assessment/${assessmentCode}`,
+            status: 'assessment_done'
+          })
+          .select()
+          .single();
+
+        if (leadError) {
+          console.error('❌ Failed to create lead:', leadError);
+          return res.status(500).json({ error: 'Failed to create lead record' });
+        }
+
+        console.log('✅ Lead created successfully:', lead.id);
+        
+        // For now, return a simple success response
+        // In the future, this could integrate with the full assessment scoring system
+        return res.json({
+          message: 'Assessment submitted successfully',
+          result: {
+            bucket: 'moderate', // Default bucket
+            score: 50, // Default score
+            rubric: {
+              capacity: 50,
+              tolerance: 50,
+              need: 50
+            }
+          },
+          leadId: lead.id,
+          isNewLead: true,
+          submissionId: `sub_${Date.now()}`,
+          assessment_code: assessmentCode
+        });
+
+      } catch (error) {
+        console.error('❌ Assessment submission error:', error);
+        return res.status(500).json({ 
+          error: 'Internal server error',
+          message: error.message 
+        });
+      }
+    }
+
+    // ============================================================================
+    // PUBLIC ASSESSMENT ROUTES (API endpoints for React app)
+    // ============================================================================
+    
+    // GET /api/assessments/public/:slug - Get public assessment data by slug (for React app)
+    if (method === 'GET' && path.match(/^\/public\/[^\/]+$/)) {
+      try {
+        const slug = path.split('/')[2];
+        console.log('🔍 Public assessment API called with slug:', slug);
+        
+        // Get the user by assessment_link field (should contain just the slug)
+        const { data: user, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('assessment_link', slug)
+          .single();
+
+        if (userError || !user) {
+          console.log('❌ User not found for assessment link:', slug);
+          return res.status(404).json({ error: 'Assessment link not found' });
+        }
+
+        console.log('✅ User found for assessment link:', user.id);
+        
+        // Get CFA framework questions
+        let questions = [];
+        try {
+          // First get the framework ID
+          const { data: framework, error: frameworkError } = await supabase
+            .from('risk_frameworks')
+            .select('id')
+            .eq('code', 'cfa_three_pillar_v1')
+            .single();
+
+          if (frameworkError || !framework) {
+            console.log('❌ CFA framework not found');
+            return res.status(500).json({ error: 'CFA framework not found' });
+          }
+
+          // Then get the questions
+          const { data: frameworkQuestions, error: questionsError } = await supabase
+            .from('framework_questions')
+            .select('*')
+            .eq('framework_id', framework.id)
+            .order('order_index');
+
+          if (questionsError) {
+            console.log('❌ Error fetching questions, trying fallback');
+            // Try fallback to question_bank table
+            const { data: fallbackQuestions, error: fallbackError } = await supabase
+              .from('question_bank')
+              .select('*')
+              .eq('is_active', true)
+              .order('order_index');
+            
+            if (fallbackError) {
+              console.log('❌ Fallback questions also failed');
+              return res.status(500).json({ error: 'Failed to fetch assessment questions' });
+            }
+            
+            questions = fallbackQuestions || [];
+          } else {
+            questions = frameworkQuestions || [];
+          }
+        } catch (error) {
+          console.error('❌ Error in questions query:', error);
+          return res.status(500).json({ error: 'Failed to fetch assessment questions' });
+        }
+
+        // Return the assessment data
+        return res.json({
+          assessment: {
+            id: `assessment_${slug}`,
+            title: 'CFA Three-Pillar Risk Assessment',
+            slug: slug,
+            user_id: user.id,
+            user_name: user.full_name
+          },
+          questions: questions
+        });
+
+      } catch (error) {
+        console.error('❌ Public assessment API error:', error);
+        return res.status(500).json({ 
+          error: 'Internal server error',
+          message: error.message 
+        });
+      }
+    }
+    
+    // POST /api/assessments/public/:slug/submit - Submit assessment by slug (API endpoint)
+    if (method === 'POST' && path.match(/^\/public\/[^\/]+\/submit$/)) {
+      try {
+        const slug = path.split('/')[2];
+        console.log('🔍 Public assessment submission endpoint called with slug:', slug);
+        
+        const { answers, submitterInfo } = req.body;
+        
+        // Validate required fields
+        if (!answers || !submitterInfo?.full_name || !submitterInfo?.email) {
+          return res.status(400).json({ error: 'Missing required fields: answers, submitterInfo.full_name, submitterInfo.email' });
+        }
+
+        // Get the user by assessment_link field
+        const { data: user, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('assessment_link', slug)
+          .single();
+
+        if (userError || !user) {
+          console.log('❌ User not found for assessment link:', slug);
+          return res.status(404).json({ error: 'Assessment link not found' });
+        }
+
+        console.log('✅ User found for assessment submission:', user.id);
+        
+        // Create lead record under the correct user
+        const { data: lead, error: leadError } = await supabase
+          .from('leads')
+          .insert({
+            user_id: user.id,
+            full_name: submitterInfo.full_name,
+            email: submitterInfo.email,
+            phone: submitterInfo.phone || null,
+            age: submitterInfo.age ? parseInt(submitterInfo.age) : null,
+            source_link: `/a/${slug}`,
+            status: 'assessment_done'
+          })
+          .select()
+          .single();
+
+        if (leadError) {
+          console.error('❌ Failed to create lead:', leadError);
+          return res.status(500).json({ error: 'Failed to create lead record' });
+        }
+
+        console.log('✅ Lead created successfully:', lead.id);
+        
+
+
+        // Store assessment submission data
+        console.log('🔍 Attempting to store assessment submission...');
+        console.log('🔍 Data to insert:', {
+          owner_id: user.id,
+          lead_id: lead.id,
+          answers: answers,
+          result: {
+            bucket: 'moderate',
+            score: 50,
+            rubric: { capacity: 50, tolerance: 50, need: 50 }
+          }
+        });
+        
+        const { data: submission, error: submissionError } = await supabase
+          .from('assessment_submissions')
+          .insert({
+            assessment_id: null, // No specific assessment form for now
+            framework_version_id: null, // No specific framework version for now
+            owner_id: user.id,
+            lead_id: lead.id,
+            submitted_at: new Date().toISOString(),
+            answers: answers,
+            result: {
+              bucket: 'moderate', // Default bucket
+              score: 50, // Default score
+              rubric: {
+                capacity: 50,
+                tolerance: 50,
+                need: 50
+              }
+            },
+            status: 'submitted'
+          })
+          .select()
+          .single();
+
+        if (submissionError) {
+          console.error('❌ Failed to create assessment submission:', submissionError);
+          console.error('❌ Error details:', submissionError);
+          // Don't fail the whole request, just log the error
+        } else {
+          console.log('✅ Assessment submission created successfully:', submission.id);
+        }
+        
+        // Update lead with risk profile information (always try to update)
+        const riskProfileData = {
+          risk_bucket: 'moderate',
+          risk_score: 50
+        };
+        
+        // Only set risk_profile_id if submission was created successfully
+        if (submission && !submissionError) {
+          riskProfileData.risk_profile_id = submission.id;
+        }
+        
+        const { error: updateError } = await supabase
+          .from('leads')
+          .update(riskProfileData)
+          .eq('id', lead.id);
+
+        if (updateError) {
+          console.error('❌ Failed to update lead risk profile:', updateError);
+        } else {
+          console.log('✅ Lead risk profile updated successfully');
+        }
+        
+        return res.json({
+          message: 'Assessment submitted successfully',
+          result: {
+            bucket: 'moderate', // Default bucket
+            score: 50, // Default score
+            rubric: {
+              capacity: 50,
+              tolerance: 50,
+              need: 50
+            }
+          },
+          leadId: lead.id,
+          isNewLead: true,
+          submissionId: submission?.id || `sub_${Date.now()}`,
+          slug: slug
+        });
+
+      } catch (error) {
+        console.error('❌ Public assessment submission error:', error);
+        return res.status(500).json({ 
+          error: 'Internal server error',
+          message: error.message 
+        });
+      }
+    }
+    
+
+
+    // ============================================================================
     // ASSESSMENT LINKS ENDPOINTS
     // ============================================================================
 
@@ -926,6 +1418,14 @@ module.exports = async function handler(req, res) {
         const expires_at = new Date();
         expires_at.setDate(expires_at.getDate() + expires_in_days);
 
+        console.log('🔍 Creating assessment link with data:', {
+          token,
+          user_id: user.supabase_user_id,
+          form_id,
+          status: 'active',
+          expires_at: expires_at.toISOString()
+        });
+
         const { data: link, error: createError } = await supabase
           .from('assessment_links')
           .insert({
@@ -942,8 +1442,11 @@ module.exports = async function handler(req, res) {
           .single();
 
         if (createError) {
+          console.error('❌ Failed to create assessment link:', createError);
           return res.status(500).json({ error: 'Failed to create assessment link' });
         }
+
+        console.log('✅ Assessment link created successfully:', link);
 
         return res.status(201).json({ 
           message: 'Assessment link created successfully', 
@@ -1031,6 +1534,80 @@ module.exports = async function handler(req, res) {
           return res.status(401).json({ error: 'Authentication failed' });
         }
         return res.status(500).json({ error: 'Failed to revoke assessment link' });
+      }
+    }
+
+    // GET /api/assessments/cfa/questions - Get CFA framework questions
+    if (method === 'GET' && (path === '/cfa/questions' || path === '/cfa/questions/')) {
+      try {
+        console.log('🔍 CFA questions endpoint called');
+        const user = await authenticateUser(req);
+        if (!user?.supabase_user_id) {
+          return res.status(400).json({ error: 'User not properly authenticated' });
+        }
+
+        // Get CFA framework questions from the framework_questions table
+        // First get the framework ID
+        console.log('🔍 Fetching CFA framework...');
+        const { data: framework, error: frameworkError } = await supabase
+          .from('risk_frameworks')
+          .select('id')
+          .eq('code', 'cfa_three_pillar_v1')
+          .single();
+
+        if (frameworkError) {
+          console.error('Error fetching CFA framework:', frameworkError);
+          return res.status(500).json({ error: 'CFA framework not found', details: frameworkError.message });
+        }
+
+        if (!framework) {
+          console.error('CFA framework not found in database');
+          return res.status(500).json({ error: 'CFA framework not found in database' });
+        }
+
+        console.log('✅ CFA framework found:', framework.id);
+
+        // Then get the questions
+        let questions = [];
+        try {
+          console.log('🔍 Fetching questions for framework:', framework.id);
+          const { data: frameworkQuestions, error: questionsError } = await supabase
+            .from('framework_questions')
+            .select('*')
+            .eq('framework_id', framework.id)
+            .order('order_index');
+
+          if (questionsError) {
+            console.error('Error fetching CFA framework questions:', questionsError);
+            // Try fallback to question_bank table if framework_questions doesn't exist
+            const { data: fallbackQuestions, error: fallbackError } = await supabase
+              .from('question_bank')
+              .select('*')
+              .eq('is_active', true)
+              .order('order_index');
+            
+            if (fallbackError) {
+              console.error('Fallback questions also failed:', fallbackError);
+              return res.status(500).json({ error: 'Failed to fetch CFA questions' });
+            }
+            
+            questions = fallbackQuestions || [];
+          } else {
+            questions = frameworkQuestions || [];
+          }
+        } catch (error) {
+          console.error('Error in CFA questions query:', error);
+          return res.status(500).json({ error: 'Failed to fetch CFA questions' });
+        }
+
+        console.log(`✅ CFA questions fetched successfully: ${questions.length} questions`);
+        return res.json({ questions: questions || [] });
+      } catch (error) {
+        console.error('Get CFA questions error:', error);
+        if (error.message.includes('authorization')) {
+          return res.status(401).json({ error: 'Authentication failed' });
+        }
+        return res.status(500).json({ error: 'Failed to fetch CFA questions' });
       }
     }
 

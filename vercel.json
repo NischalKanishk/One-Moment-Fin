@@ -61,6 +61,10 @@
       "destination": "/assets/$1"
     },
     {
+      "source": "/assessment/(.*)",
+      "destination": "/api/assessments.js"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

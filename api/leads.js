@@ -329,14 +329,72 @@ module.exports = async function handler(req, res) {
 
         const leadId = path.substring(1); // Remove leading slash
 
-        const { data: lead, error: leadError } = await supabase
+        // Get lead with assessment data
+        console.log('🔍 Lead: About to execute database query for lead ID:', leadId);
+        console.log('🔍 Lead: User ID for query:', user.supabase_user_id);
+        
+        // First, let's check if the assessment_submissions table exists
+        try {
+          const { data: tableCheck, error: tableError } = await supabase
+            .from('assessment_submissions')
+            .select('id')
+            .limit(1);
+          
+          if (tableError) {
+            console.log('⚠️ Lead: Assessment submissions table check failed:', tableError.message);
+          } else {
+            console.log('✅ Lead: Assessment submissions table exists and accessible');
+          }
+        } catch (tableCheckError) {
+          console.log('⚠️ Lead: Could not check assessment_submissions table:', tableCheckError.message);
+        }
+        
+                        // Try to get lead with assessment data first
+        let { data: lead, error: leadError } = await supabase
           .from('leads')
-          .select('*')
+          .select(`
+            *,
+            assessment_submissions (
+              id,
+              submitted_at,
+              answers,
+              result,
+              status
+            )
+          `)
           .eq('id', leadId)
           .eq('user_id', user.supabase_user_id)
           .single();
-
+        
+        // If the join fails, try to get just the lead data
+        if (leadError && leadError.message.includes('assessment_submissions')) {
+          console.log('⚠️ Lead: Assessment submissions join failed, trying basic lead query');
+          const { data: basicLead, error: basicLeadError } = await supabase
+            .from('leads')
+            .select('*')
+            .eq('id', leadId)
+            .eq('user_id', user.supabase_user_id)
+            .single();
+          
+          if (basicLeadError) {
+            leadError = basicLeadError;
+          } else {
+            lead = basicLead;
+            lead.assessment_submissions = [];
+            leadError = null;
+          }
+        }
+        
+        console.log('🔍 Lead: Database query completed successfully');
+        console.log('🔍 Lead: Lead data found:', !!lead);
+        console.log('🔍 Lead: Assessment submissions count:', lead?.assessment_submissions?.length || 0);
+        
         if (leadError) {
+          console.error('❌ Lead: Database error occurred:', leadError);
+          console.error('❌ Lead: Error code:', leadError.code);
+          console.error('❌ Lead: Error message:', leadError.message);
+          console.error('❌ Lead: Error details:', leadError.details);
+          
           if (leadError.code === 'PGRST116') {
             return res.status(404).json({ error: 'Lead not found or you do not have permission to access it' });
           }
@@ -354,6 +412,8 @@ module.exports = async function handler(req, res) {
         });
       }
     }
+
+
 
     // GET /api/leads/search - Search leads
     if (method === 'GET' && path === '/search') {

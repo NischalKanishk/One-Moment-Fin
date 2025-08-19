@@ -189,7 +189,7 @@ export default function PublicAssessment() {
       setIsLoading(true);
       console.log('🔍 Loading assessment for slug:', assessmentSlug);
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/a/${assessmentSlug}`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/assessments/public/${assessmentSlug}`);
       
       if (!response.ok) {
         throw new Error('Failed to load assessment');
@@ -381,7 +381,7 @@ export default function PublicAssessment() {
           submitData.assessmentId = assessment.id;
         }
       } else if (assessmentType === 'public' && slug) {
-        submitUrl = `${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/a/${slug}/submit`;
+        submitUrl = `${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/assessments/public/${slug}/submit`;
       } else {
         throw new Error('Invalid assessment configuration');
       }
@@ -881,24 +881,24 @@ export default function PublicAssessment() {
                       
                       {questions[currentQuestionIndex].qtype === 'multi' && questions[currentQuestionIndex].options && questions[currentQuestionIndex].options.length > 0 ? (
                         <div className="space-y-3">
-                          {questions[currentQuestionIndex].options.map((option: string, optionIndex: number) => (
+                          {questions[currentQuestionIndex].options.map((option: any, optionIndex: number) => (
                             <div key={optionIndex} className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
                               <input
                                 type="checkbox"
                                 id={`${questions[currentQuestionIndex].qkey}-${optionIndex}`}
-                                checked={Array.isArray(answers[questions[currentQuestionIndex].qkey]) && answers[questions[currentQuestionIndex].qkey].includes(option)}
+                                checked={Array.isArray(answers[questions[currentQuestionIndex].qkey]) && answers[questions[currentQuestionIndex].qkey].includes(option.value)}
                                 onChange={(e) => {
                                   const currentAnswers = Array.isArray(answers[questions[currentQuestionIndex].qkey]) ? answers[questions[currentQuestionIndex].qkey] : [];
                                   if (e.target.checked) {
-                                    handleAnswerChange(questions[currentQuestionIndex].qkey, [...currentAnswers, option]);
+                                    handleAnswerChange(questions[currentQuestionIndex].qkey, [...currentAnswers, option.value]);
                                   } else {
-                                    handleAnswerChange(questions[currentQuestionIndex].qkey, currentAnswers.filter((ans: string) => ans !== option));
+                                    handleAnswerChange(questions[currentQuestionIndex].qkey, currentAnswers.filter((ans: string) => ans !== option.value));
                                   }
                                 }}
                                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                               />
                               <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} className="text-base cursor-pointer flex-1">
-                                {option}
+                                {option.label}
                               </Label>
                             </div>
                           ))}
@@ -909,11 +909,11 @@ export default function PublicAssessment() {
                           onValueChange={(value) => handleAnswerChange(questions[currentQuestionIndex].qkey, value)}
                           className="space-y-3"
                         >
-                          {questions[currentQuestionIndex].options.map((option: string, optionIndex: number) => (
+                          {questions[currentQuestionIndex].options.map((option: any, optionIndex: number) => (
                             <div key={optionIndex} className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
-                              <RadioGroupItem value={option} id={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} />
+                              <RadioGroupItem value={option.value} id={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} />
                               <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} className="text-base cursor-pointer flex-1">
-                                {option}
+                                {option.label}
                               </Label>
                             </div>
                           ))}
@@ -944,16 +944,29 @@ export default function PublicAssessment() {
                           <RadioGroup
                             value={answers[questions[currentQuestionIndex].qkey] || ''}
                             onValueChange={(value) => handleAnswerChange(questions[currentQuestionIndex].qkey, value)}
-                            className="grid grid-cols-5 gap-2"
+                            className={`grid gap-2 ${questions[currentQuestionIndex].options?.labels ? `grid-cols-${questions[currentQuestionIndex].options.labels.length}` : 'grid-cols-5'}`}
                           >
-                            {[1, 2, 3, 4, 5].map((value) => (
-                              <div key={value} className="flex flex-col items-center">
-                                <RadioGroupItem value={value.toString()} id={`${questions[currentQuestionIndex].qkey}-${value}`} />
-                                <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${value}`} className="text-sm mt-1">
-                                  {value}
-                                </Label>
-                              </div>
-                            ))}
+                            {questions[currentQuestionIndex].options?.labels ? (
+                              // Use labels from options if available
+                              questions[currentQuestionIndex].options.labels.map((label: string, index: number) => (
+                                <div key={index} className="flex flex-col items-center">
+                                  <RadioGroupItem value={(index + 1).toString()} id={`${questions[currentQuestionIndex].qkey}-${index}`} />
+                                  <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${index}`} className="text-sm mt-1 text-center">
+                                    {label}
+                                  </Label>
+                                </div>
+                              ))
+                            ) : (
+                              // Fallback to 1-5 scale
+                              [1, 2, 3, 4, 5].map((value) => (
+                                <div key={value} className="flex flex-col items-center">
+                                  <RadioGroupItem value={value.toString()} id={`${questions[currentQuestionIndex].qkey}-${value}`} />
+                                  <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${value}`} className="text-sm mt-1">
+                                    {value}
+                                  </Label>
+                                </div>
+                              ))
+                            )}
                           </RadioGroup>
                         </div>
                       ) : questions[currentQuestionIndex].qtype === 'percent' ? (
