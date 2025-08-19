@@ -308,6 +308,13 @@ router.get('/', authenticateUser, [
         console.log('🔍 Leads: Applied source filter:', sourceFilter);
       }
 
+      // Apply risk bucket filter
+      const riskBucketFilter = req.query.risk_bucket as string;
+      if (riskBucketFilter) {
+        query = query.eq('risk_bucket', riskBucketFilter);
+        console.log('🔍 Leads: Applied risk bucket filter:', riskBucketFilter);
+      }
+
       // Apply sorting and pagination
       query = query
         .order(sortBy, { ascending: sortOrder === 'asc' })

@@ -13,8 +13,18 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey
   auth: {
     autoRefreshToken: false,
     persistSession: false
+  },
+  db: {
+    schema: 'public'
   }
 });
+
+// Log which key is being used
+console.log('🔍 Supabase client configuration:');
+console.log('🔍 URL:', supabaseUrl);
+console.log('🔍 Service Role Key:', supabaseServiceKey ? 'Present' : 'Missing');
+console.log('🔍 Anon Key:', supabaseAnonKey ? 'Present' : 'Missing');
+console.log('🔍 Using key:', supabaseServiceKey ? 'Service Role' : 'Anon Key');
 
 // Create public client for auth operations
 const supabasePublic = createClient(supabaseUrl, supabaseAnonKey);

@@ -29,7 +29,8 @@ interface Lead {
   email?: string;
   phone?: string;
   age?: number;
-  risk_category?: string;
+  risk_bucket?: string; // Assessment-based risk level (low/medium/high)
+  risk_score?: number;  // Assessment-based risk score (0-100)
   status?: string;
   source_link?: string;
   created_at: string;
@@ -74,7 +75,7 @@ export default function Leads(){
 
   const [statusFilter, setStatusFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
-  const [riskCategoryFilter, setRiskCategoryFilter] = useState('all');
+  const [riskLevelFilter, setRiskLevelFilter] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -213,21 +214,29 @@ export default function Leads(){
     }
   };
 
-  const getRiskCategoryStyle = (riskCategory: string) => {
-    const normalizedCategory = riskCategory?.toLowerCase() || 'not-assessed';
-    switch (normalizedCategory) {
-      case 'conservative':
+  const getRiskCategoryStyle = (riskBucket: string) => {
+    const normalizedBucket = riskBucket?.toLowerCase() || 'not-assessed';
+    switch (normalizedBucket) {
+      case 'low':
         return 'bg-blue-100 text-blue-800 border border-blue-200 hover:bg-blue-200 transition-colors duration-200';
-      case 'moderate':
+      case 'medium':
         return 'bg-green-100 text-green-800 border border-green-200 hover:bg-green-200 transition-colors duration-200';
-      case 'growth':
-        return 'bg-yellow-100 text-yellow-800 border border-yellow-200 hover:bg-yellow-200 transition-colors duration-200';
-      case 'aggressive':
+      case 'high':
         return 'bg-red-100 text-red-800 border border-red-200 hover:bg-red-200 transition-colors duration-200';
       case 'not assessed':
       default:
         return 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-300 transition-colors duration-200';
     }
+  };
+
+  // Helper function to get the display text for risk bucket
+  const getRiskBucketDisplay = (lead: Lead) => {
+    // Display risk_bucket directly (low/medium/high)
+    if (lead.risk_bucket) {
+      return lead.risk_bucket.charAt(0).toUpperCase() + lead.risk_bucket.slice(1); // Capitalize first letter
+    }
+    
+    return 'Not Assessed';
   };
 
   const getSourceStyle = (sourceLink: string) => {
@@ -279,7 +288,7 @@ export default function Leads(){
 
   useEffect(() => {
     fetchLeads();
-  }, [pagination.page, statusFilter, searchTerm, sourceFilter, riskCategoryFilter]);
+  }, [pagination.page, statusFilter, searchTerm, sourceFilter, riskLevelFilter]);
 
   // Debounce search term changes
   useEffect(() => {
@@ -313,7 +322,7 @@ export default function Leads(){
         ...(searchTerm.trim() && { search: searchTerm.trim() }),
 
         ...(sourceFilter !== 'all' && { source_link: sourceFilter }),
-        ...(riskCategoryFilter !== 'all' && { risk_category: riskCategoryFilter })
+        ...(riskLevelFilter !== 'all' && { risk_bucket: riskLevelFilter })
       };
 
       const response = await leadsAPI.getAll(token, params);
@@ -452,7 +461,7 @@ export default function Leads(){
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
           </svg>
           Filters
-          {(statusFilter !== 'all' || sourceFilter !== 'all' || riskCategoryFilter !== 'all') && (
+          {(statusFilter !== 'all' || sourceFilter !== 'all' || riskLevelFilter !== 'all') && (
             <span className="ml-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded-full">
               Active
             </span>
@@ -708,19 +717,18 @@ export default function Leads(){
               </Select>
             </div>
 
-            {/* Risk Category Filter */}
+            {/* Risk Level Filter */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Risk Category</label>
-              <Select value={riskCategoryFilter} onValueChange={setRiskCategoryFilter}>
+              <label className="text-sm font-medium text-gray-700">Risk Level</label>
+              <Select value={riskLevelFilter} onValueChange={setRiskLevelFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Risk Category" />
+                  <SelectValue placeholder="Select Risk Level" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Risk Categories</SelectItem>
-                  <SelectItem value="Conservative">Conservative</SelectItem>
-                  <SelectItem value="Moderate">Moderate</SelectItem>
-                  <SelectItem value="Growth">Growth</SelectItem>
-                  <SelectItem value="Aggressive">Aggressive</SelectItem>
+                  <SelectItem value="all">All Risk Levels</SelectItem>
+                  <SelectItem value="low">Low Risk</SelectItem>
+                  <SelectItem value="medium">Medium Risk</SelectItem>
+                  <SelectItem value="high">High Risk</SelectItem>
                   <SelectItem value="Not Assessed">Not Assessed</SelectItem>
                 </SelectContent>
               </Select>
@@ -733,7 +741,7 @@ export default function Leads(){
                 onClick={() => {
                   setStatusFilter('all');
                   setSourceFilter('all');
-                  setRiskCategoryFilter('all');
+                  setRiskLevelFilter('all');
                 }}
                 className="flex-1"
               >
@@ -754,7 +762,7 @@ export default function Leads(){
         <Table>
           <TableHeader>
             <TableRow>
-              {['Name','Contact','Age','Risk Category','Source','Status','Conversion %','Actions'].map(h => (
+              {['Name','Contact','Age','Risk Level','Source','Status','Conversion %','Actions'].map(h => (
                 <TableHead key={h}>{h}</TableHead>
               ))}
             </TableRow>
@@ -783,9 +791,14 @@ export default function Leads(){
                   <TableCell>{lead.phone || lead.email || 'N/A'}</TableCell>
                   <TableCell>{lead.age || 'N/A'}</TableCell>
                   <TableCell>
-                    <span className={`px-2 py-0.5 text-xs rounded ${getRiskCategoryStyle(lead.risk_category)}`}>
-                      {lead.risk_category || 'Not Assessed'}
+                    <span className={`px-2 py-0.5 text-xs rounded ${getRiskCategoryStyle(getRiskBucketDisplay(lead))}`}>
+                      {getRiskBucketDisplay(lead)}
                     </span>
+                    {lead.risk_score && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Score: {lead.risk_score}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <span className={`px-2 py-0.5 text-xs rounded ${getSourceStyle(lead.source_link)}`}>

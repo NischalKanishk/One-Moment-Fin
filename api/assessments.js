@@ -1261,62 +1261,536 @@ module.exports = async function handler(req, res) {
 
         console.log('✅ Lead created successfully:', lead.id);
         
-
-
-        // Store assessment submission data
-        console.log('🔍 Attempting to store assessment submission...');
-        console.log('🔍 Data to insert:', {
-          owner_id: user.id,
-          lead_id: lead.id,
-          answers: answers,
-          result: {
-            bucket: 'moderate',
-            score: 50,
-            rubric: { capacity: 50, tolerance: 50, need: 50 }
+        // Calculate risk score based on answers
+        console.log('🔍 Calculating risk score from answers:', answers);
+        
+        let riskScore = 0;
+        let capacityScore = 0;
+        let toleranceScore = 0;
+        let needScore = 0;
+        let questionCount = 0;
+        
+        // Risk scoring logic based on CFA framework
+        Object.entries(answers).forEach(([questionKey, answer]) => {
+          questionCount++;
+          
+          // Capacity questions (financial ability)
+          if (['age', 'dependents', 'income_security', 'emi_ratio', 'liquidity_withdrawal_2y', 'emergency_fund_months'].includes(questionKey)) {
+            let score = 0;
+            switch (questionKey) {
+              case 'age':
+                if (answer === '<25') score = 20;
+                else if (answer === '25-35') score = 30;
+                else if (answer === '36-50') score = 40;
+                else if (answer === '51+') score = 50;
+                break;
+              case 'dependents':
+                if (answer === '0') score = 50;
+                else if (answer === '1') score = 40;
+                else if (answer === '2') score = 30;
+                else if (answer === '3') score = 20;
+                else score = 10;
+                break;
+              case 'income_security':
+                if (answer === 'Very secure') score = 50;
+                else if (answer === 'Fairly secure') score = 40;
+                else if (answer === 'Somewhat secure') score = 30;
+                else score = 20;
+                break;
+              case 'emi_ratio':
+                const emiRatio = parseInt(answer);
+                if (emiRatio <= 20) score = 50;
+                else if (emiRatio <= 35) score = 40;
+                else if (emiRatio <= 50) score = 30;
+                else score = 20;
+                break;
+              case 'liquidity_withdrawal_2y':
+                const withdrawalRatio = parseInt(answer);
+                if (withdrawalRatio <= 10) score = 50;
+                else if (withdrawalRatio <= 25) score = 40;
+                else if (withdrawalRatio <= 50) score = 30;
+                else score = 20;
+                break;
+              case 'emergency_fund_months':
+                if (answer === '>12') score = 50;
+                else if (answer === '6-12') score = 40;
+                else if (answer === '3-6') score = 30;
+                else score = 20;
+                break;
+            }
+            capacityScore += score;
+          }
+          
+          // Tolerance questions (risk behavior)
+          else if (['drawdown_reaction', 'gain_loss_tradeoff', 'loss_threshold'].includes(questionKey)) {
+            let score = 0;
+            switch (questionKey) {
+              case 'drawdown_reaction':
+                if (answer === 'Buy more') score = 50;
+                else if (answer === 'Do nothing') score = 30;
+                else score = 10;
+                break;
+              case 'gain_loss_tradeoff':
+                if (answer === 'Loss25Gain50') score = 50;
+                else if (answer === 'Loss8Gain22') score = 30;
+                else score = 10;
+                break;
+              case 'loss_threshold':
+                if (answer === '>15%') score = 50;
+                else if (answer === '9-15%') score = 40;
+                else if (answer === '3-8%') score = 30;
+                else score = 20;
+                break;
+            }
+            toleranceScore += score;
+          }
+          
+          // Need questions (investment requirements)
+          else if (['goal_required_return', 'liquidity_constraint'].includes(questionKey)) {
+            let score = 0;
+            switch (questionKey) {
+              case 'goal_required_return':
+                const requiredReturn = parseInt(answer);
+                if (requiredReturn <= 8) score = 20;
+                else if (requiredReturn <= 12) score = 30;
+                else if (requiredReturn <= 16) score = 40;
+                else score = 50;
+                break;
+              case 'liquidity_constraint':
+                if (answer === 'locked_ok') score = 50;
+                else if (answer === '1y') score = 40;
+                else if (answer === '3m') score = 30;
+                else score = 20;
+                break;
+            }
+            needScore += score;
+          }
+          
+          // Knowledge questions (market understanding)
+          else if (['market_knowledge', 'investing_experience'].includes(questionKey)) {
+            let score = 0;
+            switch (questionKey) {
+              case 'market_knowledge':
+                const knowledgeLevel = parseInt(answer);
+                score = knowledgeLevel * 10; // 1-5 scale becomes 10-50
+                break;
+              case 'investing_experience':
+                if (answer === '>10y') score = 50;
+                else if (answer === '3-10y') score = 40;
+                else if (answer === '<3y') score = 30;
+                else score = 20;
+                break;
+            }
+            toleranceScore += score; // Knowledge affects risk tolerance
           }
         });
         
-        const { data: submission, error: submissionError } = await supabase
-          .from('assessment_submissions')
-          .insert({
-            assessment_id: null, // No specific assessment form for now
-            framework_version_id: null, // No specific framework version for now
+        // Calculate average scores
+        const capacityQuestions = ['age', 'dependents', 'income_security', 'emi_ratio', 'liquidity_withdrawal_2y', 'emergency_fund_months'].filter(q => answers[q]);
+        const toleranceQuestions = ['drawdown_reaction', 'gain_loss_tradeoff', 'loss_threshold', 'market_knowledge', 'investing_experience'].filter(q => answers[q]);
+        const needQuestions = ['goal_required_return', 'liquidity_constraint'].filter(q => answers[q]);
+        
+        capacityScore = capacityQuestions.length > 0 ? Math.round(capacityScore / capacityQuestions.length) : 0;
+        toleranceScore = toleranceQuestions.length > 0 ? Math.round(toleranceScore / toleranceQuestions.length) : 0;
+        needScore = needQuestions.length > 0 ? Math.round(needScore / needQuestions.length) : 0;
+        
+        // Overall risk score (weighted average)
+        riskScore = Math.round((capacityScore * 0.4 + toleranceScore * 0.4 + needScore * 0.2));
+        
+        // Determine risk bucket
+        let riskBucket = 'Medium';
+        if (riskScore <= 25) riskBucket = 'Low';
+        else if (riskScore >= 40) riskBucket = 'High';
+        
+        console.log('🔍 Risk scoring results:', {
+          capacityScore,
+          toleranceScore,
+          needScore,
+          riskScore,
+          riskBucket
+        });
+        
+        // Debug the answers object
+        console.log('🔍 Answers object debug:');
+        console.log('🔍 - Answers type:', typeof answers);
+        console.log('🔍 - Answers keys:', Object.keys(answers || {}));
+        console.log('🔍 - Answers sample:', JSON.stringify(answers, null, 2).substring(0, 500));
+        
+        // Check if answers is valid JSONB
+        try {
+          JSON.stringify(answers);
+          console.log('✅ Answers is valid JSON');
+        } catch (jsonError) {
+          console.error('❌ Answers is not valid JSON:', jsonError);
+        }
+        
+        // Clean and validate answers data
+        console.log('🔍 Cleaning and validating answers data...');
+        const cleanedAnswers = {};
+        
+        if (answers && typeof answers === 'object') {
+          Object.entries(answers).forEach(([key, value]) => {
+            // Skip null/undefined values
+            if (value !== null && value !== undefined) {
+              // Convert to string if it's not a primitive type
+              if (typeof value === 'object' && !Array.isArray(value)) {
+                cleanedAnswers[key] = JSON.stringify(value);
+              } else if (Array.isArray(value)) {
+                // Handle arrays - ensure all elements are strings
+                cleanedAnswers[key] = value.map(item => String(item));
+              } else {
+                cleanedAnswers[key] = String(value);
+              }
+            }
+          });
+        }
+        
+        console.log('🔍 Cleaned answers:', cleanedAnswers);
+        console.log('🔍 Cleaned answers keys:', Object.keys(cleanedAnswers));
+        
+        // Store assessment submission data with calculated scores
+        console.log('🔍 Storing assessment submission with calculated scores...');
+        
+        // Create or get a default CFA assessment form record FIRST
+        console.log('🔍 Creating/getting default CFA assessment form...');
+        let defaultAssessmentId = null;
+        
+        try {
+          // First try to find an existing CFA assessment form
+          const { data: existingAssessment, error: findError } = await supabase
+            .from('assessment_forms')
+            .select('id')
+            .eq('name', 'CFA Three-Pillar Risk Assessment')
+            .eq('user_id', user.id)
+            .single();
+          
+          if (findError && findError.code !== 'PGRST116') { // PGRST116 = not found
+            console.error('❌ Error finding existing assessment form:', findError);
+          } else if (existingAssessment) {
+            defaultAssessmentId = existingAssessment.id;
+            console.log('✅ Found existing CFA assessment form:', defaultAssessmentId);
+          } else {
+            // Create a new default assessment form
+            const { data: newAssessment, error: createError } = await supabase
+              .from('assessment_forms')
+              .insert({
+                user_id: user.id,
+                name: 'CFA Three-Pillar Risk Assessment',
+                description: 'Default CFA framework assessment form for public submissions',
+                is_active: true
+              })
+              .select('id')
+              .single();
+            
+            if (createError) {
+              console.error('❌ Error creating default assessment form:', createError);
+              console.error('❌ Create error details:', createError);
+            } else {
+              defaultAssessmentId = newAssessment.id;
+              console.log('✅ Created new CFA assessment form:', defaultAssessmentId);
+            }
+          }
+        } catch (assessmentError) {
+          console.error('❌ Error with assessment form creation/finding:', assessmentError);
+        }
+        
+        // If we still don't have an assessment ID, try to use null (but this might fail due to constraints)
+        if (!defaultAssessmentId) {
+          console.log('⚠️ No assessment form ID available, will try with null');
+          console.log('⚠️ This might cause insertion to fail due to foreign key constraints');
+          
+          // Try to find ANY assessment form that might work
+          try {
+            const { data: anyAssessment, error: anyError } = await supabase
+              .from('assessment_forms')
+              .select('id')
+              .limit(1)
+              .single();
+            
+            if (!anyError && anyAssessment) {
+              defaultAssessmentId = anyAssessment.id;
+              console.log('⚠️ Using fallback assessment form ID:', defaultAssessmentId);
+            }
+          } catch (fallbackError) {
+            console.log('⚠️ Fallback assessment form lookup failed:', fallbackError.message);
+          }
+        }
+        
+        // Test database connection and permissions first
+        console.log('🔍 Testing database connection and permissions...');
+        console.log('🔍 Environment variables check:');
+        console.log('🔍 - SUPABASE_URL:', process.env.SUPABASE_URL ? 'Set' : 'Missing');
+        console.log('🔍 - SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set (' + process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 10) + '...)' : 'Missing');
+        console.log('🔍 - SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? 'Set (' + process.env.SUPABASE_ANON_KEY.substring(0, 10) + '...)' : 'Missing');
+        console.log('🔍 - NODE_ENV:', process.env.NODE_ENV || 'Not set');
+        
+        // Check which Supabase client is being used
+        console.log('🔍 Supabase client check:');
+        console.log('🔍 - Client URL:', supabase.supabaseUrl);
+        console.log('🔍 - Client key type:', supabase.supabaseKey ? (supabase.supabaseKey === process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Service Role' : 'Anon Key') : 'No key');
+        
+        try {
+          // Test basic connection
+          const { data: testData, error: testError } = await supabase
+            .from('assessment_submissions')
+            .select('id')
+            .limit(1);
+          
+          if (testError) {
+            console.error('❌ Database connection test failed:', testError);
+            console.error('❌ Error code:', testError.code);
+            console.error('❌ Error message:', testError.message);
+            console.error('❌ Error details:', testError.details);
+          } else {
+            console.log('✅ Database connection test successful');
+          }
+          
+          // Test if we can insert (this will test RLS policies)
+          console.log('🔍 Testing insert permissions...');
+          console.log('🔍 Current user ID:', user.id);
+          console.log('🔍 Current lead ID:', lead.id);
+          
+          const testInsertData = {
+            assessment_id: defaultAssessmentId, // Use the assessment form ID
+            framework_version_id: null,
             owner_id: user.id,
             lead_id: lead.id,
             submitted_at: new Date().toISOString(),
-            answers: answers,
-            result: {
-              bucket: 'moderate', // Default bucket
-              score: 50, // Default score
-              rubric: {
-                capacity: 50,
-                tolerance: 50,
-                need: 50
-              }
-            },
-            status: 'submitted'
-          })
+            answers: { test: 'data' },
+            result: { test: 'result' }
+            // Removed status field as it doesn't exist in the table
+          };
+        
+        console.log('🔍 Test insert data:', testInsertData);
+        
+        const { data: testInsert, error: testInsertError } = await supabase
+          .from('assessment_submissions')
+          .insert(testInsertData)
+          .select('id')
+          .single();
+        
+        if (testInsertError) {
+          console.error('❌ Test insert failed:', testInsertError);
+          console.error('❌ Test insert error code:', testInsertError.code);
+          console.error('❌ Test insert error message:', testInsertError.message);
+          console.error('❌ Test insert error details:', testInsertError.details);
+          
+          // Check if it's an RLS policy issue
+          if (testInsertError.code === '42501') {
+            console.error('❌ RLS POLICY VIOLATION - The migration needs to be applied to fix this');
+            console.error('❌ Current RLS policies require authentication, but public users are not authenticated');
+          }
+          
+          // Try to get more info about the table structure
+          try {
+            console.log('🔍 Testing table structure queries...');
+            
+            // Test basic select
+            const { data: tableInfo, error: tableError } = await supabase
+              .from('assessment_submissions')
+              .select('*')
+              .limit(0);
+            
+            if (tableError) {
+              console.error('❌ Cannot even query table structure:', tableError);
+              console.error('❌ Table error code:', tableError.code);
+              console.error('❌ Table error message:', tableError.message);
+            } else {
+              console.log('✅ Table structure query successful');
+            }
+            
+                    // Test if we can see any existing data
+        const { data: existingData, error: existingError } = await supabase
+          .from('assessment_submissions')
+          .select('id, owner_id, lead_id, submitted_at')
+          .limit(5);
+        
+        if (existingError) {
+          console.error('❌ Cannot query existing data:', existingError);
+        } else {
+          console.log('✅ Existing data query successful, count:', existingData?.length || 0);
+          if (existingData && existingData.length > 0) {
+            console.log('🔍 Sample existing data:', existingData[0]);
+          }
+        }
+        
+        // Test table structure by trying to get column info
+        console.log('🔍 Testing table structure...');
+        try {
+          // Test if we can access assessment_forms table
+          console.log('🔍 Testing assessment_forms table access...');
+          const { data: formsData, error: formsError } = await supabase
+            .from('assessment_forms')
+            .select('id, name')
+            .limit(1);
+          
+          if (formsError) {
+            console.error('❌ Cannot access assessment_forms table:', formsError);
+            console.error('❌ Forms error code:', formsError.code);
+            console.error('❌ Forms error message:', formsError.message);
+          } else {
+            console.log('✅ Assessment forms table accessible, count:', formsData?.length || 0);
+            if (formsData && formsData.length > 0) {
+              console.log('🔍 Sample form:', formsData[0]);
+            }
+          }
+          
+          // Try to insert minimal data to see what columns are required
+          const minimalData = {
+            owner_id: user.id,
+            lead_id: lead.id,
+            answers: { test: 'minimal' }
+          };
+          
+          console.log('🔍 Testing minimal insert with data:', minimalData);
+          
+          const { data: minimalInsert, error: minimalError } = await supabase
+            .from('assessment_submissions')
+            .insert(minimalData)
+            .select('id')
+            .single();
+          
+          if (minimalError) {
+            console.error('❌ Minimal insert failed:', minimalError);
+            console.error('❌ Minimal error code:', minimalError.code);
+            console.error('❌ Minimal error message:', minimalError.message);
+            console.error('❌ Minimal error details:', minimalError.details);
+          } else {
+            console.log('✅ Minimal insert successful, ID:', minimalInsert.id);
+            
+            // Clean up minimal test data
+            const { error: deleteError } = await supabase
+              .from('assessment_submissions')
+              .delete()
+              .eq('id', minimalInsert.id);
+            
+            if (deleteError) {
+              console.log('⚠️ Could not clean up minimal test data:', deleteError.message);
+            } else {
+              console.log('✅ Minimal test data cleaned up successfully');
+            }
+          }
+        } catch (minimalTestError) {
+          console.error('❌ Minimal insert test error:', minimalTestError);
+        }
+            
+          } catch (tableQueryError) {
+            console.error('❌ Table structure query failed:', tableQueryError);
+          }
+          
+        } else {
+          console.log('✅ Test insert successful, ID:', testInsert.id);
+          
+          // Clean up test data
+          const { error: deleteError } = await supabase
+            .from('assessment_submissions')
+            .delete()
+            .eq('id', testInsert.id);
+          
+          if (deleteError) {
+            console.log('⚠️ Could not clean up test data:', deleteError.message);
+          } else {
+            console.log('✅ Test data cleaned up successfully');
+          }
+        }
+          
+        } catch (testError) {
+          console.error('❌ Database connection test error:', testError);
+        }
+        
+        // Assessment form ID is already set above, no need to duplicate
+        
+        const submissionData = {
+          assessment_id: defaultAssessmentId, // Use the assessment form ID
+          framework_version_id: null, // No specific framework version for now
+          owner_id: user.id,
+          lead_id: lead.id,
+          submitted_at: new Date().toISOString(),
+          answers: cleanedAnswers, // Use cleaned answers
+          result: {
+            bucket: riskBucket,
+            score: riskScore,
+            rubric: {
+              capacity: capacityScore,
+              tolerance: toleranceScore,
+              need: needScore
+            }
+          }
+          // Removed status field as it doesn't exist in the table
+        };
+        
+        console.log('🔍 Inserting assessment submission with data:', submissionData);
+        console.log('🔍 Owner ID type:', typeof submissionData.owner_id, 'Value:', submissionData.owner_id);
+        console.log('🔍 Lead ID type:', typeof submissionData.lead_id, 'Value:', submissionData.lead_id);
+        console.log('🔍 Owner ID valid UUID:', /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(submissionData.owner_id));
+        console.log('🔍 Lead ID valid UUID:', /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(submissionData.lead_id));
+        
+        // Check if user and lead exist in their respective tables
+        console.log('🔍 Verifying user and lead existence...');
+        try {
+          const { data: userCheck, error: userCheckError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('id', submissionData.owner_id)
+            .single();
+          
+          if (userCheckError) {
+            console.error('❌ User check failed:', userCheckError);
+          } else {
+            console.log('✅ User exists:', userCheck.id);
+          }
+          
+          const { data: leadCheck, error: leadCheckError } = await supabase
+            .from('leads')
+            .select('id')
+            .eq('id', submissionData.lead_id)
+            .single();
+          
+          if (leadCheckError) {
+            console.error('❌ Lead check failed:', leadCheckError);
+          } else {
+            console.log('✅ Lead exists:', leadCheck.id);
+          }
+        } catch (checkError) {
+          console.error('❌ User/Lead check error:', checkError);
+        }
+        
+        console.log('🔍 Attempting to insert assessment submission...');
+        const { data: submission, error: submissionError } = await supabase
+          .from('assessment_submissions')
+          .insert(submissionData)
           .select()
           .single();
 
         if (submissionError) {
           console.error('❌ Failed to create assessment submission:', submissionError);
-          console.error('❌ Error details:', submissionError);
+          console.error('❌ Error code:', submissionError.code);
+          console.error('❌ Error message:', submissionError.message);
+          console.error('❌ Error details:', submissionError.details);
+          console.error('❌ Error hint:', submissionError.hint);
+          
+          // Check if it's an RLS policy issue
+          if (submissionError.code === '42501') {
+            console.error('❌ This is an RLS policy violation - the migration needs to be applied');
+          }
+          
           // Don't fail the whole request, just log the error
         } else {
           console.log('✅ Assessment submission created successfully:', submission.id);
         }
         
-        // Update lead with risk profile information (always try to update)
+        // Update lead with risk profile information
         const riskProfileData = {
-          risk_bucket: 'moderate',
-          risk_score: 50
+          risk_bucket: riskBucket,
+          risk_score: riskScore
         };
         
         // Only set risk_profile_id if submission was created successfully
         if (submission && !submissionError) {
           riskProfileData.risk_profile_id = submission.id;
         }
+        
+        console.log('🔍 Updating lead with risk profile:', riskProfileData);
         
         const { error: updateError } = await supabase
           .from('leads')
@@ -1332,12 +1806,12 @@ module.exports = async function handler(req, res) {
         return res.json({
           message: 'Assessment submitted successfully',
           result: {
-            bucket: 'moderate', // Default bucket
-            score: 50, // Default score
+            bucket: riskBucket,
+            score: riskScore,
             rubric: {
-              capacity: 50,
-              tolerance: 50,
-              need: 50
+              capacity: capacityScore,
+              tolerance: toleranceScore,
+              need: needScore
             }
           },
           leadId: lead.id,
@@ -1356,6 +1830,64 @@ module.exports = async function handler(req, res) {
     }
     
 
+
+    // ============================================================================
+    // DEBUG ENDPOINTS
+    // ============================================================================
+    
+    // GET /api/assessments/debug/leads - Debug leads and their risk data
+    if (method === 'GET' && path === '/debug/leads') {
+      try {
+        const user = await authenticateUser(req);
+        if (!user?.supabase_user_id) {
+          return res.status(400).json({ error: 'User not properly authenticated' });
+        }
+
+        // Get leads with their risk data for debugging
+        const { data: leads, error: leadsError } = await supabase
+          .from('leads')
+          .select(`
+            id,
+            full_name,
+            email,
+            risk_category,
+            risk_bucket,
+            risk_score,
+            risk_profile_id,
+            created_at
+          `)
+          .eq('user_id', user.supabase_user_id)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (leadsError) {
+          console.error('❌ Debug leads error:', leadsError);
+          return res.status(500).json({ error: 'Failed to fetch leads for debugging' });
+        }
+
+        return res.json({
+          message: 'Debug leads data retrieved successfully',
+          leads: leads || [],
+          summary: {
+            total_leads: leads?.length || 0,
+            with_risk_category: leads?.filter(l => l.risk_category)?.length || 0,
+            with_risk_bucket: leads?.filter(l => l.risk_bucket)?.length || 0,
+            with_risk_score: leads?.filter(l => l.risk_score)?.length || 0,
+            risk_categories: leads?.reduce((acc, l) => {
+              if (l.risk_category) acc[l.risk_category] = (acc[l.risk_category] || 0) + 1;
+              return acc;
+            }, {}) || {},
+            risk_buckets: leads?.reduce((acc, l) => {
+              if (l.risk_bucket) acc[l.risk_bucket] = (acc[l.risk_bucket] || 0) + 1;
+              return acc;
+            }, {}) || {}
+          }
+        });
+      } catch (error) {
+        console.error('❌ Debug leads error:', error);
+        return res.status(500).json({ error: 'Failed to debug leads' });
+      }
+    }
 
     // ============================================================================
     // ASSESSMENT LINKS ENDPOINTS
@@ -1546,58 +2078,85 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'User not properly authenticated' });
         }
 
-        // Get CFA framework questions from the framework_questions table
-        // First get the framework ID
-        console.log('🔍 Fetching CFA framework...');
+        // Get CFA framework questions - try multiple approaches
+        console.log('🔍 Fetching CFA framework questions...');
+        
+        let questions = [];
+        
+        // Approach 1: Try to find CFA framework and get questions from framework_questions table
+        console.log('🔍 Approach 1: Looking for CFA framework and framework_questions table...');
         const { data: framework, error: frameworkError } = await supabase
           .from('risk_frameworks')
           .select('id')
           .eq('code', 'cfa_three_pillar_v1')
           .single();
-
-        if (frameworkError) {
-          console.error('Error fetching CFA framework:', frameworkError);
-          return res.status(500).json({ error: 'CFA framework not found', details: frameworkError.message });
-        }
-
-        if (!framework) {
-          console.error('CFA framework not found in database');
-          return res.status(500).json({ error: 'CFA framework not found in database' });
-        }
-
-        console.log('✅ CFA framework found:', framework.id);
-
-        // Then get the questions
-        let questions = [];
-        try {
-          console.log('🔍 Fetching questions for framework:', framework.id);
+        
+        if (!frameworkError && framework) {
+          console.log('✅ Found CFA framework:', framework.id);
+          
+          // Get questions from framework_questions table
           const { data: frameworkQuestions, error: questionsError } = await supabase
             .from('framework_questions')
             .select('*')
             .eq('framework_id', framework.id)
             .order('order_index');
-
-          if (questionsError) {
-            console.error('Error fetching CFA framework questions:', questionsError);
-            // Try fallback to question_bank table if framework_questions doesn't exist
-            const { data: fallbackQuestions, error: fallbackError } = await supabase
-              .from('question_bank')
+          
+          if (!questionsError && frameworkQuestions) {
+            questions = frameworkQuestions;
+            console.log('✅ Got questions from framework_questions table:', questions.length);
+          }
+        }
+        
+        // Approach 2: If no framework questions, try question_bank table
+        if (questions.length === 0) {
+          console.log('🔍 Approach 2: Trying question_bank table...');
+          const { data: bankQuestions, error: bankError } = await supabase
+            .from('question_bank')
+            .select('*')
+            .eq('is_active', true)
+            .order('order_index');
+          
+          if (!bankError && bankQuestions) {
+            questions = bankQuestions;
+            console.log('✅ Got questions from question_bank table:', questions.length);
+          }
+        }
+        
+        // Approach 3: If still no questions, try assessment_question_snapshots (working backend fallback)
+        if (questions.length === 0) {
+          console.log('🔍 Approach 3: Trying assessment_question_snapshots table (working backend fallback)...');
+          
+          // Try to find any assessment and get its snapshots
+          const { data: assessments, error: assessmentsError } = await supabase
+            .from('assessments')
+            .select('id')
+            .limit(1);
+          
+          if (!assessmentsError && assessments && assessments.length > 0) {
+            const assessmentId = assessments[0].id;
+            console.log('🔍 Found assessment, checking snapshots for:', assessmentId);
+            
+            const { data: snapshots, error: snapshotsError } = await supabase
+              .from('assessment_question_snapshots')
               .select('*')
-              .eq('is_active', true)
+              .eq('assessment_id', assessmentId)
               .order('order_index');
             
-            if (fallbackError) {
-              console.error('Fallback questions also failed:', fallbackError);
-              return res.status(500).json({ error: 'Failed to fetch CFA questions' });
+            if (!snapshotsError && snapshots && snapshots.length > 0) {
+              questions = snapshots;
+              console.log('✅ Got questions from assessment_question_snapshots:', snapshots.length);
+            } else {
+              console.log('⚠️ No snapshots found for assessment:', assessmentId);
             }
-            
-            questions = fallbackQuestions || [];
           } else {
-            questions = frameworkQuestions || [];
+            console.log('⚠️ No assessments found to check snapshots');
           }
-        } catch (error) {
-          console.error('Error in CFA questions query:', error);
-          return res.status(500).json({ error: 'Failed to fetch CFA questions' });
+        }
+        
+        // Approach 4: If still no questions, log the issue
+        if (questions.length === 0) {
+          console.log('⚠️ No questions found in any table. The working backend had fallback logic that is missing.');
+          console.log('⚠️ Check if assessment_question_snapshots table has data or if framework_questions table exists.');
         }
 
         console.log(`✅ CFA questions fetched successfully: ${questions.length} questions`);

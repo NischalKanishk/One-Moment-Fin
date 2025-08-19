@@ -458,16 +458,16 @@ export default function AssessmentsV2() {
 
           </div>
           
-          {/* Action Buttons */}
-          {assessments.filter(a => a.is_default).map(assessment => (
-            <div key={assessment.id} className="flex gap-2">
+          {/* Action Buttons - Always show when user has assessment link */}
+          {user?.assessment_link ? (
+            <div className="flex gap-2">
               <Button
                 variant="outline"
                 onClick={() => copyAssessmentLink()}
                 className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
               >
                 <Copy className="w-4 h-4 mr-2" />
-                Copy Link
+                Copy Assessment Link
               </Button>
               <Button
                 variant="outline"
@@ -475,43 +475,17 @@ export default function AssessmentsV2() {
                 className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
-                Open Link
+                View Live Assessment Form
               </Button>
             </div>
-          ))}
-          
-          {/* Fallback Action Buttons when no assessments exist */}
-          {assessments.length === 0 && (
-            <div className="flex gap-2">
-              {user?.assessment_link ? (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => copyAssessmentLink()}
-                    className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-                  >
-                    <Copy className="w-4 h-4 mr-2" />
-                    Copy Assessment Link
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => openAssessmentLink()}
-                    className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                  >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    View Live Assessment Form
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  onClick={() => createAssessmentLink()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Assessment Link
-                </Button>
-              )}
-            </div>
+          ) : (
+            <Button
+              onClick={() => createAssessmentLink()}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Assessment Link
+            </Button>
           )}
         </div>
 
@@ -519,336 +493,171 @@ export default function AssessmentsV2() {
 
         {/* Single Column Layout */}
         <div className="space-y-4">
-            {assessments.filter(a => a.is_default).map(assessment => (
-              <Card key={`questions-${assessment.id}`} className="border-0 shadow-sm">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <BarChart3 className="h-5 w-5 text-blue-600" />
-                    Assessment Questions
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Preview questions from your selected framework
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  {selectedAssessment ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <BookOpen className="h-4 w-4" />
-                        <span className="font-medium">{assessment.title}</span>
+            {/* CFA Framework Questions Display */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <BarChart3 className="h-5 w-5 text-blue-600" />
+                  CFA Three-Pillar Framework Questions
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Preview questions from the CFA Three-Pillar framework
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <BookOpen className="h-4 w-4" />
+                    <span className="font-medium">CFA Three-Pillar Framework</span>
+                  </div>
+                  
+                  {isLoadingFramework ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                        <p className="text-sm text-muted-foreground">Loading questions...</p>
+                      </div>
+                    </div>
+                  ) : frameworkQuestions.length > 0 ? (
+                    <>
+                      {/* Questions Summary */}
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                          <div>
+                            <div className="text-lg font-semibold text-blue-900">{frameworkQuestions.length}</div>
+                            <div className="text-xs text-blue-700">Total Questions</div>
+                          </div>
+                          <div>
+                            <div className="text-lg font-semibold text-blue-900">
+                              {frameworkQuestions.filter(q => q.qtype === 'single' || q.qtype === 'multi').length}
+                            </div>
+                            <div className="text-xs text-blue-700">Choice Questions</div>
+                          </div>
+                          <div>
+                            <div className="text-lg font-semibold text-blue-900">
+                              {frameworkQuestions.filter(q => q.qtype === 'text' || q.qtype === 'number' || q.qtype === 'percent').length}
+                            </div>
+                            <div className="text-xs text-blue-700">Input Questions</div>
+                          </div>
+                          <div>
+                            <div className="text-lg font-semibold text-blue-900">
+                              {frameworkQuestions.filter(q => q.required).length}
+                            </div>
+                            <div className="text-xs text-blue-700">Required</div>
+                          </div>
+                        </div>
                       </div>
                       
-                      {isLoadingFramework ? (
-                        <div className="flex items-center justify-center py-12">
-                          <div className="text-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                            <p className="text-sm text-muted-foreground">Loading questions...</p>
-                          </div>
-                        </div>
-                      ) : frameworkQuestions.length > 0 ? (
-                        <>
-                          {/* Questions Summary */}
-                          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                              <div>
-                                <div className="text-lg font-semibold text-blue-900">{frameworkQuestions.length}</div>
-                                <div className="text-xs text-blue-700">Total Questions</div>
-                              </div>
-                              <div>
-                                <div className="text-lg font-semibold text-blue-900">
-                                  {frameworkQuestions.filter(q => q.qtype === 'single' || q.qtype === 'multi').length}
-                                </div>
-                                <div className="text-xs text-blue-700">Choice Questions</div>
-                              </div>
-                              <div>
-                                <div className="text-lg font-semibold text-blue-900">
-                                  {frameworkQuestions.filter(q => q.qtype === 'text' || q.qtype === 'number' || q.qtype === 'percent').length}
-                                </div>
-                                <div className="text-xs text-blue-700">Input Questions</div>
-                              </div>
-                              <div>
-                                <div className="text-lg font-semibold text-blue-900">
-                                  {frameworkQuestions.filter(q => q.required).length}
-                                </div>
-                                <div className="text-xs text-blue-700">Required</div>
-                              </div>
+                      {/* Questions by Module */}
+                      <div className="space-y-6">
+                        {Object.entries(groupedQuestions).map(([module, questions]) => (
+                          <div key={module} className="space-y-3">
+                            <div className="flex items-center gap-2 mb-3">
+                              {getModuleIcon(module)}
+                              <h3 className="text-md font-semibold text-gray-900">{getModuleLabel(module)}</h3>
+                              <Badge variant="outline" className={`text-xs ${getModuleColor(module)}`}>
+                                {questions.length} questions
+                              </Badge>
                             </div>
-                          </div>
-                          
-                          {/* Questions by Module */}
-                          <div className="space-y-6">
-                            {Object.entries(groupedQuestions).map(([module, questions]) => (
-                              <div key={module} className="space-y-3">
-                                <div className="flex items-center gap-2 mb-3">
-                                  {getModuleIcon(module)}
-                                  <h3 className="text-md font-semibold text-gray-900">{getModuleLabel(module)}</h3>
-                                  <Badge variant="outline" className={`text-xs ${getModuleColor(module)}`}>
-                                    {questions.length} questions
-                                  </Badge>
-                                </div>
-                                
-                                <div className="space-y-3">
-                                  {questions.map((question, index) => (
-                                    <div key={question.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow">
-                                      <div className="flex items-start gap-3">
-                                        <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                                          {question.order_index}
+                            
+                            <div className="space-y-3">
+                              {questions.map((question, index) => (
+                                <div key={question.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow">
+                                  <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                                      {question.order_index}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <h3 className="text-sm font-semibold text-gray-900 mb-2 leading-relaxed">
+                                        {question.label}
+                                      </h3>
+                                      
+                                      {/* Question Metadata */}
+                                      <div className="flex flex-wrap gap-2 mb-3">
+                                        <Badge 
+                                          variant="outline" 
+                                          className={`text-xs px-2 py-1 ${getQuestionTypeColor(question.qtype)}`}
+                                        >
+                                          {getQuestionTypeLabel(question.qtype)}
+                                        </Badge>
+                                        {question.required && (
+                                          <Badge variant="outline" className="text-xs px-2 py-1 bg-red-50 text-red-700 border-red-200">
+                                            Required
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Options Display */}
+                                      {question.options && Array.isArray(question.options) && (
+                                        <div className="bg-gray-50 rounded-md p-3">
+                                          <div className="text-xs font-medium text-gray-700 mb-2">Options:</div>
+                                          <div className="space-y-1">
+                                            {question.options.map((option: any, optIndex: number) => (
+                                              <div key={optIndex} className="flex items-center gap-2 text-sm text-gray-600">
+                                                <ChevronRight className="h-3 w-3 text-gray-400" />
+                                                <span>{option.label || option.value || option}</span>
+                                              </div>
+                                            ))}
+                                          </div>
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                          <h3 className="text-sm font-semibold text-gray-900 mb-2 leading-relaxed">
-                                            {question.label}
-                                          </h3>
-                                          
-                                          {/* Question Metadata */}
-                                          <div className="flex flex-wrap gap-2 mb-3">
-                                            <Badge 
-                                              variant="outline" 
-                                              className={`text-xs px-2 py-1 ${getQuestionTypeColor(question.qtype)}`}
-                                            >
-                                              {getQuestionTypeLabel(question.qtype)}
-                                            </Badge>
-                                            {question.required && (
-                                              <Badge variant="outline" className="text-xs px-2 py-1 bg-red-50 text-red-700 border-red-200">
-                                                Required
-                                              </Badge>
+                                      )}
+                                      
+                                      {/* Scale Display */}
+                                      {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && question.qtype === 'scale' && (
+                                        <div className="bg-gray-50 rounded-md p-3">
+                                          <div className="text-xs font-medium text-gray-700 mb-2">Scale Range:</div>
+                                          <div className="text-sm text-gray-600">
+                                            {question.options.min} to {question.options.max}
+                                            {question.options.labels && (
+                                              <span className="ml-2">({question.options.labels.join(' → ')})</span>
                                             )}
                                           </div>
-                                          
-                                          {/* Options Display */}
-                                          {question.options && Array.isArray(question.options) && (
-                                            <div className="bg-gray-50 rounded-md p-3">
-                                              <div className="text-xs font-medium text-gray-700 mb-2">Options:</div>
-                                              <div className="space-y-1">
-                                                {question.options.map((option: any, optIndex: number) => (
-                                                  <div key={optIndex} className="flex items-center gap-2 text-sm text-gray-600">
-                                                    <ChevronRight className="h-3 w-3 text-gray-400" />
-                                                    <span>{option.label || option.value || option}</span>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          )}
-                                          
-                                          {/* Scale Display */}
-                                          {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && question.qtype === 'scale' && (
-                                            <div className="bg-gray-50 rounded-md p-3">
-                                              <div className="text-xs font-medium text-gray-700 mb-2">Scale Range:</div>
-                                              <div className="text-sm text-gray-600">
-                                                {question.options.min} to {question.options.max}
-                                                {question.options.labels && (
-                                                  <span className="ml-2">({question.options.labels.join(' → ')})</span>
-                                                )}
-                                              </div>
-                                            </div>
-                                          )}
-
-                                          {/* Number/Percent Range Display */}
-                                          {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && (question.qtype === 'number' || question.qtype === 'percent') && (
-                                            <div className="bg-gray-50 rounded-md p-3">
-                                              <div className="text-xs font-medium text-gray-700 mb-2">Range:</div>
-                                              <div className="text-sm text-gray-600">
-                                                {question.options.min} - {question.options.max}
-                                                {question.options.step && (
-                                                  <span className="ml-2">(step: {question.options.step})</span>
-                                                )}
-                                              </div>
-                                            </div>
-                                          )}
                                         </div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      ) : (
-                        <div className="text-center py-12">
-                          <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                          <p className="text-gray-500 font-medium mb-1">No questions found</p>
-                          <p className="text-sm text-gray-400">This framework doesn't have any questions configured</p>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <BookOpen className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                      <p className="text-gray-500 font-medium mb-1">Select an Assessment</p>
-                      <p className="text-sm text-gray-400">Choose an assessment from the left panel to preview its questions</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-            
-            {/* Fallback: Show framework questions when no assessments exist */}
-            {assessments.length === 0 && (
-              <Card className="border-0 shadow-sm">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <BarChart3 className="h-5 w-5 text-blue-600" />
-                    Assessment Questions
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    CFA Three-Pillar Framework Questions
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <BookOpen className="h-4 w-4" />
-                      <span className="font-medium">CFA Three-Pillar Framework</span>
-                    </div>
-                    
-                    {isLoadingFramework ? (
-                      <div className="flex items-center justify-center py-12">
-                        <div className="text-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                          <p className="text-sm text-muted-foreground">Loading questions...</p>
-                        </div>
-                      </div>
-                    ) : frameworkQuestions.length > 0 ? (
-                      <>
-                        {/* Questions Summary */}
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                            <div>
-                              <div className="text-lg font-semibold text-blue-900">{frameworkQuestions.length}</div>
-                              <div className="text-xs text-blue-700">Total Questions</div>
-                            </div>
-                            <div>
-                              <div className="text-lg font-semibold text-blue-900">
-                                {frameworkQuestions.filter(q => q.qtype === 'single' || q.qtype === 'multi').length}
-                              </div>
-                              <div className="text-xs text-blue-700">Choice Questions</div>
-                            </div>
-                            <div>
-                              <div className="text-lg font-semibold text-blue-900">
-                                {frameworkQuestions.filter(q => q.qtype === 'text' || q.qtype === 'number' || q.qtype === 'percent').length}
-                              </div>
-                              <div className="text-xs text-blue-700">Input Questions</div>
-                            </div>
-                            <div>
-                              <div className="text-lg font-semibold text-blue-900">
-                                {frameworkQuestions.filter(q => q.required).length}
-                              </div>
-                              <div className="text-xs text-blue-700">Required</div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Questions by Module */}
-                        <div className="space-y-6">
-                          {Object.entries(groupedQuestions).map(([module, questions]) => (
-                            <div key={module} className="space-y-3">
-                              <div className="flex items-center gap-2 mb-3">
-                                {getModuleIcon(module)}
-                                <h3 className="text-md font-semibold text-gray-900">{getModuleLabel(module)}</h3>
-                                <Badge variant="outline" className={`text-xs ${getModuleColor(module)}`}>
-                                  {questions.length} questions
-                                </Badge>
-                              </div>
-                              
-                              <div className="space-y-3">
-                                {questions.map((question, index) => (
-                                  <div key={question.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow">
-                                    <div className="flex items-start gap-3">
-                                      <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                                        {question.order_index}
-                                      </div>
-                                      <div className="flex-1 min-w-0">
-                                        <h3 className="text-sm font-semibold text-gray-900 mb-2 leading-relaxed">
-                                          {question.label}
-                                        </h3>
-                                        
-                                        {/* Question Metadata */}
-                                        <div className="flex flex-wrap gap-2 mb-3">
-                                          <Badge 
-                                            variant="outline" 
-                                            className={`text-xs px-2 py-1 ${getQuestionTypeColor(question.qtype)}`}
-                                          >
-                                            {getQuestionTypeLabel(question.qtype)}
-                                          </Badge>
-                                          {question.required && (
-                                            <Badge variant="outline" className="text-xs px-2 py-1 bg-red-50 text-red-700 border-red-200">
-                                              Required
-                                            </Badge>
-                                          )}
-                                        </div>
-                                        
-                                        {/* Options Display */}
-                                        {question.options && Array.isArray(question.options) && (
-                                          <div className="bg-gray-50 rounded-md p-3">
-                                            <div className="text-xs font-medium text-gray-700 mb-2">Options:</div>
-                                            <div className="space-y-1">
-                                              {question.options.map((option: any, optIndex: number) => (
-                                                <div key={optIndex} className="flex items-center gap-2 text-sm text-gray-600">
-                                                  <ChevronRight className="h-3 w-3 text-gray-400" />
-                                                  <span>{option.label || option.value || option}</span>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        )}
-                                        
-                                        {/* Scale Display */}
-                                        {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && question.qtype === 'scale' && (
-                                          <div className="bg-gray-50 rounded-md p-3">
-                                            <div className="text-xs font-medium text-gray-700 mb-2">Scale Range:</div>
-                                            <div className="text-sm text-gray-600">
-                                              {question.options.min} to {question.options.max}
-                                              {question.options.labels && (
-                                                <span className="ml-2">({question.options.labels.join(' → ')})</span>
-                                              )}
-                                            </div>
-                                          </div>
-                                        )}
+                                      )}
 
-                                        {/* Number/Percent Range Display */}
-                                        {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && (question.qtype === 'number' || question.qtype === 'percent') && (
-                                          <div className="bg-gray-50 rounded-md p-3">
-                                            <div className="text-xs font-medium text-gray-700 mb-2">Range:</div>
-                                            <div className="text-sm text-gray-600">
-                                              {question.options.min} - {question.options.max}
-                                              {question.options.step && (
-                                                <span className="ml-2">(step: {question.options.step})</span>
-                                              )}
-                                            </div>
+                                      {/* Number/Percent Range Display */}
+                                      {question.options && typeof question.options === 'object' && !Array.isArray(question.options) && (question.qtype === 'number' || question.qtype === 'percent') && (
+                                        <div className="bg-gray-50 rounded-md p-3">
+                                          <div className="text-xs font-medium text-gray-700 mb-2">Range:</div>
+                                          <div className="text-sm text-gray-600">
+                                            {question.options.min} - {question.options.max}
+                                            {question.options.step && (
+                                              <span className="ml-2">(step: {question.options.step})</span>
+                                            )}
                                           </div>
-                                        )}
-                                      </div>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
-                                ))}
-                              </div>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-center py-12">
-                        <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                        <p className="text-gray-500 font-medium mb-1">No questions loaded</p>
-                        <p className="text-sm text-gray-400">
-                          {isLoadingFramework ? 'Loading questions...' : 'Failed to load CFA framework questions. Please refresh the page.'}
-                        </p>
-                        {!isLoadingFramework && (
-                          <Button 
-                            onClick={() => loadCFAFrameworkQuestions()} 
-                            variant="outline" 
-                            size="sm" 
-                            className="mt-3"
-                          >
-                            Retry Loading Questions
-                          </Button>
-                        )}
+                          </div>
+                        ))}
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                    </>
+                  ) : (
+                    <div className="text-center py-12">
+                      <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <p className="text-gray-500 font-medium mb-1">No questions loaded</p>
+                      <p className="text-sm text-gray-400">
+                        {isLoadingFramework ? 'Loading questions...' : 'Failed to load CFA framework questions. Please refresh the page.'}
+                      </p>
+                      {!isLoadingFramework && (
+                        <Button 
+                          onClick={() => loadCFAFrameworkQuestions()} 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-3"
+                        >
+                          Retry Loading Questions
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
         </div>
 
         {/* Other Assessments - Full Width Below */}
@@ -902,3 +711,4 @@ export default function AssessmentsV2() {
     </>
   );
 }
+

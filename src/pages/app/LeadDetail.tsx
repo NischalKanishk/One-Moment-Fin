@@ -92,6 +92,37 @@ interface EditFormData {
   age: string;
 }
 
+// Question mapping for better display
+const CFA_QUESTION_MAPPING: Record<string, string> = {
+  // Capacity Questions
+  'primary_goal': 'What is your primary financial goal?',
+  'investment_horizon': 'What is your investment time horizon?',
+  'age': 'What is your age?',
+  'dependents': 'How many dependents do you have?',
+  'income': 'What is your annual income?',
+  'emergency_fund': 'Do you have an emergency fund?',
+  'debt_level': 'What is your current debt level?',
+  
+  // Tolerance Questions
+  'market_experience': 'What is your experience with market investments?',
+  'volatility_comfort': 'How comfortable are you with market volatility?',
+  'loss_tolerance': 'What is your tolerance for investment losses?',
+  'drawdown_comfort': 'How would you react to a 20% portfolio decline?',
+  
+  // Need Questions
+  'return_expectation': 'What is your expected annual return?',
+  'liquidity_needs': 'How quickly might you need to access your investments?',
+  'tax_considerations': 'How important are tax considerations?',
+  'inflation_protection': 'How concerned are you about inflation?',
+  
+  // Knowledge Questions
+  'investment_knowledge': 'How would you rate your investment knowledge?',
+  'product_familiarity': 'How familiar are you with investment products?',
+  
+  // Fallback for any other questions
+  'other': 'Additional Question'
+};
+
 export default function LeadDetail() {
   const { id } = useParams<{ id: string }>();
   const { getToken } = useAuth();
@@ -850,39 +881,17 @@ export default function LeadDetail() {
                     </div>
                   </div>
                   
-                  {/* Risk Insights Summary */}
-                  {lead.assessment_submissions?.[0]?.result?.rubric && (
-                    <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
-                      <div className="text-sm font-medium text-blue-900 mb-2">Risk Profile Breakdown</div>
-                      <div className="grid grid-cols-3 gap-2 text-xs">
-                        <div className="text-center p-2 bg-white rounded border border-blue-200">
-                          <div className="font-semibold text-blue-700">Capacity</div>
-                          <div className="text-blue-600">{lead.assessment_submissions[0].result.rubric.capacity || 0}</div>
-                        </div>
-                        <div className="text-center p-2 bg-white rounded border border-blue-200">
-                          <div className="font-semibold text-blue-700">Tolerance</div>
-                          <div className="text-blue-600">{lead.assessment_submissions[0].result.rubric.tolerance || 0}</div>
-                        </div>
-                        <div className="text-center p-2 bg-white rounded border border-blue-200">
-                          <div className="font-semibold text-blue-700">Need</div>
-                          <div className="text-blue-600">{lead.assessment_submissions[0].result.rubric.need || 0}</div>
+                  {/* Risk Profile Summary - Clean and Simple */}
+                  {(lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket) && (
+                    <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <div className="text-sm font-medium text-green-800">
+                          Risk Profile: <span className="font-semibold capitalize">{lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket}</span>
                         </div>
                       </div>
                     </div>
                   )}
-                  
-                  {/* Quick Insight */}
-                  <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                    <div className="flex items-start gap-2">
-                      <div className="w-2 h-2 bg-purple-400 rounded-full mt-2"></div>
-                      <div className="text-xs text-purple-700">
-                        {(lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket) === 'Low' && 'Low risk tolerance - suitable for stable investments'}
-                        {(lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket) === 'Medium' && 'Balanced approach - mix of growth and stability'}
-                        {(lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket) === 'High' && 'High risk tolerance - potential for higher returns'}
-                        {!(lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket) && 'Risk profile assessment completed'}
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -949,40 +958,62 @@ export default function LeadDetail() {
                           <h3 className="text-xl font-semibold text-gray-900">Assessment Questions & Answers</h3>
                         </div>
                         
-                        {/* Module-based organization */}
-                        {Object.entries(answersByModule).map(([module, answers]) => (
-                          <div key={module} className="space-y-3">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
-                              <h4 className="font-semibold text-gray-800 text-sm uppercase tracking-wide">{module}</h4>
-                            </div>
-                            <div className="space-y-3 ml-5">
-                              {answers.map(([question, answer], index) => (
-                                <div key={index} className="border border-gray-200 rounded-lg p-4 bg-white hover:bg-gray-50 transition-colors">
-                                  <div className="font-medium text-sm text-gray-900 mb-2">{question}</div>
-                                  <div className="text-sm text-gray-700">
-                                    <span className="font-medium text-gray-900">Answer:</span> {String(answer)}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+                                                 {/* Module-based organization */}
+                         {Object.entries(answersByModule).map(([module, answers]) => (
+                           <div key={module} className="space-y-4">
+                             <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                               <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                               <h4 className="font-semibold text-blue-800 text-sm uppercase tracking-wide">{module}</h4>
+                               <div className="ml-auto text-xs text-blue-600 bg-white px-2 py-1 rounded-full">
+                                 {answers.length} question{answers.length !== 1 ? 's' : ''}
+                               </div>
+                             </div>
+                                                         <div className="space-y-4 ml-5">
+                               {answers.map(([questionKey, answer], index) => {
+                                 const questionText = CFA_QUESTION_MAPPING[questionKey] || questionKey;
+                                 return (
+                                   <div key={index} className="bg-gradient-to-r from-gray-50 to-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200">
+                                     <div className="flex items-start gap-3">
+                                       <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                         <span className="text-xs font-semibold text-blue-700">{index + 1}</span>
+                                       </div>
+                                       <div className="flex-1 space-y-3">
+                                         <h5 className="font-medium text-gray-900 text-sm leading-relaxed">{questionText}</h5>
+                                         <div className="bg-white rounded border border-gray-200 p-3">
+                                           <span className="text-sm font-medium text-gray-700">Answer:</span>
+                                           <span className="ml-2 text-sm text-gray-900 font-medium">{String(answer)}</span>
+                                         </div>
+                                       </div>
+                                     </div>
+                                   </div>
+                                 );
+                               })}
+                             </div>
                           </div>
                         ))}
                         
-                        {/* Summary Stats */}
-                        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                          <div className="text-sm font-medium text-blue-900 mb-2">Assessment Summary</div>
-                          <div className="grid grid-cols-2 gap-4 text-xs">
-                            <div>
-                              <span className="text-blue-600 font-medium">Total Questions:</span>
-                              <span className="ml-2 text-blue-800">{Object.keys(assessmentData.answers).length}</span>
-                            </div>
-                            <div>
-                              <span className="text-blue-600 font-medium">Modules Covered:</span>
-                              <span className="ml-2 text-blue-800">{Object.keys(answersByModule).length}</span>
-                            </div>
-                          </div>
-                        </div>
+                                                 {/* Assessment Summary */}
+                         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
+                           <div className="text-lg font-semibold text-blue-900 mb-4">Assessment Summary</div>
+                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                             <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
+                               <div className="text-2xl font-bold text-blue-600">{Object.keys(assessmentData.answers).length}</div>
+                               <div className="text-blue-700 font-medium text-sm">Total Questions</div>
+                             </div>
+                             <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
+                               <div className="text-2xl font-bold text-blue-600">{Object.keys(answersByModule).length}</div>
+                               <div className="text-blue-700 font-medium text-sm">Categories</div>
+                             </div>
+                             <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
+                               <div className="text-2xl font-bold text-blue-600">{lead.assessment_submissions?.[0]?.result?.score || lead.risk_score || 0}</div>
+                               <div className="text-blue-700 font-medium text-sm">Risk Score</div>
+                             </div>
+                             <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
+                               <div className="text-2xl font-bold text-blue-600">{lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket || 'N/A'}</div>
+                               <div className="text-blue-700 font-medium text-sm">Risk Level</div>
+                             </div>
+                           </div>
+                         </div>
                       </div>
                     );
                   })()}
@@ -996,69 +1027,56 @@ export default function LeadDetail() {
                       <h3 className="text-xl font-semibold text-gray-900">Risk Profile</h3>
                     </div>
                     
-                    {/* Risk Score Card */}
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-100">
-                                              <div className="text-center">
-                          <div className="text-3xl font-bold text-blue-600 mb-2">
-                            {lead.assessment_submissions?.[0]?.result?.score || lead.risk_score || 0}
-                          </div>
-                          <div className="text-sm font-medium text-blue-700 uppercase tracking-wide">Risk Score</div>
-                        </div>
-                      </div>
+                                         {/* Risk Score Card */}
+                     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-100 shadow-sm">
+                       <div className="text-center">
+                         <div className="text-4xl font-bold text-blue-600 mb-2">
+                           {lead.assessment_submissions?.[0]?.result?.score || lead.risk_score || 0}
+                         </div>
+                         <div className="text-lg font-medium text-blue-700 uppercase tracking-wide">Risk Score</div>
+                         <div className="text-sm text-blue-600 mt-2">0-100 scale</div>
+                       </div>
+                     </div>
 
-                      {/* Risk Category Card */}
-                      <div className="bg-white rounded-lg p-6 border border-gray-200">
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-gray-900 mb-2">
-                            {lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket || 'N/A'}
-                          </div>
-                          <div className="text-sm text-gray-600 uppercase tracking-wide">Risk Category</div>
-                        </div>
-                      </div>
+                     {/* Risk Category Card */}
+                     <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
+                       <div className="text-center">
+                         <div className="text-4xl font-bold text-gray-900 mb-2">
+                           {lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket || 'N/A'}
+                         </div>
+                         <div className="text-lg font-medium text-gray-600 uppercase tracking-wide">Risk Category</div>
+                         <div className="text-sm text-gray-500 mt-2">Low • Medium • High</div>
+                       </div>
+                     </div>
 
-                    {/* Assessment Details */}
-                    <div className="bg-white rounded-lg p-6 border border-gray-200">
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium text-gray-600">Assessment Date</span>
-                          <span className="text-sm font-semibold text-gray-900">
-                            {lead.assessment_submissions?.[0]?.submitted_at ? 
-                              new Date(lead.assessment_submissions[0].submitted_at).toLocaleDateString() : 
-                              new Date(lead.created_at).toLocaleDateString()
-                            }
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium text-gray-600">Assessment Title</span>
-                          <span className="text-sm font-semibold text-gray-900">
-                            CFA Three-Pillar Risk Assessment
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium text-gray-600">Total Questions</span>
-                          <span className="text-sm font-semibold text-gray-900">
-                            {lead.assessment_submissions?.[0]?.answers ? Object.keys(lead.assessment_submissions[0].answers).length : 'N/A'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                                         {/* Assessment Details */}
+                     <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
+                       <div className="space-y-4">
+                         <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                           <span className="text-sm font-medium text-gray-600">Assessment Date</span>
+                           <span className="text-sm font-semibold text-gray-900">
+                             {lead.assessment_submissions?.[0]?.submitted_at ? 
+                               new Date(lead.assessment_submissions[0].submitted_at).toLocaleDateString() : 
+                               new Date(lead.created_at).toLocaleDateString()
+                             }
+                           </span>
+                         </div>
+                         <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                           <span className="text-sm font-medium text-gray-600">Assessment Title</span>
+                           <span className="text-sm font-semibold text-gray-900">
+                             CFA Three-Pillar Risk Assessment
+                           </span>
+                         </div>
+                         <div className="flex justify-between items-center py-3">
+                           <span className="text-sm font-medium text-gray-600">Total Questions</span>
+                           <span className="text-sm font-semibold text-gray-900">
+                             {lead.assessment_submissions?.[0]?.answers ? Object.keys(lead.assessment_submissions[0].answers).length : 'N/A'}
+                           </span>
+                         </div>
+                       </div>
+                     </div>
 
-                    {/* Risk Insights */}
-                    {lead.assessment_submissions?.[0]?.result?.rubric && (
-                      <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg p-6 border border-amber-100">
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-                            <TrendingUp className="w-4 h-4 text-amber-600" />
-                          </div>
-                          <h4 className="font-semibold text-amber-800">Risk Insights</h4>
-                        </div>
-                        <div className="text-sm text-amber-700">
-                          {(lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket) === 'Low' && 'Conservative approach recommended for this risk profile.'}
-                          {(lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket) === 'Medium' && 'Balanced approach suitable for moderate risk tolerance.'}
-                          {(lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket) === 'High' && 'Aggressive approach possible given high risk tolerance.'}
-                        </div>
-                      </div>
-                    )}
+                    
                   </div>
                 </div>
               ) : (
