@@ -132,9 +132,15 @@ export default function LeadDetail() {
   // Helper function to safely get assessment data
   const getAssessmentData = (lead: Lead) => {
     if (!lead.assessment_submissions || lead.assessment_submissions.length === 0) {
+      console.log('🔍 No assessment submissions found for lead');
       return null;
     }
-    return lead.assessment_submissions[0];
+    const submission = lead.assessment_submissions[0];
+    console.log('🔍 Assessment data found:', submission);
+    console.log('🔍 Result:', submission.result);
+    console.log('🔍 Score:', submission.result?.score);
+    console.log('🔍 Bucket:', submission.result?.bucket);
+    return submission;
   };
   
   const [lead, setLead] = useState<Lead | null>(null);
@@ -195,6 +201,22 @@ export default function LeadDetail() {
       }
 
       const leadData = await leadsAPI.getById(token, id);
+      
+      // Debug: Log the actual data structure received
+      console.log('🔍 Lead data received:', leadData);
+      console.log('🔍 Assessment submissions:', leadData?.assessment_submissions);
+      if (leadData?.assessment_submissions && leadData.assessment_submissions.length > 0) {
+        const submission = leadData.assessment_submissions[0];
+        console.log('🔍 First submission details:');
+        console.log('   - ID:', submission.id);
+        console.log('   - Submitted at:', submission.submitted_at);
+        console.log('   - Status:', submission.status);
+        console.log('   - Answers count:', submission.answers ? Object.keys(submission.answers).length : 0);
+        console.log('   - Result:', submission.result);
+        console.log('   - Result bucket:', submission.result?.bucket);
+        console.log('   - Result score:', submission.result?.score);
+      }
+      
       setLead(leadData);
     } catch (error: any) {
       console.error('Failed to load lead:', error);
