@@ -16,14 +16,29 @@ router.get('/:userLink', async (req: express.Request, res: express.Response) => 
     const { userLink } = req.params;
     console.log('🔍 Public assessment requested for user link:', userLink);
 
-    // First, try to find user by assessment link
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id, full_name, assessment_link')
-      .eq('assessment_link', userLink)
+    // First, try to find user by assessment link from assessment_links table
+    const { data: assessmentLink, error: linkError } = await supabase
+      .from('assessment_links')
+      .select('user_id, token, status')
+      .eq('token', userLink)
+      .eq('status', 'active')
       .single();
 
-    if (userError || !user) {
+    let user;
+    if (!linkError && assessmentLink) {
+      // Get user details
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id, full_name')
+        .eq('id', assessmentLink.user_id)
+        .single();
+      
+      if (!userError && userData) {
+        user = userData;
+      }
+    }
+
+    if (!user) {
       console.log('❌ User not found by assessment link, trying as assessment slug...');
       
       // If not found by assessment link, try as assessment slug (fallback)

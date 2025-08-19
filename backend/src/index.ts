@@ -112,10 +112,10 @@ app.use('/api/meetings', meetingsRoutes);
 
 // Public assessment routes
 app.use('/a', userAssessmentLinksRoutes); // User assessment links (e.g., /a/1677811521d31-5477-4cf8-b718-78a64536e553RFEMC)
-app.use('/assessment', publicAssessmentsRoutes); // Legacy assessment routes
+app.use('/api/assessment', publicAssessmentsRoutes); // Legacy assessment routes
 
 // Referral-based assessment routes
-app.use('/r', publicAssessmentsRoutes);
+app.use('/api/r', publicAssessmentsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

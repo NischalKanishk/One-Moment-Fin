@@ -15,15 +15,27 @@ router.get('/:assessmentCode', async (req: express.Request, res: express.Respons
   try {
     const { assessmentCode } = req.params;
 
-    // Get user by assessment code
+    // Get user by assessment code from assessment_links table
+    const { data: assessmentLink, error: linkError } = await supabase
+      .from('assessment_links')
+      .select('user_id, token, status')
+      .eq('token', assessmentCode)
+      .eq('status', 'active')
+      .single();
+
+    if (linkError || !assessmentLink) {
+      return res.status(404).json({ error: 'Assessment link not found or expired' });
+    }
+
+    // Get user details
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('id, full_name, assessment_link')
-      .eq('assessment_link', `/assessment/${assessmentCode}`)
+      .select('id, full_name')
+      .eq('id', assessmentLink.user_id)
       .single();
 
     if (userError || !user) {
-      return res.status(404).json({ error: 'Assessment link not found' });
+      return res.status(404).json({ error: 'User not found' });
     }
 
     // Get default/active assessment for the user
@@ -66,15 +78,27 @@ router.post('/:assessmentCode/submit', [
     const { assessmentCode } = req.params;
     const { answers, submitterInfo } = req.body;
 
-    // Get user by assessment code
+    // Get user by assessment code from assessment_links table
+    const { data: assessmentLink, error: linkError } = await supabase
+      .from('assessment_links')
+      .select('user_id, token, status')
+      .eq('token', assessmentCode)
+      .eq('status', 'active')
+      .single();
+
+    if (linkError || !assessmentLink) {
+      return res.status(404).json({ error: 'Assessment link not found or expired' });
+    }
+
+    // Get user details
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('id, full_name, assessment_link')
-      .eq('assessment_link', `/assessment/${assessmentCode}`)
+      .select('id, full_name')
+      .eq('id', assessmentLink.user_id)
       .single();
 
     if (userError || !user) {
-      return res.status(404).json({ error: 'Assessment link not found' });
+      return res.status(404).json({ error: 'User not found' });
     }
 
     // Get default assessment for the user
@@ -162,14 +186,29 @@ router.get('/:userLink', async (req: express.Request, res: express.Response) => 
     const { userLink } = req.params;
     console.log('🔍 Public assessment requested for user link:', userLink);
 
-    // First, try to find user by assessment link
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id, full_name, assessment_link')
-      .eq('assessment_link', userLink)
+    // First, try to find user by assessment link from assessment_links table
+    const { data: assessmentLink, error: linkError } = await supabase
+      .from('assessment_links')
+      .select('user_id, token, status')
+      .eq('token', userLink)
+      .eq('status', 'active')
       .single();
 
-    if (userError || !user) {
+    let user;
+    if (!linkError && assessmentLink) {
+      // Get user details
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id, full_name')
+        .eq('id', assessmentLink.user_id)
+        .single();
+      
+      if (!userError && userData) {
+        user = userData;
+      }
+    }
+
+    if (!user) {
       console.log('❌ User not found by assessment link, trying as assessment slug...');
       
       // If not found by assessment link, try as assessment slug (fallback)
@@ -369,17 +408,32 @@ router.post('/:userLink/submit', [
     const { answers, submitterInfo } = req.body;
     console.log('🔍 Assessment submission requested for user link:', userLink);
 
-    // First, try to find user by assessment link
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id, full_name, assessment_link')
-      .eq('assessment_link', userLink)
+    // First, try to find user by assessment link from assessment_links table
+    const { data: assessmentLink, error: linkError } = await supabase
+      .from('assessment_links')
+      .select('user_id, token, status')
+      .eq('token', userLink)
+      .eq('status', 'active')
       .single();
 
+    let user;
     let assessmentId: string;
     let source: string;
 
-    if (userError || !user) {
+    if (!linkError && assessmentLink) {
+      // Get user details
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id, full_name')
+        .eq('id', assessmentLink.user_id)
+        .single();
+      
+      if (!userError && userData) {
+        user = userData;
+      }
+    }
+
+    if (!user) {
       console.log('❌ User not found by assessment link, trying as assessment slug...');
       
       // If not found by assessment link, try as assessment slug (fallback)

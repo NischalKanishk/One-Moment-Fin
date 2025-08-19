@@ -226,7 +226,9 @@ export default function PublicAssessment() {
       return;
     }
 
-    if (!assessment?.user_id) {
+    // For default assessments without a specific user, we can still proceed
+    // The assessment will be submitted as a general assessment
+    if (!assessment) {
       toast({
         title: "Error",
         description: "Assessment information is missing. Please try again.",

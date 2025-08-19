@@ -49,15 +49,19 @@
       "destination": "/api/[...path].js"
     },
     {
-      "source": "/api/(.*)",
-      "destination": "/api/[...path].js"
-    },
-    {
       "source": "/assets/(.*)",
       "destination": "/assets/$1"
     },
     {
+      "source": "/a/(.*)",
+      "destination": "/api/assessments.js"
+    },
+    {
       "source": "/assessment/(.*)",
+      "destination": "/api/[...path].js"
+    },
+    {
+      "source": "/api/(.*)",
       "destination": "/api/[...path].js"
     },
     {
