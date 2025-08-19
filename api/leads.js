@@ -138,9 +138,9 @@ module.exports = async function handler(req, res) {
         // Then get the assessment submissions for this lead
         const { data: assessmentSubmissions, error: submissionsError } = await supabase
           .from('assessment_submissions')
-          .select('*')
+          .select('id, submitted_at, answers, result, status, created_at')
           .eq('lead_id', leadId)
-          .order('created_at', { ascending: false });
+          .order('submitted_at', { ascending: false });
 
         if (submissionsError) {
           console.error('❌ Error fetching assessment submissions:', submissionsError);
@@ -153,15 +153,20 @@ module.exports = async function handler(req, res) {
           assessment_submissions: assessmentSubmissions || []
         };
 
-        if (error) {
-          if (error.code === 'PGRST116') {
-            return res.status(404).json({ error: 'Lead not found' });
-          }
-          console.error('❌ Database error:', error);
-          return res.status(500).json({ error: 'Database query failed', details: error.message });
-        }
-
         console.log(`✅ Found lead: ${leadWithSubmissions.full_name} with ${leadWithSubmissions.assessment_submissions.length} assessment submissions`);
+        
+        // Debug: Log the actual data structure being returned
+        if (leadWithSubmissions.assessment_submissions.length > 0) {
+          const submission = leadWithSubmissions.assessment_submissions[0];
+          console.log('🔍 Assessment submission data structure:');
+          console.log('   - ID:', submission.id);
+          console.log('   - Submitted at:', submission.submitted_at);
+          console.log('   - Status:', submission.status);
+          console.log('   - Answers count:', submission.answers ? Object.keys(submission.answers).length : 0);
+          console.log('   - Result:', submission.result);
+          console.log('   - Sample answers:', submission.answers ? Object.keys(submission.answers).slice(0, 3) : 'None');
+        }
+        
         return res.json({ lead: leadWithSubmissions });
       } catch (error) {
         console.error('❌ Error fetching lead:', error);
