@@ -613,29 +613,16 @@ router.get('/search', authenticateUser, [
 router.get('/:id', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
     const { id } = req.params;
-    const clerkUserId = req.user!.clerk_id;
+    const user_id = req.user!.supabase_user_id;
 
-    // Get the actual user UUID from the users table using the Clerk ID
-    let user_id;
-    try {
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('clerk_id', clerkUserId)
-        .single();
-
-      if (userError || !userData) {
-        console.error('User lookup failed:', userError);
-        throw new Error('User not found. Please complete your profile first.');
-      }
-      
-      user_id = (userData as { id: string }).id;
-    } catch (error) {
-      console.error('User lookup error:', error);
-      return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
+    if (!user_id) {
+      console.error('User ID not found in request');
+      return res.status(400).json({ error: 'User not found. Please complete your profile first.' });
     }
 
-    console.log('🔍 Backend: Querying lead with ID:', id, 'for user:', user_id);
+    console.log('🔍 Backend: Using user_id from auth middleware:', user_id);
+
+
     
     // Use service role to bypass RLS policy issues temporarily
     const { data: lead, error } = await supabase
@@ -664,155 +651,80 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
       return res.status(404).json({ error: 'Lead not found' });
     }
 
-    // If lead has a risk profile, fetch the assessment submission details
-    let assessmentData = null;
-    if (lead.risk_profile_id) {
-      try {
-        const { data: submission, error: submissionError } = await supabase
-          .from('assessment_submissions')
-          .select(`
-            id,
-            assessment_id,
-            framework_id,
-            answers,
-            result,
-            submitted_at
-          `)
-          .eq('id', lead.risk_profile_id)
-          .single();
+    // Fetch assessment submission details for this lead
+    let assessmentSubmissions: any[] = [];
+    let updatedLead = { ...lead };
+    
+    console.log('🔍 Backend: Fetching assessment submissions for lead:', lead.id);
+    
+    try {
+      const { data: submissions, error: submissionsError } = await supabase
+        .from('assessment_submissions')
+        .select(`
+          id,
+          assessment_id,
+          framework_version_id,
+          answers,
+          result,
+          submitted_at,
+          status
+        `)
+        .eq('lead_id', lead.id);
 
-        if (!submissionError && submission) {
-          // Get the assessment details to understand the framework
-          const { data: assessment, error: assessmentError } = await supabase
-            .from('assessments')
-            .select(`
-              id,
-              title,
-              framework_id
-            `)
-            .eq('id', submission.assessment_id)
-            .single();
+      console.log('🔍 Backend: Submissions query result:', { submissions, submissionsError });
 
-          if (!assessmentError && assessment) {
-            // Get the CFA framework questions
-            const { data: frameworkQuestions, error: questionsError } = await supabase
-              .from('framework_questions')
-              .select(`
-                qkey,
-                required,
-                order_index,
-                label,
-                qtype,
-                options,
-                module
-              `)
-              .eq('framework_id', assessment.framework_id)
-              .order('order_index', { ascending: true });
-
-            if (!questionsError && frameworkQuestions) {
-              assessmentData = {
-                submission,
-                assessment,
-                questions: frameworkQuestions,
-                mappedAnswers: frameworkQuestions.map((q: any) => {
-                  // Get the answer value, handling different possible formats
-                  let answerValue = submission.answers[q.qkey];
-                  
-                  // If no direct match, try alternative keys or formats
-                  if (!answerValue || answerValue === 'Not answered') {
-                    const possibleKeys = [
-                      q.qkey,
-                      q.label,
-                      q.label?.toLowerCase().replace(/\s+/g, '_'),
-                      q.label?.toLowerCase().replace(/\s+/g, '-'),
-                      typeof q.qkey === 'number' ? q.qkey.toString() : null,
-                      q.qkey?.toString().toLowerCase(),
-                      q.qkey?.toString().toUpperCase()
-                    ].filter(Boolean); // Remove null/undefined values
-                    
-                    for (const key of possibleKeys) {
-                      if (key && submission.answers[key]) {
-                        answerValue = submission.answers[key];
-                        console.log(`🔍 Found answer for ${q.qkey} using key: ${key}`);
-                        break;
-                      }
-                    }
-                  }
-                  
-                  // If still no answer, try to find any answer that might match this question
-                  if (!answerValue || answerValue === 'Not answered') {
-                    const questionText = q.label || q.qkey;
-                    if (questionText) {
-                      for (const [answerKey, answerVal] of Object.entries(submission.answers)) {
-                        if (answerKey.toLowerCase().includes(questionText.toLowerCase()) || 
-                            questionText.toLowerCase().includes(answerKey.toLowerCase())) {
-                          answerValue = answerVal;
-                          console.log(`🔍 Found answer for ${q.qkey} using fuzzy match: ${answerKey}`);
-                          break;
-                        }
-                      }
-                    }
-                  }
-                  
-                  // If still no answer, check if it's a required field that might be empty
-                  if (!answerValue || answerValue === 'Not answered') {
-                    if (q.required) {
-                      answerValue = 'Required field - No response provided';
-                    } else {
-                      answerValue = 'No response provided';
-                    }
-                  }
-                  
-                  console.log(`🔍 Final answer for ${q.qkey}: ${answerValue}`);
-                  
-                  return {
-                    question: q.label || q.qkey,
-                    answer: answerValue,
-                    type: q.qtype,
-                    options: q.options,
-                    module: q.module
-                  };
-                })
-              };
-              
-              // Fallback to show raw answers if no mapped answers found
-              if (assessmentData.mappedAnswers.every(qa => qa.answer === 'No response provided' || qa.answer === 'Required field - No response provided')) {
-                console.log('⚠️ No mapped answers found, showing raw answers');
-                assessmentData.mappedAnswers = Object.entries(submission.answers).map(([key, value]) => ({
-                  question: key,
-                  answer: value,
-                  type: 'unknown',
-                  options: null,
-                  module: 'Raw Data'
-                }));
-              }
-              
-              // Fallback to show data structure info if no answers at all
-              if (assessmentData.mappedAnswers.length === 0) {
-                console.log('⚠️ No answers found at all, showing data structure info');
-                assessmentData.mappedAnswers = [{
-                  question: 'Data Structure Information',
-                  answer: `Submission ID: ${submission.id}, Answers object keys: ${Object.keys(submission.answers).join(', ')}`,
-                  type: 'info',
-                  options: null,
-                  module: 'Debug Info'
-                }];
-              }
-            }
+      if (!submissionsError && submissions && submissions.length > 0) {
+        console.log('🔍 Backend: Found submissions, processing...');
+        assessmentSubmissions = submissions.map(submission => ({
+          id: submission.id,
+          submitted_at: submission.submitted_at,
+          answers: submission.answers,
+          result: submission.result,
+          status: submission.status
+        }));
+        
+        console.log('🔍 Backend: Processed submissions:', assessmentSubmissions);
+        
+        // Also update the lead with the risk profile data from the first submission
+        if (submissions[0].result) {
+          const { data: updateData, error: updateError } = await supabase
+            .from('leads')
+            .update({
+              risk_profile_id: submissions[0].id,
+              risk_bucket: submissions[0].result.bucket,
+              risk_score: submissions[0].result.score
+            })
+            .eq('id', lead.id)
+            .select();
+          
+          if (!updateError && updateData) {
+            updatedLead = { ...updatedLead, ...updateData[0] };
           }
         }
-      } catch (assessmentError) {
-        console.log('Could not fetch assessment data:', assessmentError);
-        // Continue without assessment data
+      } else {
+        console.log('🔍 Backend: No submissions found or error occurred');
       }
+    } catch (assessmentError) {
+      console.log('🔍 Backend: Could not fetch assessment submissions:', assessmentError);
+      // Continue without assessment data
     }
 
-    return res.json({ 
+
+
+    const finalResponse = {
       lead: {
-        ...lead,
-        assessment: assessmentData
+        ...updatedLead,
+        assessment_submissions: assessmentSubmissions
       }
+    };
+    
+    console.log('🔍 Backend: Final response:', {
+      leadId: finalResponse.lead.id,
+      assessmentSubmissionsCount: finalResponse.lead.assessment_submissions?.length || 0,
+      hasAssessmentSubmissions: !!finalResponse.lead.assessment_submissions?.length
     });
+    
+    return res.json(finalResponse);
   } catch (error) {
     console.error('Lead fetch error:', error);
     return res.status(500).json({ error: 'Failed to fetch lead' });

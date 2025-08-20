@@ -129,20 +129,12 @@ export default function LeadDetail() {
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  // 🔧 DEBUG: This is the LeadDetail component that should show the red button
-  console.log('🔧 LeadDetail component rendered with ID:', id);
-  
   // Helper function to safely get assessment data
   const getAssessmentData = (lead: Lead) => {
     if (!lead.assessment_submissions || lead.assessment_submissions.length === 0) {
-      console.log('🔍 No assessment submissions found for lead');
       return null;
     }
     const submission = lead.assessment_submissions[0];
-    console.log('🔍 Assessment data found:', submission);
-    console.log('🔍 Result:', submission.result);
-    console.log('🔍 Score:', submission.result?.score);
-    console.log('🔍 Bucket:', submission.result?.bucket);
     return submission;
   };
   
@@ -154,7 +146,6 @@ export default function LeadDetail() {
   const [canDelete, setCanDelete] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
-  const [recreatingAssessment, setRecreatingAssessment] = useState(false);
 
 
   const form = useForm<EditFormData>({
@@ -205,22 +196,6 @@ export default function LeadDetail() {
       }
 
       const leadData = await leadsAPI.getById(token, id);
-      
-      // Debug: Log the actual data structure received
-      console.log('🔍 Lead data received:', leadData);
-      console.log('🔍 Assessment submissions:', leadData?.assessment_submissions);
-      if (leadData?.assessment_submissions && leadData.assessment_submissions.length > 0) {
-        const submission = leadData.assessment_submissions[0];
-        console.log('🔍 First submission details:');
-        console.log('   - ID:', submission.id);
-        console.log('   - Submitted at:', submission.submitted_at);
-        console.log('   - Status:', submission.status);
-        console.log('   - Answers count:', submission.answers ? Object.keys(submission.answers).length : 0);
-        console.log('   - Result:', submission.result);
-        console.log('   - Result bucket:', submission.result?.bucket);
-        console.log('   - Result score:', submission.result?.score);
-      }
-      
       setLead(leadData);
     } catch (error: any) {
       console.error('Failed to load lead:', error);
@@ -292,56 +267,7 @@ export default function LeadDetail() {
     }
   };
 
-  const handleRecreateAssessment = async () => {
-    console.log('🔧 Button clicked! Starting assessment recreation...');
-    try {
-      setRecreatingAssessment(true);
-      
-      const token = await getToken();
-      if (!token) {
-        throw new Error('No authentication token available');
-      }
 
-      // Call the recreate assessment endpoint
-      console.log('🔧 Making API call to recreate assessment...');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/leads/${id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ action: 'recreate_assessment' })
-      });
-      console.log('🔧 API response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to recreate assessment');
-      }
-
-      const result = await response.json();
-      console.log('🔧 API response result:', result);
-      
-      toast({
-        title: "Success",
-        description: "Assessment submission recreated successfully!",
-      });
-
-      // Reload the lead data to show the new assessment submission
-      console.log('🔧 Reloading lead data to show new assessment...');
-      loadLead();
-      
-    } catch (error: any) {
-      console.error('Failed to recreate assessment:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to recreate assessment. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setRecreatingAssessment(false);
-    }
-  };
 
   const handleDelete = async () => {
     try {
@@ -522,10 +448,7 @@ export default function LeadDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 🔧 DEBUG: This should be visible if the component is updated */}
-      <div className="bg-red-500 text-white p-4 text-center font-bold text-xl mb-4">
-        🔧 LEAD DETAIL COMPONENT UPDATED - RED BUTTON SHOULD BE VISIBLE BELOW
-      </div>
+
       <Helmet>
         <title>{lead.full_name} – OneMFin</title>
         <meta name="description" content="Lead summary, risk assessment, meetings and AI suggestions." />
@@ -962,6 +885,24 @@ export default function LeadDetail() {
                     </div>
                   </div>
                   
+                  {/* Question Count Summary */}
+                  {lead.assessment_submissions?.[0]?.answers && (
+                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-800">Assessment Questions</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold text-blue-900">
+                            {Object.keys(lead.assessment_submissions[0].answers).length}
+                          </div>
+                          <div className="text-xs text-blue-600">Total Questions</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Risk Profile Summary - Clean and Simple */}
                   {(lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket) && (
                     <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
@@ -994,9 +935,10 @@ export default function LeadDetail() {
               <div className="grid gap-8 grid-cols-1">
                 {/* Left Side: Questions and Answers */}
                 {(() => {
+                  console.log('🔍 Component render - lead:', lead);
+                  console.log('🔍 Component render - assessment_submissions:', lead?.assessment_submissions);
                   const assessmentData = getAssessmentData(lead);
-                  console.log('🔍 Debug: assessmentData:', assessmentData);
-                  console.log('🔍 Debug: assessmentData?.answers:', assessmentData?.answers);
+                  console.log('🔍 Component render - assessmentData:', assessmentData);
                   
                   if (!assessmentData || !assessmentData.answers) {
                       return (
@@ -1011,18 +953,6 @@ export default function LeadDetail() {
                               <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                               <p>No assessment responses available</p>
                               <p className="text-sm">This lead hasn't completed a risk assessment yet.</p>
-                              <div className="mt-4">
-                                <button
-                                  onClick={handleRecreateAssessment}
-                                  disabled={recreatingAssessment}
-                                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  {recreatingAssessment ? 'Creating...' : '🔧 RECREATE ASSESSMENT NOW'}
-                                </button>
-                                <p className="text-xs text-gray-400 mt-2">
-                                  This will create a default assessment based on lead data
-                                </p>
-                              </div>
                             </div>
                         </div>
                       );
@@ -1144,6 +1074,19 @@ export default function LeadDetail() {
                          <div className="text-sm text-gray-500 mt-2">Low • Medium • High</div>
                        </div>
                      </div>
+
+                     {/* Question Count Card */}
+                     {lead.assessment_submissions?.[0]?.answers && (
+                       <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-6 border border-green-100 shadow-sm">
+                         <div className="text-center">
+                           <div className="text-4xl font-bold text-green-600 mb-2">
+                             {Object.keys(lead.assessment_submissions[0].answers).length}
+                           </div>
+                           <div className="text-lg font-medium text-green-700 uppercase tracking-wide">Questions Answered</div>
+                           <div className="text-sm text-green-600 mt-2">CFA Assessment</div>
+                         </div>
+                       </div>
+                     )}
 
                                          {/* Assessment Details */}
                      <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
