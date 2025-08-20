@@ -287,6 +287,64 @@ module.exports = async function handler(req, res) {
         }
       }
 
+      // GET /api/meetings/google-status - Check Google Calendar connection status
+      if (method === 'GET' && meetingsPath === '/google-status') {
+        try {
+          const user = await authenticateUser(req);
+          if (!user?.supabase_user_id) {
+            return res.status(400).json({ error: 'User not properly authenticated' });
+          }
+
+          // Check if user has Google Calendar connected
+          // Note: The user_settings table is missing Google Calendar columns
+          // For now, return a default response indicating no connection
+          console.log('⚠️ user_settings table is missing Google Calendar columns');
+          
+          return res.json({
+            isConnected: false,
+            email: null,
+            name: null,
+            note: 'Google Calendar integration not yet configured'
+          });
+        } catch (error) {
+          console.error('❌ Error checking Google Calendar connection:', error);
+          return res.status(500).json({ error: 'Failed to check Google Calendar connection' });
+        }
+      }
+
+      // GET /api/meetings/google-auth-test - Test Google OAuth configuration
+      if (method === 'GET' && meetingsPath === '/google-auth-test') {
+        try {
+          console.log('🔍 Google OAuth configuration test');
+          console.log('🔍 Environment variables:');
+          console.log('  - GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? '✅ Set' : '❌ Not set');
+          console.log('  - GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? '✅ Set' : '❌ Not set');
+          console.log('  - GOOGLE_REDIRECT_URI:', process.env.GOOGLE_REDIRECT_URI || '❌ Not set (will use auto-generated)');
+          console.log('  - FRONTEND_URL:', process.env.FRONTEND_URL || '❌ Not set (will use auto-generated)');
+          console.log('🔍 Request origin:', req.headers.origin);
+          
+          // Calculate the auto-generated redirect URI
+          const autoRedirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.FRONTEND_URL?.replace(/\/$/, '')}/api/meetings/google-callback`;
+          
+          return res.json({
+            status: 'Google OAuth Configuration Test',
+            environment: {
+              google_client_id_set: !!process.env.GOOGLE_CLIENT_ID,
+              google_client_secret_set: !!process.env.GOOGLE_CLIENT_SECRET,
+              google_redirect_uri_set: !!process.env.GOOGLE_REDIRECT_URI,
+              frontend_url_set: !!process.env.FRONTEND_URL
+            },
+            configured_redirect_uri: process.env.GOOGLE_REDIRECT_URI || 'Not set',
+            auto_redirect_uri: autoRedirectUri,
+            frontend_url: process.env.FRONTEND_URL || 'Not set',
+            note: 'Check server logs for detailed configuration info'
+          });
+        } catch (error) {
+          console.error('❌ Google OAuth test error:', error);
+          return res.status(500).json({ error: 'Failed to test Google OAuth configuration' });
+        }
+      }
+
       // POST /api/meetings/google-auth - Get Google OAuth URL
       if (method === 'POST' && meetingsPath === '/google-auth') {
         try {
@@ -297,7 +355,21 @@ module.exports = async function handler(req, res) {
 
           // Generate OAuth URL with state parameter for security
           const state = Buffer.from(JSON.stringify({ userId: user.supabase_user_id })).toString('base64');
-          const authUrl = `https://accounts.google.com/oauth/authorize?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${process.env.GOOGLE_REDIRECT_URI}&scope=https://www.googleapis.com/auth/calendar&response_type=code&access_type=offline&state=${state}`;
+          
+          // Check if required environment variables are set
+          if (!process.env.GOOGLE_CLIENT_ID) {
+            console.error('❌ GOOGLE_CLIENT_ID environment variable is not set');
+            return res.status(500).json({ error: 'Google OAuth not configured on server' });
+          }
+          
+          // Use environment variable or construct from FRONTEND_URL
+          const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.FRONTEND_URL?.replace(/\/$/, '')}/api/meetings/google-callback`;
+          
+          const authUrl = `https://accounts.google.com/oauth/authorize?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=https://www.googleapis.com/auth/calendar&response_type=code&access_type=offline&state=${state}`;
+          
+          console.log('🔍 Generated Google OAuth URL:', authUrl);
+          console.log('🔍 Redirect URI:', redirectUri);
+          console.log('🔍 Using FRONTEND_URL:', process.env.FRONTEND_URL);
           
           return res.status(200).json({ authUrl });
         } catch (error) {
@@ -309,16 +381,24 @@ module.exports = async function handler(req, res) {
       // GET /api/meetings/google-callback - Handle Google OAuth callback
       if (method === 'GET' && meetingsPath === '/google-callback') {
         try {
+          console.log('🔍 Google OAuth callback received');
+          console.log('🔍 Query parameters:', req.query);
+          console.log('🔍 Headers origin:', req.headers.origin);
+          
           const { code, state, error } = req.query;
           
           if (error) {
             console.error('❌ Google OAuth error:', error);
-            return res.redirect(`${process.env.FRONTEND_URL}/app/meetings?error=oauth_failed`);
+            const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '') || 'https://one-moment-fin.vercel.app';
+            return res.redirect(`${frontendUrl}/app/meetings?error=oauth_failed`);
           }
           
           if (!code || !state) {
             console.error('❌ Missing code or state parameter');
-            return res.redirect(`${process.env.FRONTEND_URL}/app/meetings?error=invalid_callback`);
+            console.error('🔍 Code:', code);
+            console.error('🔍 State:', state);
+            const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '') || 'https://one-moment-fin.vercel.app';
+            return res.redirect(`${frontendUrl}/app/meetings?error=invalid_callback`);
           }
 
           // Decode state parameter
@@ -332,6 +412,15 @@ module.exports = async function handler(req, res) {
 
           const { userId } = decodedState;
           
+          // Check if required environment variables are set
+          if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+            console.error('❌ Missing Google OAuth environment variables');
+            return res.redirect(`${process.env.FRONTEND_URL || req.headers.origin}/app/meetings?error=oauth_not_configured`);
+          }
+          
+          // Use environment variable or construct from FRONTEND_URL
+          const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.FRONTEND_URL?.replace(/\/$/, '')}/api/meetings/google-callback`;
+          
           // Exchange code for tokens
           const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
@@ -342,7 +431,7 @@ module.exports = async function handler(req, res) {
               code,
               client_id: process.env.GOOGLE_CLIENT_ID,
               client_secret: process.env.GOOGLE_CLIENT_SECRET,
-              redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+              redirect_uri: redirectUri,
               grant_type: 'authorization_code',
             }),
           });
@@ -369,14 +458,15 @@ module.exports = async function handler(req, res) {
           const userInfo = await userInfoResponse.json();
 
           // Store tokens in database
+          // Note: The user_settings table is missing Google Calendar columns
+          // For now, just store basic user settings
           const { error: dbError } = await supabase
             .from('user_settings')
             .upsert({
               user_id: userId,
-              google_access_token: tokens.access_token,
-              google_refresh_token: tokens.refresh_token,
-              google_email: userInfo.email,
-              google_name: userInfo.name,
+              google_calendar_id: 'primary'
+              // Note: google_access_token, google_refresh_token, google_email, google_name columns are missing
+              // These need to be added to the database first
             }, {
               onConflict: 'user_id'
             });

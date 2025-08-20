@@ -136,11 +136,19 @@ module.exports = async function handler(req, res) {
         }
 
         // Then get the assessment submissions for this lead
+        console.log('🔍 Root API: Fetching assessment submissions for lead:', leadId);
+        
         const { data: assessmentSubmissions, error: submissionsError } = await supabase
           .from('assessment_submissions')
-          .select('id, submitted_at, answers, result, status, created_at')
+          .select('id, submitted_at, answers, result, status')
           .eq('lead_id', leadId)
           .order('submitted_at', { ascending: false });
+
+        console.log('🔍 Root API: Submissions query result:', { 
+          submissions: assessmentSubmissions?.length || 0, 
+          submissionsError: submissionsError?.message || null,
+          submissionsData: assessmentSubmissions
+        });
 
         if (submissionsError) {
           console.error('❌ Error fetching assessment submissions:', submissionsError);
@@ -166,6 +174,14 @@ module.exports = async function handler(req, res) {
           console.log('   - Result:', submission.result);
           console.log('   - Sample answers:', submission.answers ? Object.keys(submission.answers).slice(0, 3) : 'None');
         }
+        
+        // Log the final response structure
+        console.log('🔍 Root API: Final response structure:', {
+          leadId: leadWithSubmissions.id,
+          assessmentSubmissionsCount: leadWithSubmissions.assessment_submissions?.length || 0,
+          hasAssessmentSubmissions: !!leadWithSubmissions.assessment_submissions?.length,
+          responseStructure: { lead: { ...leadWithSubmissions, assessment_submissions: leadWithSubmissions.assessment_submissions?.length || 0 } }
+        });
         
         return res.json({ lead: leadWithSubmissions });
       } catch (error) {

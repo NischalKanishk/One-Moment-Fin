@@ -406,7 +406,7 @@ export class MeetingService {
     try {
       const { data: userSettings, error } = await supabase
         .from('user_settings')
-        .select('google_access_token, google_email, google_name, google_calendar_connected')
+        .select('google_access_token, google_email, google_name')
         .eq('user_id', userId)
         .single();
 
@@ -414,8 +414,11 @@ export class MeetingService {
         return { isConnected: false };
       }
 
+      // Check if user has Google credentials (temporary fix until google_calendar_connected column is added)
+      const hasGoogleCredentials = !!(userSettings.google_access_token && userSettings.google_email);
+      
       return {
-        isConnected: !!(userSettings.google_calendar_connected && userSettings.google_access_token && userSettings.google_email),
+        isConnected: hasGoogleCredentials,
         email: userSettings.google_email,
         name: userSettings.google_name
       };

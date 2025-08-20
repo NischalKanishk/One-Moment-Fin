@@ -244,8 +244,8 @@ router.post('/google-callback', authenticateUser, async (req: express.Request, r
         google_access_token: tokens.access_token,
         google_refresh_token: tokens.refresh_token,
         google_email: tokens.email,
-        google_name: tokens.name,
-        google_calendar_connected: true
+        google_name: tokens.name
+        // Note: google_calendar_connected column will be added via migration
       });
 
     if (updateError) {

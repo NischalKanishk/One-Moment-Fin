@@ -932,13 +932,10 @@ export default function LeadDetail() {
               </div>
               
               {/* Always show the assessment section, but conditionally render content */}
-              <div className="grid gap-8 grid-cols-1">
-                {/* Left Side: Questions and Answers */}
+              <div className="space-y-8">
+                {/* Assessment Summary - Now at the top */}
                 {(() => {
-                  console.log('🔍 Component render - lead:', lead);
-                  console.log('🔍 Component render - assessment_submissions:', lead?.assessment_submissions);
                   const assessmentData = getAssessmentData(lead);
-                  console.log('🔍 Component render - assessmentData:', assessmentData);
                   
                   if (!assessmentData || !assessmentData.answers) {
                       return (
@@ -976,147 +973,78 @@ export default function LeadDetail() {
                     });
                     
                     return (
-                      <div className="space-y-6">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <FileText className="w-5 h-5 text-blue-600" />
+                      <div className="space-y-8">
+                        {/* Assessment Summary - Now at the top */}
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
+                          <div className="text-lg font-semibold text-blue-900 mb-4">Assessment Summary</div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
+                              <div className="text-2xl font-bold text-blue-600">{Object.keys(assessmentData.answers).length}</div>
+                              <div className="text-blue-700 font-medium text-sm">Total Questions</div>
+                            </div>
+                            <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
+                              <div className="text-2xl font-bold text-blue-600">{Object.keys(answersByModule).length}</div>
+                              <div className="text-blue-700 font-medium text-sm">Categories</div>
+                            </div>
+                            <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
+                              <div className="text-2xl font-bold text-blue-600">{lead.assessment_submissions?.[0]?.result?.score || lead.risk_score || 0}</div>
+                              <div className="text-blue-700 font-medium text-sm">Risk Score</div>
+                            </div>
+                            <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
+                              <div className="text-2xl font-bold text-blue-600">{lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket || 'N/A'}</div>
+                              <div className="text-blue-700 font-medium text-sm">Risk Level</div>
+                            </div>
                           </div>
-                          <h3 className="text-xl font-semibold text-gray-900">Assessment Questions & Answers</h3>
                         </div>
-                        
-                                                 {/* Module-based organization */}
-                         {Object.entries(answersByModule).map(([module, answers]) => (
-                           <div key={module} className="space-y-4">
-                             <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                               <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                               <h4 className="font-semibold text-blue-800 text-sm uppercase tracking-wide">{module}</h4>
-                               <div className="ml-auto text-xs text-blue-600 bg-white px-2 py-1 rounded-full">
-                                 {answers.length} question{answers.length !== 1 ? 's' : ''}
-                               </div>
-                             </div>
-                                                         <div className="space-y-4 ml-5">
-                               {answers.map(([questionKey, answer], index) => {
-                                 const questionText = CFA_QUESTION_MAPPING[questionKey] || questionKey;
-                                 return (
-                                   <div key={index} className="bg-gradient-to-r from-gray-50 to-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200">
-                                     <div className="flex items-start gap-3">
-                                       <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                                         <span className="text-xs font-semibold text-blue-700">{index + 1}</span>
-                                       </div>
-                                       <div className="flex-1 space-y-3">
-                                         <h5 className="font-medium text-gray-900 text-sm leading-relaxed">{questionText}</h5>
-                                         <div className="bg-white rounded border border-gray-200 p-3">
-                                           <span className="text-sm font-medium text-gray-700">Answer:</span>
-                                           <span className="ml-2 text-sm text-gray-900 font-medium">{String(answer)}</span>
-                                         </div>
-                                       </div>
-                                     </div>
-                                   </div>
-                                 );
-                               })}
-                             </div>
+
+                        {/* Questions and Answers */}
+                        <div className="space-y-6">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                              <FileText className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <h3 className="text-xl font-semibold text-gray-900">Assessment Questions & Answers</h3>
                           </div>
-                        ))}
-                        
-                                                 {/* Assessment Summary */}
-                         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
-                           <div className="text-lg font-semibold text-blue-900 mb-4">Assessment Summary</div>
-                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                             <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
-                               <div className="text-2xl font-bold text-blue-600">{Object.keys(assessmentData.answers).length}</div>
-                               <div className="text-blue-700 font-medium text-sm">Total Questions</div>
-                             </div>
-                             <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
-                               <div className="text-2xl font-bold text-blue-600">{Object.keys(answersByModule).length}</div>
-                               <div className="text-blue-700 font-medium text-sm">Categories</div>
-                             </div>
-                             <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
-                               <div className="text-2xl font-bold text-blue-600">{lead.assessment_submissions?.[0]?.result?.score || lead.risk_score || 0}</div>
-                               <div className="text-blue-700 font-medium text-sm">Risk Score</div>
-                             </div>
-                             <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
-                               <div className="text-2xl font-bold text-blue-600">{lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket || 'N/A'}</div>
-                               <div className="text-blue-700 font-medium text-sm">Risk Level</div>
-                             </div>
-                           </div>
-                         </div>
+                          
+                          {/* Module-based organization */}
+                          {Object.entries(answersByModule).map(([module, answers]) => (
+                            <div key={module} className="space-y-4">
+                              <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                                <h4 className="font-semibold text-blue-800 text-sm uppercase tracking-wide">{module}</h4>
+                                <div className="ml-auto text-xs text-blue-600 bg-white px-2 py-1 rounded-full">
+                                  {answers.length} question{answers.length !== 1 ? 's' : ''}
+                                </div>
+                              </div>
+                              <div className="space-y-4 ml-5">
+                                {answers.map(([questionKey, answer], index) => {
+                                  const questionText = CFA_QUESTION_MAPPING[questionKey] || questionKey;
+                                  return (
+                                    <div key={index} className="bg-gradient-to-r from-gray-50 to-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200">
+                                      <div className="flex items-start gap-3">
+                                        <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                          <span className="text-xs font-semibold text-blue-700">{index + 1}</span>
+                                        </div>
+                                        <div className="flex-1 space-y-3">
+                                          <h5 className="font-medium text-gray-900 text-sm leading-relaxed">{questionText}</h5>
+                                          <div className="bg-white rounded border border-gray-200 p-3">
+                                            <span className="text-sm font-medium text-gray-700">Answer:</span>
+                                            <span className="ml-2 text-sm text-gray-900 font-medium">{String(answer)}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     );
                   })()}
 
-                  {/* Right Side: Risk Factors */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <TrendingUp className="w-5 h-5 text-purple-600" />
-                      </div>
-                      <h3 className="text-xl font-semibold text-gray-900">Risk Profile</h3>
-                    </div>
-                    
-                                         {/* Risk Score Card */}
-                     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-100 shadow-sm">
-                       <div className="text-center">
-                         <div className="text-4xl font-bold text-blue-600 mb-2">
-                           {lead.assessment_submissions?.[0]?.result?.score || lead.risk_score || 0}
-                         </div>
-                         <div className="text-lg font-medium text-blue-700 uppercase tracking-wide">Risk Score</div>
-                         <div className="text-sm text-blue-600 mt-2">0-100 scale</div>
-                       </div>
-                     </div>
 
-                     {/* Risk Category Card */}
-                     <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-                       <div className="text-center">
-                         <div className="text-4xl font-bold text-gray-900 mb-2">
-                           {lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket || 'N/A'}
-                         </div>
-                         <div className="text-lg font-medium text-gray-600 uppercase tracking-wide">Risk Category</div>
-                         <div className="text-sm text-gray-500 mt-2">Low • Medium • High</div>
-                       </div>
-                     </div>
-
-                     {/* Question Count Card */}
-                     {lead.assessment_submissions?.[0]?.answers && (
-                       <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-6 border border-green-100 shadow-sm">
-                         <div className="text-center">
-                           <div className="text-4xl font-bold text-green-600 mb-2">
-                             {Object.keys(lead.assessment_submissions[0].answers).length}
-                           </div>
-                           <div className="text-lg font-medium text-green-700 uppercase tracking-wide">Questions Answered</div>
-                           <div className="text-sm text-green-600 mt-2">CFA Assessment</div>
-                         </div>
-                       </div>
-                     )}
-
-                                         {/* Assessment Details */}
-                     <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-                       <div className="space-y-4">
-                         <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                           <span className="text-sm font-medium text-gray-600">Assessment Date</span>
-                           <span className="text-sm font-semibold text-gray-900">
-                             {lead.assessment_submissions?.[0]?.submitted_at ? 
-                               new Date(lead.assessment_submissions[0].submitted_at).toLocaleDateString() : 
-                               new Date(lead.created_at).toLocaleDateString()
-                             }
-                           </span>
-                         </div>
-                         <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                           <span className="text-sm font-medium text-gray-600">Assessment Title</span>
-                           <span className="text-sm font-semibold text-gray-900">
-                             CFA Three-Pillar Risk Assessment
-                           </span>
-                         </div>
-                         <div className="flex justify-between items-center py-3">
-                           <span className="text-sm font-medium text-gray-600">Total Questions</span>
-                           <span className="text-sm font-semibold text-gray-900">
-                             {lead.assessment_submissions?.[0]?.answers ? Object.keys(lead.assessment_submissions[0].answers).length : 'N/A'}
-                           </span>
-                         </div>
-                       </div>
-                     </div>
-
-                    
-                  </div>
                 </div>
             </div>
           </TabsContent>
