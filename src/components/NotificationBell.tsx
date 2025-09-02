@@ -36,7 +36,7 @@ export default function NotificationBell({ className }: NotificationBellProps) {
       setIsLoading(true);
       const token = await window.Clerk?.session?.getToken();
       
-      const response = await fetch('/api/notifications', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/notifications`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -59,7 +59,7 @@ export default function NotificationBell({ className }: NotificationBellProps) {
     try {
       const token = await window.Clerk?.session?.getToken();
       
-      const response = await fetch('/api/notifications/count', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/notifications/count`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -79,7 +79,7 @@ export default function NotificationBell({ className }: NotificationBellProps) {
     try {
       const token = await window.Clerk?.session?.getToken();
       
-      const response = await fetch(`/api/notifications/${notificationId}/read`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/notifications/${notificationId}/read`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -106,7 +106,7 @@ export default function NotificationBell({ className }: NotificationBellProps) {
     try {
       const token = await window.Clerk?.session?.getToken();
       
-      const response = await fetch('/api/notifications/read-all', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/notifications/read-all`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

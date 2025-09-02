@@ -23,7 +23,7 @@ import assessmentsRoutes from './routes/assessments';
 import publicAssessmentsRoutes from './routes/publicAssessments';
 import userAssessmentLinksRoutes from './routes/userAssessmentLinks';
 import aiRoutes from './routes/ai';
-
+import notificationsRoutes from './routes/notifications';
 import meetingsRoutes from './routes/meetings';
 
 
@@ -107,7 +107,7 @@ app.use('/api/leads', leadsRoutes);
 app.use('/api/assessments', assessmentsRoutes);
 app.use('/api/public-assessments', publicAssessmentsRoutes);
 app.use('/api/ai', aiRoutes);
-
+app.use('/api/notifications', notificationsRoutes);
 app.use('/api/meetings', meetingsRoutes);
 
 // Public assessment routes
