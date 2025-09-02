@@ -615,6 +615,7 @@ module.exports = async function handler(req, res) {
     // ============================================================================
     // ASSESSMENT ENDPOINTS - Handle public assessment links
     // ============================================================================
+    console.log('🔍 Checking path:', path, 'startsWith /api/assessment/:', path.startsWith('/api/assessment/'));
     if (path.startsWith('/api/assessment/')) {
       const assessmentPath = path.replace('/api/assessment/', '');
       
@@ -769,6 +770,7 @@ module.exports = async function handler(req, res) {
     // ============================================================================
     // ASSESSMENTS ENDPOINTS - Handle directly since routing is not working
     // ============================================================================
+    console.log('🔍 Checking path:', path, 'startsWith /api/assessments:', path.startsWith('/api/assessments'));
     if (path.startsWith('/api/assessments')) {
       const assessmentsPath = path.replace('/api/assessments', '');
       
