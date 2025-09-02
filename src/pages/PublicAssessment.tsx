@@ -301,23 +301,15 @@ export default function PublicAssessment() {
       errors.push('Full name is required');
     }
     
-    // Check that either email or phone is provided
-    const hasEmail = submitterInfo.email.trim() !== '';
-    const hasPhone = submitterInfo.phone.trim() !== '' && submitterInfo.phone !== '+91';
-    
-    if (!hasEmail && !hasPhone) {
-      errors.push('Please provide either email address or phone number');
+    // Email is now compulsory
+    if (!submitterInfo.email.trim()) {
+      errors.push('Email address is required');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(submitterInfo.email)) {
+      errors.push('Please enter a valid email address');
     }
     
-    // Validate email if provided
-    if (hasEmail) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(submitterInfo.email)) {
-        errors.push('Please enter a valid email address');
-      }
-    }
-    
-    // Validate phone if provided
-    if (hasPhone) {
+    // Validate phone if provided (optional)
+    if (submitterInfo.phone && submitterInfo.phone !== '+91') {
       const phoneNumber = submitterInfo.phone.replace('+91', '').trim();
       if (phoneNumber.length !== 10 || !/^\d{10}$/.test(phoneNumber)) {
         errors.push('Phone number must be exactly 10 digits');
@@ -761,21 +753,22 @@ export default function PublicAssessment() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email">Email Address *</Label>
                 <Input
                   id="email"
                   type="email"
                   value={submitterInfo.email}
                   onChange={(e) => setSubmitterInfo(prev => ({ ...prev, email: e.target.value.trim() }))}
                   placeholder="Enter your email address (e.g., user@example.com)"
+                  required
                 />
                 <p className="text-xs text-muted-foreground">
-                  Provide either email or phone number to continue
+                  Email address is required to continue
                 </p>
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="phone">Phone Number (Optional)</Label>
                 <div className="relative">
                   <Input
                     id="phone"
@@ -821,7 +814,7 @@ export default function PublicAssessment() {
                 </Button>
                 <Button
                   onClick={handleNext}
-                  disabled={isVerifying || (!submitterInfo.email && !submitterInfo.phone) || !submitterInfo.full_name.trim()}
+                  disabled={isVerifying || !submitterInfo.email.trim() || !submitterInfo.full_name.trim()}
                   className="flex-1"
                 >
                   {isVerifying ? 'Verifying...' : 'Continue'}
