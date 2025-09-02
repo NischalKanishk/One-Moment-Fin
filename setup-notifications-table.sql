@@ -1,6 +1,7 @@
--- Create notifications table for OneMFin
--- This table will store all notifications for users
+-- OneMFin Notifications Table Setup
+-- Run this SQL in your Supabase SQL Editor
 
+-- Create notifications table
 CREATE TABLE notifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -14,22 +15,25 @@ CREATE TABLE notifications (
     )),
     title TEXT NOT NULL,
     message TEXT NOT NULL,
-    data JSONB, -- Additional data like lead_id, meeting_id, etc.
+    data JSONB,
     is_read BOOLEAN DEFAULT FALSE,
     priority TEXT DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     read_at TIMESTAMP WITH TIME ZONE,
-    expires_at TIMESTAMP WITH TIME ZONE -- Optional expiration for time-sensitive notifications
+    expires_at TIMESTAMP WITH TIME ZONE
 );
 
--- Indexes for better performance
+-- Create indexes for better performance
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_type ON notifications(type);
 CREATE INDEX idx_notifications_is_read ON notifications(is_read);
 CREATE INDEX idx_notifications_created_at ON notifications(created_at);
 CREATE INDEX idx_notifications_user_unread ON notifications(user_id, is_read) WHERE is_read = FALSE;
 
--- RLS Policies
+-- Enable Row Level Security
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies
 CREATE POLICY "Users can view own notifications" ON notifications
     FOR SELECT USING (user_id IN (
         SELECT id FROM users WHERE clerk_id = get_clerk_user_id()
@@ -43,9 +47,7 @@ CREATE POLICY "Users can update own notifications" ON notifications
 CREATE POLICY "Service role can manage all notifications" ON notifications
     FOR ALL USING (auth.role() = 'service_role');
 
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-
--- Function to create a notification
+-- Create helper functions
 CREATE OR REPLACE FUNCTION create_notification(
     p_user_id UUID,
     p_type TEXT,
@@ -69,21 +71,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function to mark notification as read
-CREATE OR REPLACE FUNCTION mark_notification_read(p_notification_id UUID)
-RETURNS BOOLEAN AS $$
-BEGIN
-    UPDATE notifications 
-    SET is_read = TRUE, read_at = NOW()
-    WHERE id = p_notification_id 
-    AND user_id IN (
-        SELECT id FROM users WHERE clerk_id = get_clerk_user_id()
-    );
-    
-    RETURN FOUND;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
 -- Function to get unread notification count
 CREATE OR REPLACE FUNCTION get_unread_notification_count(p_user_id UUID)
 RETURNS INTEGER AS $$
@@ -97,3 +84,17 @@ BEGIN
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Insert a test notification to verify setup
+INSERT INTO notifications (user_id, type, title, message, priority)
+SELECT 
+    id,
+    'system_update',
+    'Notification System Setup',
+    'The notification system has been successfully configured!',
+    'medium'
+FROM users 
+LIMIT 1;
+
+-- Show success message
+SELECT 'Notifications table created successfully!' as status;
