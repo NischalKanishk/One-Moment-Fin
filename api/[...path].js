@@ -1413,6 +1413,113 @@ module.exports = async function handler(req, res) {
     }
     
     // ============================================================================
+    // SIP FORECAST ENDPOINTS
+    // ============================================================================
+    if (path.startsWith('/api/sip')) {
+      const sipPath = path.replace('/api/sip', '');
+      
+      // POST /api/sip/forecast - Calculate SIP forecast
+      if (method === 'POST' && sipPath === '/forecast') {
+        try {
+          const body = req.body;
+          
+          // Validate input
+          if (!body.monthlyInvestment || !body.years || body.expectedAnnualReturn === undefined) {
+            return res.status(400).json({
+              ok: false,
+              error: { 
+                code: "VALIDATION_ERROR", 
+                message: "Missing required fields: monthlyInvestment, years, expectedAnnualReturn" 
+              }
+            });
+          }
+          
+          // Accept either decimals or percents (if *_Pct present)
+          const payload = typeof body.expectedAnnualReturnPct === "number"
+            ? {
+                monthlyInvestment: Number(body.monthlyInvestment),
+                years: Number(body.years),
+                expectedAnnualReturn: Number(body.expectedAnnualReturnPct) / 100,
+                inflation: body.inflationPct ? Number(body.inflationPct) / 100 : 0,
+              }
+            : {
+                monthlyInvestment: Number(body.monthlyInvestment),
+                years: Number(body.years),
+                expectedAnnualReturn: Number(body.expectedAnnualReturn),
+                inflation: body.inflation ? Number(body.inflation) : 0,
+              };
+
+          // Additional validation
+          if (payload.monthlyInvestment <= 0 || payload.years <= 0 || payload.expectedAnnualReturn < 0) {
+            return res.status(400).json({
+              ok: false,
+              error: { 
+                code: "VALIDATION_ERROR", 
+                message: "Invalid input values" 
+              }
+            });
+          }
+
+          // SIP calculation functions
+          function toMonthlyRate(annual) {
+            return annual / 12;
+          }
+
+          function round2(n) {
+            return Math.round(n * 100) / 100;
+          }
+
+          function fvSip(monthlyInvestment, annualReturn, years) {
+            const m = Math.max(0, Math.floor(years * 12));
+            const i = toMonthlyRate(annualReturn);
+            if (Math.abs(i) < 1e-12) return monthlyInvestment * m;
+            const factor = (Math.pow(1 + i, m) - 1) / i;
+            return monthlyInvestment * factor * (1 + i);
+          }
+
+          function realAnnualRate(nominal, inflation) {
+            return (1 + nominal) / (1 + inflation) - 1;
+          }
+
+          function projectSipYearly(input) {
+            const { monthlyInvestment, years, expectedAnnualReturn, inflation } = input;
+            const rReal = realAnnualRate(expectedAnnualReturn, inflation);
+            const out = [];
+            for (let y = 1; y <= years; y++) {
+              const nominal = fvSip(monthlyInvestment, expectedAnnualReturn, y);
+              const real = fvSip(monthlyInvestment, rReal, y);
+              out.push({ year: y, nominal: round2(nominal), real: round2(real) });
+            }
+            return out;
+          }
+
+          function computeSipForecast(input) {
+            const fvNominal = round2(fvSip(input.monthlyInvestment, input.expectedAnnualReturn, input.years));
+            const fvReal = round2(fvSip(input.monthlyInvestment, realAnnualRate(input.expectedAnnualReturn, input.inflation), input.years));
+            const yearly = projectSipYearly(input);
+            return { input, fvNominal, fvReal, yearly };
+          }
+
+          const result = computeSipForecast(payload);
+          
+          return res.status(200).json({ 
+            ok: true, 
+            result 
+          });
+        } catch (error) {
+          console.error('❌ SIP Forecast error:', error);
+          return res.status(500).json({
+            ok: false,
+            error: { 
+              code: "INTERNAL_ERROR", 
+              message: error?.message ?? "Failed to compute SIP forecast" 
+            }
+          });
+        }
+      }
+    }
+    
+    // ============================================================================
     // DEFAULT RESPONSE
     // ============================================================================
     return res.status(404).json({

@@ -27,6 +27,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { leadsAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { LeadAutocomplete } from "@/components/LeadAutocomplete";
+import SipForecaster from "@/components/SipForecaster";
 import { 
   Dialog, 
   DialogTrigger, 
@@ -121,6 +122,49 @@ const CFA_QUESTION_MAPPING: Record<string, string> = {
   
   // Fallback for any other questions
   'other': 'Additional Question'
+};
+
+// Helper function to extract monthly investment amount from lead data
+const extractMonthlyInvestmentAmount = (lead: Lead): number => {
+  // First, try to find monthly investment in assessment submissions
+  if (lead.assessment_submissions && lead.assessment_submissions.length > 0) {
+    const latestSubmission = lead.assessment_submissions[0];
+    const answers = latestSubmission.answers;
+    
+    // Look for various possible keys that might contain monthly investment
+    const possibleKeys = [
+      'monthly_investment',
+      'monthly_investment_amount',
+      'investment_amount',
+      'monthly_amount',
+      'sip_amount',
+      'monthly_sip'
+    ];
+    
+    for (const key of possibleKeys) {
+      if (answers[key]) {
+        const value = Number(answers[key]);
+        if (!isNaN(value) && value > 0) {
+          return value;
+        }
+      }
+    }
+  }
+  
+  // Fallback to cfa_min_investment if available
+  if (lead.cfa_min_investment) {
+    // Try to extract number from the string (e.g., "₹15,000" -> 15000)
+    const match = lead.cfa_min_investment.match(/[\d,]+/);
+    if (match) {
+      const value = Number(match[0].replace(/,/g, ''));
+      if (!isNaN(value) && value > 0) {
+        return value;
+      }
+    }
+  }
+  
+  // Default fallback
+  return 15000;
 };
 
 export default function LeadDetail() {
@@ -748,7 +792,7 @@ export default function LeadDetail() {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Tabs */}
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 bg-white border border-gray-200 rounded-xl p-1 h-16 shadow-sm">
+          <TabsList className="grid w-full grid-cols-5 bg-white border border-gray-200 rounded-xl p-1 h-16 shadow-sm">
             <TabsTrigger 
               value="overview" 
               className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:border-blue-200 data-[state=active]:shadow-sm rounded-lg h-14 transition-all duration-200 font-medium"
@@ -772,6 +816,12 @@ export default function LeadDetail() {
               className="data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:border-amber-200 data-[state=active]:shadow-sm rounded-lg h-14 transition-all duration-200 font-medium"
             >
               Notes
+            </TabsTrigger>
+            <TabsTrigger 
+              value="sip" 
+              className="data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:border-emerald-200 data-[state=active]:shadow-sm rounded-lg h-14 transition-all duration-200 font-medium"
+            >
+              SIP Forecaster
             </TabsTrigger>
           </TabsList>
           
@@ -1298,6 +1348,39 @@ export default function LeadDetail() {
                 </div>
               )}
             </div>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="sip" className="space-y-6 mt-8">
+          <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center">
+                <TrendingUp className="w-7 h-7 text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">SIP Forecaster</h3>
+                <p className="text-sm text-gray-600">Plan and forecast SIP investments for {lead?.full_name}</p>
+                {lead && (
+                  <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-xs text-blue-700">
+                      💡 Monthly investment amount pre-filled from: {
+                        lead.assessment_submissions?.[0]?.answers?.monthly_investment ? 'Assessment submission' :
+                        lead.assessment_submissions?.[0]?.answers?.investment_amount ? 'Assessment submission' :
+                        lead.cfa_min_investment ? 'CFA minimum investment' : 'Default value'
+                      }
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <SipForecaster 
+              defaultMonthly={lead ? extractMonthlyInvestmentAmount(lead) : 15000}
+              defaultYears={15}
+              defaultReturnPct={12}
+              defaultInflationPct={6}
+              className="border-0 shadow-none"
+            />
           </div>
         </TabsContent>
       </Tabs>
