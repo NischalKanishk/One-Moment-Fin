@@ -658,7 +658,10 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
         status,
         source_link,
         created_at,
-        notes
+        notes,
+        cfa_goals,
+        cfa_min_investment,
+        cfa_investment_horizon
       `)
       .eq('id', id)
       .eq('user_id', user_id)

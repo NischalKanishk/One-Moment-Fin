@@ -286,7 +286,10 @@ export default function SmartSummary() {
       if (!hasAssessment && hasAssessmentSubmissions) {
         pdfAnswers = Object.entries(lead.assessment_submissions[0].answers).map(([question, answer]) => ({
           question: formatQuestionText(question),
-          answer: String(answer)
+          answer: String(answer),
+          type: 'text',
+          options: null,
+          module: 'assessment'
         }));
       }
       pdfContent.innerHTML = `
@@ -713,26 +716,17 @@ export default function SmartSummary() {
                 
                 <TabsContent value="sip" className="p-6">
                   <div className="space-y-6">
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center">
-                        <TrendingUp className="w-7 h-7 text-emerald-600" />
+                    {lead && (
+                      <div className="p-2 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-xs text-blue-700">
+                          💡 Monthly investment amount pre-filled from: {
+                            lead.assessment_submissions?.[0]?.answers?.monthly_investment ? 'Assessment submission' :
+                            lead.assessment_submissions?.[0]?.answers?.investment_amount ? 'Assessment submission' :
+                            lead.cfa_min_investment ? 'CFA minimum investment' : 'Default value'
+                          }
+                        </p>
                       </div>
-                      <div>
-                        <h3 className="text-xl font-semibold text-gray-900">SIP Investment Forecast</h3>
-                        <p className="text-sm text-gray-600">Investment projection for {lead.full_name}</p>
-                        {lead && (
-                          <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                            <p className="text-xs text-blue-700">
-                              💡 Monthly investment amount pre-filled from: {
-                                lead.assessment_submissions?.[0]?.answers?.monthly_investment ? 'Assessment submission' :
-                                lead.assessment_submissions?.[0]?.answers?.investment_amount ? 'Assessment submission' :
-                                lead.cfa_min_investment ? 'CFA minimum investment' : 'Default value'
-                              }
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    )}
                     
                     <SipForecasterReadOnly
                       monthlyInvestment={extractMonthlyInvestmentAmount(lead)}
@@ -748,8 +742,6 @@ export default function SmartSummary() {
               </Tabs>
             </CardContent>
           </Card>
-
-
 
           {/* CFA Information Display */}
           {(lead.cfa_goals || lead.cfa_min_investment || lead.cfa_investment_horizon) && (
