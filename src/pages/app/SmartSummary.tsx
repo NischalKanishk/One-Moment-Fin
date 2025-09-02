@@ -102,6 +102,7 @@ const extractMonthlyInvestmentAmount = (lead: Lead): number => {
 };
 
 interface Lead {
+  risk_category: string;
   id: string;
   full_name: string;
   email: string | null;
@@ -245,6 +246,8 @@ export default function SmartSummary() {
       return;
     }
     
+    let pdfContent: HTMLDivElement | null = null;
+    
     try {
       setGeneratingPDF(true);
       
@@ -262,7 +265,7 @@ export default function SmartSummary() {
       const html2pdf = (await import('html2pdf.js')).default;
       
       // Create a clean HTML structure for PDF with safe data access
-      const pdfContent = document.createElement('div');
+      pdfContent = document.createElement('div');
       
       // Safely access lead properties with fallbacks
       const leadName = lead.full_name || 'Unknown Lead';
@@ -444,7 +447,7 @@ export default function SmartSummary() {
       });
     } finally {
       // Clean up the temporary element if it exists
-      if (pdfContent.parentNode) {
+      if (pdfContent && pdfContent.parentNode) {
         document.body.removeChild(pdfContent);
       }
       setGeneratingPDF(false);
