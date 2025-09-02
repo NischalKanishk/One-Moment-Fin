@@ -143,8 +143,19 @@ export default function AssessmentTest() {
     
     // Check required questions
     questions.forEach(question => {
-      if (question.required && (!answers[question.qkey] || answers[question.qkey] === '')) {
-        errors.push(`${question.label} is required`);
+      if (question.required) {
+        const answer = answers[question.qkey];
+        
+        if (question.qtype === 'multiple') {
+          // For multiple choice, check if at least one option is selected
+          if (!answer || !Array.isArray(answer) || answer.length === 0) {
+            errors.push(`${question.label} is required`);
+          } else if (answer.length > 5) {
+            errors.push(`${question.label}: Please select maximum 5 options`);
+          }
+        } else if (!answer || answer === '') {
+          errors.push(`${question.label} is required`);
+        }
       }
     });
     
@@ -431,20 +442,45 @@ export default function AssessmentTest() {
                             {question.required && <span className="text-red-500 ml-1">*</span>}
                           </Label>
                           
-                          {question.qtype === 'mcq' && question.options && question.options.length > 0 ? (
+                          {question.qtype === 'single' && question.options && question.options.length > 0 ? (
                             <RadioGroup
                               value={answers[question.qkey] || ''}
                               onValueChange={(value) => handleAnswerChange(question.qkey, value)}
                             >
-                              {question.options.map((option: string, optionIndex: number) => (
+                              {question.options.map((option: any, optionIndex: number) => (
                                 <div key={optionIndex} className="flex items-center space-x-2">
-                                  <RadioGroupItem value={option} id={`${question.qkey}-${optionIndex}`} />
+                                  <RadioGroupItem value={option.value} id={`${question.qkey}-${optionIndex}`} />
                                   <Label htmlFor={`${question.qkey}-${optionIndex}`} className="text-sm">
-                                    {option}
+                                    {option.label}
                                   </Label>
                                 </div>
                               ))}
                             </RadioGroup>
+                          ) : question.qtype === 'multiple' && question.options && question.options.length > 0 ? (
+                            <div className="space-y-2">
+                              {question.options.map((option: any, optionIndex: number) => (
+                                <div key={optionIndex} className="flex items-center space-x-2">
+                                  <input
+                                    type="checkbox"
+                                    id={`${question.qkey}-${optionIndex}`}
+                                    checked={answers[question.qkey]?.includes(option.value) || false}
+                                    onChange={(e) => {
+                                      const currentValues = answers[question.qkey] || [];
+                                      if (e.target.checked) {
+                                        handleAnswerChange(question.qkey, [...currentValues, option.value]);
+                                      } else {
+                                        handleAnswerChange(question.qkey, currentValues.filter((v: string) => v !== option.value));
+                                      }
+                                    }}
+                                    className="rounded border-gray-300"
+                                  />
+                                  <Label htmlFor={`${question.qkey}-${optionIndex}`} className="text-sm">
+                                    {option.label}
+                                  </Label>
+                                </div>
+                              ))}
+                              <p className="text-xs text-gray-500 mt-2">Select up to 5 options</p>
+                            </div>
                           ) : question.qtype === 'scale' ? (
                             <div className="flex items-center gap-4">
                               <span className="text-sm text-gray-500">Low</span>
@@ -464,6 +500,13 @@ export default function AssessmentTest() {
                               </RadioGroup>
                               <span className="text-sm text-gray-500">High</span>
                             </div>
+                          ) : question.qtype === 'text' ? (
+                            <Input
+                              value={answers[question.qkey] || ''}
+                              onChange={(e) => handleAnswerChange(question.qkey, e.target.value)}
+                              placeholder="Enter your answer"
+                              className="w-full"
+                            />
                           ) : (
                             <Textarea
                               value={answers[question.qkey] || ''}

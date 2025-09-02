@@ -18,38 +18,40 @@ export type WeightedSumConfig = {
 
 export type ThreePillarConfig = {
   engine: 'three_pillar';
-  capacity: { 
-    inputs: Array<{
-      qkey: string;
-      map?: Record<string, number>;
-      type?: string;
-      transform?: string;
-      scale?: number[];
-      scores?: number[];
-    }>; 
-    weights: Record<string, number> 
-  };
-  tolerance: { 
-    inputs: Array<{
-      qkey: string;
-      map?: Record<string, number>;
-      type?: string;
-      transform?: string;
-      scale?: number[];
-      scores?: number[];
-    }>; 
-    weights: Record<string, number> 
-  };
-  need: { 
-    inputs: Array<{
-      qkey: string;
-      map?: Record<string, number>;
-      type?: string;
-      transform?: string;
-      scale?: number[];
-      scores?: number[];
-    }>; 
-    weights: Record<string, number> 
+  pillars: {
+    capacity: { 
+      inputs: Array<{
+        qkey: string;
+        map?: Record<string, number>;
+        type?: string;
+        transform?: string;
+        scale?: number[];
+        scores?: number[];
+      }>; 
+      weights: Record<string, number> 
+    };
+    tolerance: { 
+      inputs: Array<{
+        qkey: string;
+        map?: Record<string, number>;
+        type?: string;
+        transform?: string;
+        scale?: number[];
+        scores?: number[];
+      }>; 
+      weights: Record<string, number> 
+    };
+    need: { 
+      inputs: Array<{
+        qkey: string;
+        map?: Record<string, number>;
+        type?: string;
+        transform?: string;
+        scale?: number[];
+        scores?: number[];
+      }>; 
+      weights: Record<string, number> 
+    };
   };
   decision: {
     formula: 'min(capacity, tolerance)';
@@ -164,9 +166,9 @@ function scoreWeightedSum(cfg: WeightedSumConfig, answers: Record<string, any>):
  * Score using three pillar approach
  */
 function scoreThreePillar(cfg: ThreePillarConfig, answers: Record<string, any>): ScoringResult {
-  const capacity = calculatePillarScore(cfg.capacity, answers);
-  const tolerance = calculatePillarScore(cfg.tolerance, answers);
-  const need = calculatePillarScore(cfg.need, answers);
+  const capacity = calculatePillarScore(cfg.pillars.capacity, answers);
+  const tolerance = calculatePillarScore(cfg.pillars.tolerance, answers);
+  const need = calculatePillarScore(cfg.pillars.need, answers);
 
   // Calculate final score using min(capacity, tolerance)
   const finalScore = Math.min(capacity, tolerance);
@@ -222,6 +224,12 @@ function calculatePillarScore(pillar: { inputs: any[]; weights: Record<string, n
     if (input.map && input.map[answer] !== undefined) {
       // Direct mapping
       score = input.map[answer];
+    } else if (input.type === 'multiple' && input.transform === 'score_goals_complexity') {
+      // Score multiple investment goals based on complexity
+      score = scoreGoalsComplexity(answer);
+    } else if (input.type === 'text' && input.transform === 'parse_amount') {
+      // Parse amount from text and score based on amount ranges
+      score = parseAndScoreAmount(answer);
     } else if (input.type === 'percent') {
       // Percentage transformation
       const numValue = parseFloat(answer);
@@ -250,6 +258,63 @@ function calculatePillarScore(pillar: { inputs: any[]; weights: Record<string, n
 
   // Return weighted average, or 0 if no weights
   return totalWeight > 0 ? totalScore / totalWeight : 0;
+}
+
+/**
+ * Score investment goals based on complexity
+ */
+function scoreGoalsComplexity(goals: string[]): number {
+  if (!goals || !Array.isArray(goals) || goals.length === 0) {
+    return 0;
+  }
+
+  // Define goal complexity scores
+  const goalScores: Record<string, number> = {
+    'buying_home': 60,
+    'children_education': 70,
+    'retirement_planning': 80,
+    'investment_growth': 90,
+    'debt_repayment': 40,
+    'starting_business': 95,
+    'marriage': 50,
+    'travel_leisure': 30,
+    'supporting_parents': 60,
+    'saving_down_payment': 50,
+    'health_wellness': 70,
+    'emergency_fund': 20
+  };
+
+  // Calculate average complexity score
+  const totalScore = goals.reduce((sum, goal) => sum + (goalScores[goal] || 50), 0);
+  return totalScore / goals.length;
+}
+
+/**
+ * Parse amount from text and score based on amount ranges
+ */
+function parseAndScoreAmount(amountText: string): number {
+  if (!amountText || typeof amountText !== 'string') {
+    return 0;
+  }
+
+  // Extract numeric value from text
+  const numericMatch = amountText.match(/(\d+(?:,\d{3})*(?:\.\d{2})?)/);
+  if (!numericMatch) {
+    return 0;
+  }
+
+  const amount = parseFloat(numericMatch[1].replace(/,/g, ''));
+  
+  // Score based on amount ranges (in INR)
+  if (amount >= 1000000) return 90; // 10L+
+  if (amount >= 500000) return 80;  // 5L+
+  if (amount >= 100000) return 70;  // 1L+
+  if (amount >= 50000) return 60;   // 50K+
+  if (amount >= 25000) return 50;   // 25K+
+  if (amount >= 10000) return 40;   // 10K+
+  if (amount >= 5000) return 30;    // 5K+
+  if (amount >= 1000) return 20;    // 1K+
+  return 10; // Less than 1K
 }
 
 /**

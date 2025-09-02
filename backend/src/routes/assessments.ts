@@ -1255,6 +1255,50 @@ router.get('/public/:slug', async (req: express.Request, res: express.Response) 
 // RISK ASSESSMENT SYSTEM ROUTES
 // ============================================================================
 
+// GET /api/assessments/forms - Get assessment forms (for frontend compatibility)
+router.get('/forms', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    // Return empty forms array for now (legacy compatibility)
+    return res.json({ forms: [] });
+  } catch (error) {
+    console.error('Get assessment forms error:', error);
+    return res.status(500).json({ error: 'Failed to fetch assessment forms' });
+  }
+});
+
+// GET /api/assessments/cfa/questions - Get CFA framework questions
+router.get('/cfa/questions', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user?.supabase_user_id) {
+      return res.status(400).json({ error: 'User not properly authenticated' });
+    }
+
+    console.log('🔍 Getting CFA framework questions...');
+    
+    // Get questions from framework_questions table
+    const { data: questions, error: questionsError } = await supabase
+      .from('framework_questions')
+      .select('*')
+      .order('order_index');
+
+    if (questionsError) {
+      console.error('❌ Error fetching questions:', questionsError);
+      return res.status(500).json({ error: 'Failed to fetch questions' });
+    }
+
+    console.log(`✅ Found ${questions?.length || 0} questions`);
+    
+    return res.json({ questions: questions || [] });
+  } catch (error) {
+    console.error('Get CFA questions error:', error);
+    return res.status(500).json({ error: 'Failed to fetch CFA questions' });
+  }
+});
+
 // GET /api/assessments/frameworks - Get available frameworks
 router.get('/frameworks', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
