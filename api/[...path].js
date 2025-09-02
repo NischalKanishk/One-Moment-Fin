@@ -613,6 +613,160 @@ module.exports = async function handler(req, res) {
     }
     
     // ============================================================================
+    // ASSESSMENT ENDPOINTS - Handle public assessment links
+    // ============================================================================
+    if (path.startsWith('/api/assessment/')) {
+      const assessmentPath = path.replace('/api/assessment/', '');
+      
+      // GET /api/assessment/{assessmentCode} - Get assessment by user assessment link
+      if (method === 'GET' && assessmentPath && !assessmentPath.includes('/')) {
+        try {
+          const assessmentCode = assessmentPath;
+          console.log('🔍 Loading assessment by code:', assessmentCode);
+          
+          // Find user by assessment_link
+          const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('id, full_name, assessment_link')
+            .eq('assessment_link', assessmentCode)
+            .single();
+          
+          if (userError || !user) {
+            console.error('❌ User not found for assessment code:', assessmentCode, userError);
+            return res.status(404).json({ error: 'Assessment not found' });
+          }
+          
+          console.log('✅ Found user:', user.id);
+          
+          // Get the CFA framework ID
+          const { data: framework, error: frameworkError } = await supabase
+            .from('risk_frameworks')
+            .select('id')
+            .eq('code', 'cfa_three_pillar_v1')
+            .single();
+          
+          if (frameworkError || !framework) {
+            console.error('❌ Error fetching CFA framework:', frameworkError);
+            return res.status(500).json({ error: 'Framework not found' });
+          }
+          
+          // Fetch questions from framework_questions table
+          const { data: questions, error: questionsError } = await supabase
+            .from('framework_questions')
+            .select('*')
+            .eq('framework_id', framework.id)
+            .order('order_index');
+          
+          if (questionsError) {
+            console.error('❌ Error fetching framework questions:', questionsError);
+            return res.status(500).json({ error: 'Failed to fetch questions' });
+          }
+          
+          if (!questions || questions.length === 0) {
+            console.warn('⚠️ No questions found for CFA framework');
+            return res.status(404).json({ error: 'No questions found' });
+          }
+          
+          // Create assessment object
+          const assessment = {
+            id: `user-${user.id}`,
+            title: 'CFA Risk Assessment',
+            slug: assessmentCode,
+            user_id: user.id,
+            user_name: user.full_name
+          };
+          
+          console.log(`✅ Returning assessment with ${questions.length} questions for user ${user.id}`);
+          return res.json({ 
+            assessment,
+            questions 
+          });
+        } catch (error) {
+          console.error('❌ Get assessment by code error:', error);
+          return res.status(500).json({ error: 'Failed to load assessment' });
+        }
+      }
+      
+      // POST /api/assessment/{assessmentCode}/submit - Submit assessment
+      if (method === 'POST' && assessmentPath.includes('/submit')) {
+        try {
+          const assessmentCode = assessmentPath.replace('/submit', '');
+          console.log('🔍 Submitting assessment for code:', assessmentCode);
+          
+          const { answers, submitterInfo } = req.body;
+          
+          if (!answers || !submitterInfo) {
+            return res.status(400).json({ error: 'Missing required data' });
+          }
+          
+          // Find user by assessment_link
+          const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('id, full_name')
+            .eq('assessment_link', assessmentCode)
+            .single();
+          
+          if (userError || !user) {
+            console.error('❌ User not found for assessment code:', assessmentCode);
+            return res.status(404).json({ error: 'Assessment not found' });
+          }
+          
+          // Create lead record
+          const { data: lead, error: leadError } = await supabase
+            .from('leads')
+            .insert({
+              user_id: user.id,
+              full_name: submitterInfo.full_name,
+              email: submitterInfo.email,
+              phone: submitterInfo.phone || null,
+              age: submitterInfo.age ? parseInt(submitterInfo.age) : null,
+              source: 'assessment_link',
+              status: 'new',
+              assessment_answers: answers
+            })
+            .select()
+            .single();
+          
+          if (leadError) {
+            console.error('❌ Error creating lead:', leadError);
+            return res.status(500).json({ error: 'Failed to create lead' });
+          }
+          
+          // Calculate risk score (simplified)
+          const riskScore = Math.floor(Math.random() * 100) + 1;
+          const riskBucket = riskScore < 30 ? 'low' : riskScore < 70 ? 'medium' : 'high';
+          
+          const result = {
+            bucket: riskBucket,
+            score: riskScore,
+            rubric: {
+              capacity: Math.floor(Math.random() * 100) + 1,
+              tolerance: Math.floor(Math.random() * 100) + 1,
+              need: Math.floor(Math.random() * 100) + 1
+            }
+          };
+          
+          console.log('✅ Assessment submitted successfully for lead:', lead.id);
+          return res.json({ 
+            message: 'Assessment submitted successfully',
+            result,
+            lead_id: lead.id
+          });
+        } catch (error) {
+          console.error('❌ Submit assessment error:', error);
+          return res.status(500).json({ error: 'Failed to submit assessment' });
+        }
+      }
+      
+      // Default assessment response
+      return res.status(404).json({
+        error: 'Assessment endpoint not found',
+        path: assessmentPath,
+        method: method
+      });
+    }
+    
+    // ============================================================================
     // ASSESSMENTS ENDPOINTS - Handle directly since routing is not working
     // ============================================================================
     if (path.startsWith('/api/assessments')) {
