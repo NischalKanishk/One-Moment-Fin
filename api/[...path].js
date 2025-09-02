@@ -35,6 +35,81 @@ module.exports = async function handler(req, res) {
     }
     
     // ============================================================================
+    // DATABASE TEST
+    // ============================================================================
+    if (path === '/api/test-db') {
+      try {
+        console.log('🔍 Testing database queries...');
+        
+        // Test basic connection
+        const { data: testData, error: testError } = await supabase
+          .from('users')
+          .select('count')
+          .limit(1);
+        
+        if (testError) {
+          console.error('❌ Basic connection test failed:', testError);
+          return res.status(500).json({ 
+            error: 'Basic connection failed', 
+            details: testError.message 
+          });
+        }
+        
+        console.log('✅ Basic connection test successful');
+        
+        // Test risk_frameworks table
+        const { data: frameworks, error: frameworkError } = await supabase
+          .from('risk_frameworks')
+          .select('*');
+        
+        if (frameworkError) {
+          console.error('❌ Frameworks query failed:', frameworkError);
+          return res.status(500).json({ 
+            error: 'Frameworks query failed', 
+            details: frameworkError.message 
+          });
+        }
+        
+        console.log(`✅ Found ${frameworks?.length || 0} frameworks`);
+        
+        // Test framework_questions table
+        const { data: questions, error: questionsError } = await supabase
+          .from('framework_questions')
+          .select('*')
+          .limit(5);
+        
+        if (questionsError) {
+          console.error('❌ Questions query failed:', questionsError);
+          return res.status(500).json({ 
+            error: 'Questions query failed', 
+            details: questionsError.message 
+          });
+        }
+        
+        console.log(`✅ Found ${questions?.length || 0} questions (showing first 5)`);
+        
+        return res.json({
+          status: 'OK',
+          message: 'Database queries successful',
+          results: {
+            basicConnection: 'OK',
+            frameworksCount: frameworks?.length || 0,
+            questionsCount: questions?.length || 0,
+            sampleQuestions: questions?.slice(0, 3) || []
+          },
+          timestamp: new Date().toISOString()
+        });
+        
+      } catch (error) {
+        console.error('❌ Database test failed:', error);
+        return res.status(500).json({ 
+          error: 'Database test failed', 
+          details: error.message 
+        });
+      }
+    }
+    
+    // ============================================================================
     // ENVIRONMENT CHECK
     // ============================================================================
     if (path === '/api/check-env') {
