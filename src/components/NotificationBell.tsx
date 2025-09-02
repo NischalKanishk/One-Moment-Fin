@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@clerk/clerk-react';
 
 interface Notification {
   id: string;
@@ -29,12 +30,13 @@ export default function NotificationBell({ className }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { getToken } = useAuth();
 
   // Fetch notifications
   const fetchNotifications = async () => {
     try {
       setIsLoading(true);
-      const token = await window.Clerk?.session?.getToken();
+      const token = await getToken();
       
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/notifications`, {
         headers: {
@@ -57,7 +59,7 @@ export default function NotificationBell({ className }: NotificationBellProps) {
   // Fetch unread count only
   const fetchUnreadCount = async () => {
     try {
-      const token = await window.Clerk?.session?.getToken();
+      const token = await getToken();
       
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/notifications/count`, {
         headers: {
@@ -77,7 +79,7 @@ export default function NotificationBell({ className }: NotificationBellProps) {
   // Mark notification as read
   const markAsRead = async (notificationId: string) => {
     try {
-      const token = await window.Clerk?.session?.getToken();
+      const token = await getToken();
       
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/notifications/${notificationId}/read`, {
         method: 'PUT',
@@ -104,7 +106,7 @@ export default function NotificationBell({ className }: NotificationBellProps) {
   // Mark all as read
   const markAllAsRead = async () => {
     try {
-      const token = await window.Clerk?.session?.getToken();
+      const token = await getToken();
       
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/notifications/read-all`, {
         method: 'PUT',
