@@ -57,6 +57,10 @@
       "destination": "/api/[...path].js"
     },
     {
+      "source": "/a/(.*)",
+      "destination": "/index.html"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/[...path].js"
     },
