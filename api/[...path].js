@@ -21,7 +21,7 @@ module.exports = async function handler(req, res) {
     const urlObj = new URL(url, `http://localhost`);
     const path = urlObj.pathname;
     
-    console.log(`🔍 API Request: ${method} ${path} - v2.0`);
+    console.log(`🔍 API Request: ${method} ${path} - v2.1`);
     
     // ============================================================================
     // HEALTH CHECK
