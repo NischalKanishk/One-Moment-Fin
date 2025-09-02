@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/assessment/(.*)",
-      "destination": "/api/assessments.js"
+      "destination": "/api/[...path].js"
     },
     {
       "source": "/api/assessments/(.*)",
