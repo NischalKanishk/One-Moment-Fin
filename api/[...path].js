@@ -487,13 +487,128 @@ module.exports = async function handler(req, res) {
     }
     
     // ============================================================================
-    // ASSESSMENTS ENDPOINTS - Now handled by dedicated assessments.js file
+    // ASSESSMENTS ENDPOINTS - Handle directly since routing is not working
     // ============================================================================
     if (path.startsWith('/api/assessments')) {
-      // Assessments are now handled by the dedicated assessments.js file
-      return res.status(200).json({ 
-        message: 'Assessments endpoint redirected to dedicated file',
-        note: 'This endpoint is handled by /api/assessments.js'
+      const assessmentsPath = path.replace('/api/assessments', '');
+      
+      // GET /api/assessments/cfa/questions - Get CFA framework questions
+      if (method === 'GET' && assessmentsPath === '/cfa/questions') {
+        try {
+          const user = await authenticateUser(req);
+          if (!user?.supabase_user_id) {
+            return res.status(400).json({ error: 'User not properly authenticated' });
+          }
+
+          console.log('🔍 Getting CFA framework questions from database...');
+          console.log('🔍 Supabase client initialized:', !!supabase);
+          
+          // Get the CFA framework ID
+          const { data: framework, error: frameworkError } = await supabase
+            .from('risk_frameworks')
+            .select('id')
+            .eq('code', 'cfa_three_pillar_v1')
+            .single();
+          
+          if (frameworkError || !framework) {
+            console.error('❌ Error fetching CFA framework:', frameworkError);
+            console.error('❌ Framework data:', framework);
+            return res.status(500).json({ error: 'CFA framework not found', details: frameworkError?.message });
+          }
+          
+          console.log(`✅ Found CFA framework: ${framework.id}`);
+          
+          // Fetch questions from framework_questions table
+          const { data: questions, error: questionsError } = await supabase
+            .from('framework_questions')
+            .select('*')
+            .eq('framework_id', framework.id)
+            .order('order_index');
+          
+          if (questionsError) {
+            console.error('❌ Error fetching framework questions:', questionsError);
+            return res.status(500).json({ error: 'Failed to fetch framework questions', details: questionsError?.message });
+          }
+          
+          if (!questions || questions.length === 0) {
+            console.warn('⚠️ No questions found for CFA framework');
+            return res.json({ questions: [] });
+          }
+          
+          console.log(`✅ Returning ${questions.length} CFA framework questions from database`);
+          return res.json({ questions });
+        } catch (error) {
+          console.error('❌ Get CFA questions error:', error);
+          return res.status(500).json({ error: 'Failed to fetch CFA questions' });
+        }
+      }
+      
+      // GET /api/assessments/forms - List user assessment forms
+      if (method === 'GET' && assessmentsPath === '/forms') {
+        try {
+          const user = await authenticateUser(req);
+          if (!user?.supabase_user_id) {
+            return res.status(400).json({ error: 'User not properly authenticated' });
+          }
+
+          console.log('🔍 Getting assessment forms for user:', user.supabase_user_id);
+
+          // Get the CFA framework ID
+          const { data: framework, error: frameworkError } = await supabase
+            .from('risk_frameworks')
+            .select('id')
+            .eq('code', 'cfa_three_pillar_v1')
+            .single();
+          
+          if (frameworkError || !framework) {
+            console.error('❌ Error fetching CFA framework:', frameworkError);
+            return res.status(500).json({ error: 'CFA framework not found' });
+          }
+          
+          // Fetch questions from framework_questions table
+          const { data: questions, error: questionsError } = await supabase
+            .from('framework_questions')
+            .select('*')
+            .eq('framework_id', framework.id)
+            .order('order_index');
+          
+          if (questionsError) {
+            console.error('❌ Error fetching framework questions:', questionsError);
+            return res.status(500).json({ error: 'Failed to fetch framework questions' });
+          }
+
+          // Create a default CFA framework form with real questions
+          const defaultForm = {
+            id: 'cfa-default-form',
+            name: 'CFA Risk Assessment Form',
+            description: 'Industry-standard risk assessment based on CFA three-pillar framework',
+            is_active: true,
+            created_at: new Date().toISOString(),
+            questions: questions ? questions.map(q => ({
+              id: q.id,
+              question_text: q.label,
+              type: q.qtype,
+              options: q.options,
+              weight: 1,
+              required: q.required,
+              module: q.module,
+              order_index: q.order_index
+            })) : []
+          };
+
+          console.log(`✅ Returning CFA form with ${questions?.length || 0} questions from database`);
+          return res.json({ forms: [defaultForm] });
+        } catch (error) {
+          console.error('❌ Get forms error:', error);
+          return res.status(500).json({ error: 'Failed to fetch forms' });
+        }
+      }
+      
+      // Default assessments response
+      return res.status(404).json({
+        error: 'Assessment endpoint not found',
+        path: assessmentsPath,
+        method: method
       });
     }
     
