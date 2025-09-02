@@ -98,6 +98,7 @@ module.exports = async function handler(req, res) {
         }
 
         console.log('🔍 Getting CFA framework questions from database...');
+        console.log('🔍 Supabase client initialized:', !!supabase);
         
         // Get the CFA framework ID
         const { data: framework, error: frameworkError } = await supabase
@@ -108,7 +109,8 @@ module.exports = async function handler(req, res) {
         
         if (frameworkError || !framework) {
           console.error('❌ Error fetching CFA framework:', frameworkError);
-          return res.status(500).json({ error: 'CFA framework not found' });
+          console.error('❌ Framework data:', framework);
+          return res.status(500).json({ error: 'CFA framework not found', details: frameworkError?.message });
         }
         
         console.log(`✅ Found CFA framework: ${framework.id}`);
@@ -122,7 +124,7 @@ module.exports = async function handler(req, res) {
         
         if (questionsError) {
           console.error('❌ Error fetching framework questions:', questionsError);
-          return res.status(500).json({ error: 'Failed to fetch framework questions' });
+          return res.status(500).json({ error: 'Failed to fetch framework questions', details: questionsError?.message });
         }
         
         if (!questions || questions.length === 0) {
