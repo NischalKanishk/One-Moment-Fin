@@ -509,30 +509,29 @@ router.post('/check-existing', [
     if (existingLead) {
       // Check if they have completed an assessment
       let assessmentData = null;
-      if (existingLead.risk_profile_id) {
-        try {
-          const { data: submission, error: submissionError } = await supabase
-            .from('assessment_submissions')
-            .select(`
-              id,
-              answers,
-              result,
-              submitted_at
-            `)
-            .eq('id', existingLead.risk_profile_id)
-            .single();
+      try {
+        const { data: submissions, error: submissionsError } = await supabase
+          .from('assessment_submissions')
+          .select(`
+            id,
+            answers,
+            result,
+            submitted_at
+          `)
+          .eq('lead_id', existingLead.id)
+          .limit(1);
 
-          if (!submissionError && submission) {
-            assessmentData = {
-              submission,
-              hasAssessment: true,
-              riskScore: existingLead.risk_score,
-              riskBucket: existingLead.risk_bucket
-            };
-          }
-        } catch (error) {
-          console.log('Could not fetch assessment data for existing lead');
+        if (!submissionsError && submissions && submissions.length > 0) {
+          const submission = submissions[0];
+          assessmentData = {
+            submission,
+            hasAssessment: true,
+            riskScore: submission.result?.score,
+            riskBucket: submission.result?.bucket
+          };
         }
+      } catch (error) {
+        console.log('Could not fetch assessment data for existing lead');
       }
 
       return res.json({
@@ -633,13 +632,9 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
         email,
         phone,
         age,
-        risk_category,
         status,
         source_link,
         created_at,
-        risk_profile_id,
-        risk_bucket,
-        risk_score,
         notes
       `)
       .eq('id', id)
@@ -662,8 +657,8 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
         .from('assessment_submissions')
         .select(`
           id,
-          assessment_id,
           framework_version_id,
+          owner_id,
           answers,
           result,
           submitted_at,
@@ -685,22 +680,8 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
         
         console.log('🔍 Backend: Processed submissions:', assessmentSubmissions);
         
-        // Also update the lead with the risk profile data from the first submission
-        if (submissions[0].result) {
-          const { data: updateData, error: updateError } = await supabase
-            .from('leads')
-            .update({
-              risk_profile_id: submissions[0].id,
-              risk_bucket: submissions[0].result.bucket,
-              risk_score: submissions[0].result.score
-            })
-            .eq('id', lead.id)
-            .select();
-          
-          if (!updateError && updateData) {
-            updatedLead = { ...updatedLead, ...updateData[0] };
-          }
-        }
+        // Note: Risk profile data is stored in assessment_submissions table
+        // The lead table doesn't have risk_bucket, risk_score, or risk_profile_id fields
       } else {
         console.log('🔍 Backend: No submissions found or error occurred');
       }

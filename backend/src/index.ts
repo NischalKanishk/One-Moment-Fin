@@ -26,6 +26,7 @@ import aiRoutes from './routes/ai';
 import notificationsRoutes from './routes/notifications';
 import meetingsRoutes from './routes/meetings';
 import testRoutes from './routes/test';
+import debugRoutes from './routes/debug';
 
 
 const app = express();
@@ -111,6 +112,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/meetings', meetingsRoutes);
 app.use('/api/test', testRoutes);
+app.use('/api/debug', debugRoutes);
 
 // Public assessment routes
 app.use('/a', userAssessmentLinksRoutes); // User assessment links (e.g., /a/1677811521d31-5477-4cf8-b718-78a64536e553RFEMC)
