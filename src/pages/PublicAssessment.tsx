@@ -301,10 +301,27 @@ export default function PublicAssessment() {
       errors.push('Full name is required');
     }
     
-    if (!submitterInfo.email.trim()) {
-      errors.push('Email is required');
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(submitterInfo.email)) {
-      errors.push('Please enter a valid email address');
+    // Check that either email or phone is provided
+    const hasEmail = submitterInfo.email.trim() !== '';
+    const hasPhone = submitterInfo.phone.trim() !== '' && submitterInfo.phone !== '+91';
+    
+    if (!hasEmail && !hasPhone) {
+      errors.push('Please provide either email address or phone number');
+    }
+    
+    // Validate email if provided
+    if (hasEmail) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(submitterInfo.email)) {
+        errors.push('Please enter a valid email address');
+      }
+    }
+    
+    // Validate phone if provided
+    if (hasPhone) {
+      const phoneNumber = submitterInfo.phone.replace('+91', '').trim();
+      if (phoneNumber.length !== 10 || !/^\d{10}$/.test(phoneNumber)) {
+        errors.push('Phone number must be exactly 10 digits');
+      }
     }
     
     // Check age if provided
@@ -312,19 +329,19 @@ export default function PublicAssessment() {
       errors.push('Age must be between 18 and 100');
     }
     
-    // Check phone if provided
-    if (submitterInfo.phone && submitterInfo.phone !== '+91') {
-      const phoneNumber = submitterInfo.phone.replace('+91', '').trim();
-      if (phoneNumber.length !== 10 || !/^\d{10}$/.test(phoneNumber)) {
-        errors.push('Phone number must be 10 digits');
-      }
-    }
-    
     // Check required questions
     questions.forEach(question => {
       if (question.required) {
         const answer = answers[question.qkey];
-        if (!answer || 
+        
+        if (question.qtype === 'multiple') {
+          // For multiple choice, check if at least one option is selected
+          if (!answer || !Array.isArray(answer) || answer.length === 0) {
+            errors.push(`${question.label} is required`);
+          } else if (answer.length > 5) {
+            errors.push(`${question.label}: Please select maximum 5 options`);
+          }
+        } else if (!answer || 
             (Array.isArray(answer) && answer.length === 0) || 
             (typeof answer === 'string' && answer.trim() === '')) {
           errors.push(`${question.label} is required`);
@@ -749,8 +766,8 @@ export default function PublicAssessment() {
                   id="email"
                   type="email"
                   value={submitterInfo.email}
-                  onChange={(e) => setSubmitterInfo(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="Enter your email address"
+                  onChange={(e) => setSubmitterInfo(prev => ({ ...prev, email: e.target.value.trim() }))}
+                  placeholder="Enter your email address (e.g., user@example.com)"
                 />
                 <p className="text-xs text-muted-foreground">
                   Provide either email or phone number to continue
@@ -766,17 +783,32 @@ export default function PublicAssessment() {
                     value={submitterInfo.phone}
                     onChange={(e) => {
                       let value = e.target.value;
+                      // Remove any non-digit characters except +91 prefix
+                      value = value.replace(/[^\d+]/g, '');
+                      
+                      // Ensure +91 prefix
                       if (!value.startsWith('+91')) {
                         value = '+91' + value.replace('+91', '');
                       }
+                      
+                      // Limit to 10 digits after +91
+                      const digits = value.replace('+91', '');
+                      if (digits.length > 10) {
+                        value = '+91' + digits.substring(0, 10);
+                      }
+                      
                       setSubmitterInfo(prev => ({ ...prev, phone: value }));
                     }}
-                    placeholder="Enter your phone number"
+                    placeholder="Enter your 10-digit phone number"
+                    maxLength={13} // +91 + 10 digits
                   />
                   <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
                     +91
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Enter exactly 10 digits (e.g., 9876543210)
+                </p>
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -948,6 +980,36 @@ export default function PublicAssessment() {
                             );
                           })}
                         </div>
+                      ) : questions[currentQuestionIndex].qtype === 'multiple' && questions[currentQuestionIndex].options && questions[currentQuestionIndex].options.length > 0 ? (
+                        <div className="space-y-3">
+                          {questions[currentQuestionIndex].options.map((option: any, optionIndex: number) => {
+                            const optionValue = typeof option === 'string' ? option : option.value;
+                            const optionLabel = typeof option === 'string' ? option : option.label;
+                            
+                            return (
+                              <div key={optionIndex} className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+                                <input
+                                  type="checkbox"
+                                  id={`${questions[currentQuestionIndex].qkey}-${optionIndex}`}
+                                  checked={answers[questions[currentQuestionIndex].qkey]?.includes(optionValue) || false}
+                                  onChange={(e) => {
+                                    const currentValues = answers[questions[currentQuestionIndex].qkey] || [];
+                                    if (e.target.checked) {
+                                      handleAnswerChange(questions[currentQuestionIndex].qkey, [...currentValues, optionValue]);
+                                    } else {
+                                      handleAnswerChange(questions[currentQuestionIndex].qkey, currentValues.filter((v: string) => v !== optionValue));
+                                    }
+                                  }}
+                                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                />
+                                <Label htmlFor={`${questions[currentQuestionIndex].qkey}-${optionIndex}`} className="text-base cursor-pointer flex-1">
+                                  {optionLabel}
+                                </Label>
+                              </div>
+                            );
+                          })}
+                          <p className="text-sm text-gray-500 mt-2">Select up to 5 options</p>
+                        </div>
                       ) : questions[currentQuestionIndex].qtype === 'single' && questions[currentQuestionIndex].options && questions[currentQuestionIndex].options.length > 0 ? (
                         <RadioGroup
                           value={answers[questions[currentQuestionIndex].qkey] || ''}
@@ -1035,6 +1097,13 @@ export default function PublicAssessment() {
                             Enter a value between {questions[currentQuestionIndex].options?.min || 0}% and {questions[currentQuestionIndex].options?.max || 100}%
                           </p>
                         </div>
+                      ) : questions[currentQuestionIndex].qtype === 'text' ? (
+                        <Input
+                          value={answers[questions[currentQuestionIndex].qkey] || ''}
+                          onChange={(e) => handleAnswerChange(questions[currentQuestionIndex].qkey, e.target.value)}
+                          placeholder="Enter your answer"
+                          className="w-full"
+                        />
                       ) : (
                         <Textarea
                           value={answers[questions[currentQuestionIndex].qkey] || ''}
