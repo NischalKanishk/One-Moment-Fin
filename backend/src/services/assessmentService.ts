@@ -393,11 +393,7 @@ export class AssessmentService {
               phone: submitterInfo.phone,
               age: submitterInfo.age,
               source_link: sourceLink || `Assessment: ${assessment.title}`,
-              status: 'assessment_done',
-              risk_profile_id: submission.id,
-              risk_bucket: result.bucket,
-              risk_score: result.score,
-              risk_category: result.bucket
+              status: 'assessment_done'
             })
             .select()
             .single();
@@ -420,11 +416,7 @@ export class AssessmentService {
             phone: submitterInfo.phone,
             age: submitterInfo.age,
             source_link: sourceLink || `Assessment: ${assessment.title}`,
-            status: 'assessment_done',
-            risk_profile_id: submission.id,
-            risk_bucket: result.bucket,
-            risk_score: result.score,
-            risk_category: result.bucket
+            status: 'assessment_done'
           })
           .select()
           .single();

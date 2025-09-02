@@ -720,9 +720,8 @@ module.exports = async function handler(req, res) {
               email: submitterInfo.email,
               phone: submitterInfo.phone || null,
               age: submitterInfo.age ? parseInt(submitterInfo.age) : null,
-              source: 'assessment_link',
-              status: 'new',
-              assessment_answers: answers
+              source_link: 'assessment_link',
+              status: 'assessment_done'
             })
             .select()
             .single();
