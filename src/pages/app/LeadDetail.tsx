@@ -190,6 +190,13 @@ export default function LeadDetail() {
   const [canDelete, setCanDelete] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
+  const [savingSipForecast, setSavingSipForecast] = useState(false);
+  const [savedSipForecast, setSavedSipForecast] = useState<{
+    monthly: number;
+    years: number;
+    returnPct: number;
+    inflationPct: number;
+  } | null>(null);
 
 
   const form = useForm<EditFormData>({
@@ -403,6 +410,43 @@ export default function LeadDetail() {
       });
     } finally {
       setSavingNotes(false);
+    }
+  };
+
+  const handleSaveSipForecast = async (values: { monthly: number; years: number; returnPct: number; inflationPct: number }) => {
+    if (!lead) return;
+    
+    try {
+      setSavingSipForecast(true);
+      const token = await getToken();
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      await leadsAPI.update(token, lead.id, {
+        sip_forecast: {
+          monthly_investment: values.monthly,
+          years: values.years,
+          expected_return_pct: values.returnPct,
+          inflation_pct: values.inflationPct,
+          saved_at: new Date().toISOString()
+        }
+      });
+
+      setSavedSipForecast(values);
+      toast({
+        title: "Success",
+        description: "SIP forecast saved successfully!",
+      });
+    } catch (error: any) {
+      console.error('Failed to save SIP forecast:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save SIP forecast. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingSipForecast(false);
     }
   };
 
@@ -1380,6 +1424,9 @@ export default function LeadDetail() {
               defaultReturnPct={12}
               defaultInflationPct={6}
               className="border-0 shadow-none"
+              onSave={handleSaveSipForecast}
+              isSaving={savingSipForecast}
+              showSaveButton={true}
             />
           </div>
         </TabsContent>

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Button } from "@/components/ui/button";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 
 /** Simple currency formatter (₹ by default). Tweak as needed. */
@@ -19,6 +20,9 @@ interface SipForecasterProps {
   defaultInflationPct?: number;
   currencyFormatter?: (n: number) => string;
   className?: string;
+  onSave?: (values: { monthly: number; years: number; returnPct: number; inflationPct: number }) => void;
+  isSaving?: boolean;
+  showSaveButton?: boolean;
 }
 
 export default function SipForecaster({
@@ -28,6 +32,9 @@ export default function SipForecaster({
   defaultInflationPct = 5,
   currencyFormatter = fmtINR,
   className = "",
+  onSave,
+  isSaving = false,
+  showSaveButton = true,
 }: SipForecasterProps) {
   const [monthly, setMonthly] = useState<number>(defaultMonthly);
   const [years, setYears] = useState<number>(defaultYears);
@@ -50,13 +57,35 @@ export default function SipForecaster({
     };
   }, [monthly, years, retPct, inflPct]);
 
+  const handleSave = () => {
+    if (onSave) {
+      onSave({
+        monthly,
+        years,
+        returnPct: retPct,
+        inflationPct: inflPct,
+      });
+    }
+  };
+
   return (
     <Card className={`p-6 space-y-6 ${className}`}>
       <CardHeader className="pb-4">
-        <CardTitle className="text-xl font-semibold flex items-center gap-2">
-          <span className="text-2xl">📈</span>
-          SIP Forecaster
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-xl font-semibold flex items-center gap-2">
+            <span className="text-2xl">📈</span>
+            SIP Forecaster
+          </CardTitle>
+          {showSaveButton && onSave && (
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {isSaving ? 'Saving...' : 'Save Forecast'}
+            </Button>
+          )}
+        </div>
       </CardHeader>
       
       <CardContent className="space-y-6">

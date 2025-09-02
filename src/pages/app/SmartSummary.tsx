@@ -20,6 +20,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { leadsAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import SipForecasterReadOnly from "@/components/SipForecasterReadOnly";
 
 // Question mapping for better display
 const CFA_QUESTION_MAPPING: Record<string, string> = {
@@ -55,6 +56,49 @@ const CFA_QUESTION_MAPPING: Record<string, string> = {
 // Helper function to format question text
 const formatQuestionText = (questionKey: string) => {
   return CFA_QUESTION_MAPPING[questionKey] || questionKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
+// Helper function to extract monthly investment amount from lead data
+const extractMonthlyInvestmentAmount = (lead: Lead): number => {
+  // First, try to find monthly investment in assessment submissions
+  if (lead.assessment_submissions && lead.assessment_submissions.length > 0) {
+    const latestSubmission = lead.assessment_submissions[0];
+    const answers = latestSubmission.answers;
+    
+    // Look for various possible keys that might contain monthly investment
+    const possibleKeys = [
+      'monthly_investment',
+      'monthly_investment_amount',
+      'investment_amount',
+      'monthly_amount',
+      'sip_amount',
+      'monthly_sip'
+    ];
+    
+    for (const key of possibleKeys) {
+      if (answers[key]) {
+        const value = Number(answers[key]);
+        if (!isNaN(value) && value > 0) {
+          return value;
+        }
+      }
+    }
+  }
+  
+  // Fallback to cfa_min_investment if available
+  if (lead.cfa_min_investment) {
+    // Try to extract number from the string (e.g., "₹15,000" -> 15000)
+    const match = lead.cfa_min_investment.match(/[\d,]+/);
+    if (match) {
+      const value = Number(match[0].replace(/,/g, ''));
+      if (!isNaN(value) && value > 0) {
+        return value;
+      }
+    }
+  }
+  
+  // Default fallback
+  return 15000;
 };
 
 interface Lead {
@@ -562,7 +606,7 @@ export default function SmartSummary() {
           <Card className="border-0 shadow-sm bg-white">
             <CardContent className="p-0">
               <Tabs defaultValue="questions" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 bg-white border-b border-gray-200 rounded-none p-0 h-14">
+                <TabsList className="grid w-full grid-cols-3 bg-white border-b border-gray-200 rounded-none p-0 h-14">
                   <TabsTrigger 
                     value="questions" 
                     className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:border-blue-200 data-[state=active]:shadow-sm rounded-none h-14 transition-all duration-200 font-medium border-b-2 data-[state=active]:border-b-blue-500"
@@ -576,6 +620,13 @@ export default function SmartSummary() {
                   >
                     <FileText className="h-4 w-4 mr-2" />
                     Notes
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="sip" 
+                    className="data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:border-emerald-200 data-[state=active]:shadow-sm rounded-none h-14 transition-all duration-200 font-medium border-b-2 data-[state=active]:border-b-emerald-500"
+                  >
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    SIP Forecast
                   </TabsTrigger>
                 </TabsList>
                 
@@ -660,26 +711,39 @@ export default function SmartSummary() {
                   )}
                 </TabsContent>
                 
-                <TabsContent value="notes" className="p-6">
-                  {lead.notes ? (
-                    <div className="space-y-4">
-                      <div className="p-4 bg-amber-50 rounded-lg border-l-4 border-amber-300">
-                        <div className="text-sm text-amber-800 whitespace-pre-wrap">
-                          {lead.notes}
-                        </div>
+                <TabsContent value="sip" className="p-6">
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center">
+                        <TrendingUp className="w-7 h-7 text-emerald-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-900">SIP Investment Forecast</h3>
+                        <p className="text-sm text-gray-600">Investment projection for {lead.full_name}</p>
+                        {lead && (
+                          <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                            <p className="text-xs text-blue-700">
+                              💡 Monthly investment amount pre-filled from: {
+                                lead.assessment_submissions?.[0]?.answers?.monthly_investment ? 'Assessment submission' :
+                                lead.assessment_submissions?.[0]?.answers?.investment_amount ? 'Assessment submission' :
+                                lead.cfa_min_investment ? 'CFA minimum investment' : 'Default value'
+                              }
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <FileText className="h-8 w-8 text-gray-400" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No Notes Available</h3>
-                      <p className="text-gray-600 max-w-md mx-auto">
-                        No notes have been added for this lead yet. Add notes to track important information and insights.
-                      </p>
-                    </div>
-                  )}
+                    
+                    <SipForecasterReadOnly
+                      monthlyInvestment={extractMonthlyInvestmentAmount(lead)}
+                      years={15}
+                      expectedAnnualReturnPct={12}
+                      inflationPct={6}
+                      showEditButton={false}
+                      showSaveButton={false}
+                      className="border-0 shadow-none"
+                    />
+                  </div>
                 </TabsContent>
               </Tabs>
             </CardContent>
