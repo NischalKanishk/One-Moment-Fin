@@ -380,6 +380,7 @@ export default function AssessmentsV2() {
     switch (module) {
       case 'profile': return <Users className="w-4 h-4" />;
       case 'capacity': return <TrendingUp className="w-4 h-4" />;
+      case 'tolerance': return <Brain className="w-4 h-4" />;
       case 'behavior': return <Brain className="w-4 h-4" />;
       case 'knowledge': return <Lightbulb className="w-4 h-4" />;
       case 'need': return <TargetIcon className="w-4 h-4" />;
@@ -392,6 +393,7 @@ export default function AssessmentsV2() {
     switch (module) {
       case 'profile': return 'Profile & Goals';
       case 'capacity': return 'Financial Capacity';
+      case 'tolerance': return 'Risk Tolerance';
       case 'behavior': return 'Risk Tolerance';
       case 'knowledge': return 'Market Knowledge';
       case 'need': return 'Return Requirements';
@@ -404,6 +406,7 @@ export default function AssessmentsV2() {
     switch (module) {
       case 'profile': return 'bg-blue-50 border-blue-200 text-blue-800';
       case 'capacity': return 'bg-green-50 border-green-200 text-green-800';
+      case 'tolerance': return 'bg-purple-50 border-purple-200 text-purple-800';
       case 'behavior': return 'bg-purple-50 border-purple-200 text-purple-800';
       case 'knowledge': return 'bg-orange-50 border-orange-200 text-orange-800';
       case 'need': return 'bg-red-50 border-red-200 text-red-800';
