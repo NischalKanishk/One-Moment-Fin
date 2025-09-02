@@ -47,10 +47,18 @@ module.exports = async function handler(req, res) {
           risk_category 
         } = req.query;
 
-        // Build the query
+        // Build the query with assessment submissions data
         let query = supabase
           .from('leads')
-          .select('*', { count: 'exact' })
+          .select(`
+            *,
+            assessment_submissions(
+              id,
+              result,
+              submitted_at,
+              status
+            )
+          `, { count: 'exact' })
           .eq('user_id', user.supabase_user_id);
 
         // Apply filters
@@ -86,12 +94,32 @@ module.exports = async function handler(req, res) {
           return res.status(500).json({ error: 'Database query failed', details: error.message });
         }
 
+        // Process leads to extract risk assessment data
+        const processedLeads = (leads || []).map(lead => {
+          // Get the latest assessment submission
+          const latestSubmission = lead.assessment_submissions && lead.assessment_submissions.length > 0 
+            ? lead.assessment_submissions[0] 
+            : null;
+
+          // Extract risk data from assessment submission
+          const riskData = latestSubmission?.result || {};
+          
+          return {
+            ...lead,
+            risk_bucket: riskData.bucket || null,
+            risk_score: riskData.score || null,
+            risk_category: riskData.bucket || 'Not Assessed',
+            // Keep the full assessment_submissions array for detailed views
+            assessment_submissions: lead.assessment_submissions || []
+          };
+        });
+
         const totalPages = Math.ceil((count || 0) / limitNum);
         
-        console.log(`✅ Found ${leads?.length || 0} leads for user`);
+        console.log(`✅ Found ${processedLeads?.length || 0} leads for user`);
         
         return res.json({ 
-          leads: leads || [],
+          leads: processedLeads,
           pagination: {
             page: pageNum,
             limit: limitNum,

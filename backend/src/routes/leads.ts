@@ -283,7 +283,13 @@ router.get('/', authenticateUser, [
           status,
           source_link,
           created_at,
-          notes
+          notes,
+          assessment_submissions(
+            id,
+            result,
+            submitted_at,
+            status
+          )
         `, { count: 'exact' })
         .eq('user_id', user_id); // Filter by user_id manually since we're using service role
 
@@ -340,10 +346,30 @@ router.get('/', authenticateUser, [
         console.log('🔍 Leads: Sample lead data:', leads[0]);
       }
 
+      // Process leads to extract risk assessment data
+      const processedLeads = (leads || []).map(lead => {
+        // Get the latest assessment submission
+        const latestSubmission = lead.assessment_submissions && lead.assessment_submissions.length > 0 
+          ? lead.assessment_submissions[0] 
+          : null;
+
+        // Extract risk data from assessment submission
+        const riskData = latestSubmission?.result || {};
+        
+        return {
+          ...lead,
+          risk_bucket: riskData.bucket || null,
+          risk_score: riskData.score || null,
+          risk_category: riskData.bucket || 'Not Assessed',
+          // Keep the full assessment_submissions array for detailed views
+          assessment_submissions: lead.assessment_submissions || []
+        };
+      });
+
       const totalPages = Math.ceil((count || 0) / limit);
       
       return res.json({ 
-        leads: leads || [],
+        leads: processedLeads,
         pagination: {
           page,
           limit,
