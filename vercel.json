@@ -49,6 +49,14 @@
       "destination": "/api/[...path].js"
     },
     {
+      "source": "/api/notifications/(.*)",
+      "destination": "/api/[...path].js"
+    },
+    {
+      "source": "/api/notifications",
+      "destination": "/api/[...path].js"
+    },
+    {
       "source": "/assets/(.*)",
       "destination": "/assets/$1"
     },

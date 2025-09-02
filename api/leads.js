@@ -226,6 +226,33 @@ module.exports = async function handler(req, res) {
         }
 
         console.log(`✅ Created lead: ${leadData.full_name}`);
+        
+        // Create notification for new lead
+        try {
+          const { error: notificationError } = await supabase
+            .from('notifications')
+            .insert({
+              user_id: user.supabase_user_id,
+              type: 'new_lead',
+              title: 'New Lead Added',
+              message: `${leadData.full_name} has been added to your leads`,
+              data: {
+                lead_id: leadData.id,
+                lead_name: leadData.full_name,
+                source: leadData.source_link
+              },
+              priority: 'medium'
+            });
+          
+          if (notificationError) {
+            console.error('Failed to create notification:', notificationError);
+          } else {
+            console.log('✅ Notification created for new lead');
+          }
+        } catch (notificationErr) {
+          console.error('Notification creation error:', notificationErr);
+        }
+        
         return res.json({ message: 'Lead created successfully', lead: leadData });
       } catch (error) {
         console.error('Lead creation error:', error);

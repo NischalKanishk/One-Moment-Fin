@@ -747,6 +747,34 @@ module.exports = async function handler(req, res) {
           };
           
           console.log('✅ Assessment submitted successfully for lead:', lead.id);
+          
+          // Create notification for assessment completion
+          try {
+            const { error: notificationError } = await supabase
+              .from('notifications')
+              .insert({
+                user_id: user.id,
+                type: 'assessment_completed',
+                title: 'Assessment Completed',
+                message: `${submitterInfo.full_name} has completed the risk assessment`,
+                data: {
+                  lead_id: lead.id,
+                  lead_name: submitterInfo.full_name,
+                  risk_score: riskScore,
+                  risk_bucket: riskBucket
+                },
+                priority: 'high'
+              });
+            
+            if (notificationError) {
+              console.error('Failed to create assessment notification:', notificationError);
+            } else {
+              console.log('✅ Notification created for assessment completion');
+            }
+          } catch (notificationErr) {
+            console.error('Assessment notification creation error:', notificationErr);
+          }
+          
           return res.json({ 
             message: 'Assessment submitted successfully',
             result,
@@ -766,6 +794,192 @@ module.exports = async function handler(req, res) {
       });
     }
     
+    // ============================================================================
+    // NOTIFICATIONS ENDPOINTS
+    // ============================================================================
+    if (path.startsWith('/api/notifications')) {
+      const notificationsPath = path.replace('/api/notifications', '');
+      
+      // GET /api/notifications - Get user notifications
+      if (method === 'GET' && notificationsPath === '') {
+        try {
+          const user = await authenticateUser(req);
+          if (!user?.supabase_user_id) {
+            return res.status(401).json({ error: 'Unauthorized' });
+          }
+
+          const { page = 1, limit = 20, unread_only = false } = req.query;
+          const offset = (page - 1) * limit;
+
+          let query = supabase
+            .from('notifications')
+            .select('*')
+            .eq('user_id', user.supabase_user_id)
+            .order('created_at', { ascending: false })
+            .range(offset, offset + limit - 1);
+
+          if (unread_only === 'true') {
+            query = query.eq('is_read', false);
+          }
+
+          const { data: notifications, error } = await query;
+
+          if (error) {
+            console.error('Error fetching notifications:', error);
+            return res.status(500).json({ error: 'Failed to fetch notifications' });
+          }
+
+          // Get unread count
+          const { count: unreadCount } = await supabase
+            .from('notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.supabase_user_id)
+            .eq('is_read', false);
+
+          return res.json({
+            notifications,
+            unread_count: unreadCount || 0,
+            pagination: {
+              page: parseInt(page),
+              limit: parseInt(limit),
+              has_more: notifications.length === parseInt(limit)
+            }
+          });
+        } catch (error) {
+          console.error('❌ Get notifications error:', error);
+          return res.status(500).json({ error: 'Failed to fetch notifications' });
+        }
+      }
+
+      // GET /api/notifications/count - Get unread notification count
+      if (method === 'GET' && notificationsPath === '/count') {
+        try {
+          const user = await authenticateUser(req);
+          if (!user?.supabase_user_id) {
+            return res.status(401).json({ error: 'Unauthorized' });
+          }
+
+          const { count, error } = await supabase
+            .from('notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.supabase_user_id)
+            .eq('is_read', false);
+
+          if (error) {
+            console.error('Error fetching notification count:', error);
+            return res.status(500).json({ error: 'Failed to fetch notification count' });
+          }
+
+          return res.json({ unread_count: count || 0 });
+        } catch (error) {
+          console.error('❌ Get notification count error:', error);
+          return res.status(500).json({ error: 'Failed to fetch notification count' });
+        }
+      }
+
+      // PUT /api/notifications/:id/read - Mark notification as read
+      if (method === 'PUT' && notificationsPath.match(/^\/[^\/]+\/read$/)) {
+        try {
+          const user = await authenticateUser(req);
+          if (!user?.supabase_user_id) {
+            return res.status(401).json({ error: 'Unauthorized' });
+          }
+
+          const notificationId = notificationsPath.split('/')[1];
+
+          const { error } = await supabase
+            .from('notifications')
+            .update({ 
+              is_read: true, 
+              read_at: new Date().toISOString() 
+            })
+            .eq('id', notificationId)
+            .eq('user_id', user.supabase_user_id);
+
+          if (error) {
+            console.error('Error marking notification as read:', error);
+            return res.status(500).json({ error: 'Failed to mark notification as read' });
+          }
+
+          return res.json({ success: true });
+        } catch (error) {
+          console.error('❌ Mark notification read error:', error);
+          return res.status(500).json({ error: 'Failed to mark notification as read' });
+        }
+      }
+
+      // PUT /api/notifications/read-all - Mark all notifications as read
+      if (method === 'PUT' && notificationsPath === '/read-all') {
+        try {
+          const user = await authenticateUser(req);
+          if (!user?.supabase_user_id) {
+            return res.status(401).json({ error: 'Unauthorized' });
+          }
+
+          const { error } = await supabase
+            .from('notifications')
+            .update({ 
+              is_read: true, 
+              read_at: new Date().toISOString() 
+            })
+            .eq('user_id', user.supabase_user_id)
+            .eq('is_read', false);
+
+          if (error) {
+            console.error('Error marking all notifications as read:', error);
+            return res.status(500).json({ error: 'Failed to mark all notifications as read' });
+          }
+
+          return res.json({ success: true });
+        } catch (error) {
+          console.error('❌ Mark all notifications read error:', error);
+          return res.status(500).json({ error: 'Failed to mark all notifications as read' });
+        }
+      }
+
+      // POST /api/notifications - Create notification (admin only)
+      if (method === 'POST' && notificationsPath === '') {
+        try {
+          const user = await authenticateUser(req);
+          if (!user?.supabase_user_id) {
+            return res.status(401).json({ error: 'Unauthorized' });
+          }
+
+          const { user_id, type, title, message, data, priority = 'medium', expires_at } = req.body;
+
+          if (!user_id || !type || !title || !message) {
+            return res.status(400).json({ error: 'Missing required fields' });
+          }
+
+          const { data: notification, error } = await supabase
+            .from('notifications')
+            .insert({
+              user_id,
+              type,
+              title,
+              message,
+              data,
+              priority,
+              expires_at
+            })
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error creating notification:', error);
+            return res.status(500).json({ error: 'Failed to create notification' });
+          }
+
+          return res.status(201).json(notification);
+        } catch (error) {
+          console.error('❌ Create notification error:', error);
+          return res.status(500).json({ error: 'Failed to create notification' });
+        }
+      }
+
+      return res.status(404).json({ error: 'Notification endpoint not found' });
+    }
+
     // ============================================================================
     // ASSESSMENTS ENDPOINTS - Handle directly since routing is not working
     // ============================================================================
