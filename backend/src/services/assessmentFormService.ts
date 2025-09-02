@@ -369,14 +369,14 @@ export class AssessmentFormService {
     const { data: submission, error: submissionError } = await supabase
       .from('assessment_submissions')
       .insert({
-        user_id: data.userId,
+        owner_id: data.userId, // Use owner_id instead of user_id
         lead_id: data.leadId,
-        form_id: data.formId,
-        version_id: data.versionId,
-        filled_by: data.filledBy,
+        framework_version_id: data.versionId, // Use framework_version_id instead of version_id
         answers: data.answers,
-        score,
-        risk_category: riskCategory
+        result: {
+          score: score,
+          bucket: riskCategory
+        }
       })
       .select()
       .single();
@@ -396,12 +396,11 @@ export class AssessmentFormService {
       .from('assessment_submissions')
       .select(`
         *,
-        form:assessment_forms(name),
-        version:assessment_form_versions(version)
+        version:risk_framework_versions(version)
       `)
-      .eq('user_id', userId)
+      .eq('owner_id', userId) // Use owner_id instead of user_id
       .eq('lead_id', leadId)
-      .order('created_at', { ascending: false });
+      .order('submitted_at', { ascending: false }); // Use submitted_at instead of created_at
 
     if (error) {
       throw new Error(`Failed to fetch lead submissions: ${error.message}`);

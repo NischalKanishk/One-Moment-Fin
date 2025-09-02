@@ -651,11 +651,9 @@ router.post('/submit', [
     const { data: submission, error: submissionError } = await supabase
       .from('assessment_submissions')
       .insert({
-        user_id: lead.user_id,
+        owner_id: lead.user_id, // Use owner_id instead of user_id
         lead_id: lead_id,
-        form_id: assessment_id,
-        version_id: version.id,
-        filled_by: 'lead',
+        framework_version_id: version.id, // Use framework_version_id instead of version_id
         answers: responses,
         status: 'submitted'
       })

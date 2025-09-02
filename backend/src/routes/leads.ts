@@ -280,13 +280,10 @@ router.get('/', authenticateUser, [
           email,
           phone,
           age,
-          risk_category,
           status,
           source_link,
           created_at,
-          risk_profile_id,
-          risk_bucket,
-          risk_score
+          notes
         `, { count: 'exact' })
         .eq('user_id', user_id); // Filter by user_id manually since we're using service role
 

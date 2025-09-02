@@ -325,8 +325,7 @@ export class AssessmentService {
       const { data: submission, error: submissionError } = await supabase
         .from('assessment_submissions')
         .insert({
-          assessment_id: assessmentId,
-          framework_id: assessment.framework_id,
+          framework_version_id: assessment.framework_id, // Use framework_version_id instead of assessment_id
           owner_id: assessment.user_id,
           submitted_at: new Date().toISOString(),
           answers: answers,
