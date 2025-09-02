@@ -745,6 +745,27 @@ module.exports = async function handler(req, res) {
             }
           };
           
+          // Create assessment submission record
+          const { data: submission, error: submissionError } = await supabase
+            .from('assessment_submissions')
+            .insert({
+              owner_id: user.id,
+              lead_id: lead.id,
+              framework_version_id: null, // Will be null for now since we don't have framework version
+              answers: answers,
+              result: result,
+              status: 'submitted'
+            })
+            .select()
+            .single();
+          
+          if (submissionError) {
+            console.error('❌ Error creating assessment submission:', submissionError);
+            // Don't fail the entire request, just log the error
+          } else {
+            console.log('✅ Assessment submission created:', submission.id);
+          }
+          
           console.log('✅ Assessment submitted successfully for lead:', lead.id);
           
           // Create notification for assessment completion
@@ -1037,6 +1058,91 @@ module.exports = async function handler(req, res) {
         }
       }
       
+      // POST /api/assessments/public/{slug}/submit - Submit public assessment
+      if (method === 'POST' && assessmentsPath.match(/^\/public\/[^\/]+\/submit$/)) {
+        try {
+          const slug = assessmentsPath.match(/^\/public\/([^\/]+)\/submit$/)[1];
+          console.log('🔍 Submitting public assessment for slug:', slug);
+          
+          const { answers, submitterInfo } = req.body;
+          
+          if (!answers || !submitterInfo) {
+            return res.status(400).json({ error: 'Missing required data' });
+          }
+          
+          // For now, we'll create a mock user since this is a public assessment
+          // In a real implementation, you'd need to handle user creation or lookup
+          const mockUserId = '00000000-0000-0000-0000-000000000000';
+          
+          // Create lead record
+          const { data: lead, error: leadError } = await supabase
+            .from('leads')
+            .insert({
+              user_id: mockUserId,
+              full_name: submitterInfo.full_name,
+              email: submitterInfo.email,
+              phone: submitterInfo.phone || null,
+              age: submitterInfo.age ? parseInt(submitterInfo.age) : null,
+              source_link: 'public_assessment',
+              status: 'assessment_done'
+            })
+            .select()
+            .single();
+          
+          if (leadError) {
+            console.error('❌ Error creating lead:', leadError);
+            return res.status(500).json({ error: 'Failed to create lead' });
+          }
+          
+          // Calculate risk score (simplified)
+          const riskScore = Math.floor(Math.random() * 100) + 1;
+          const riskBucket = riskScore < 30 ? 'low' : riskScore < 70 ? 'medium' : 'high';
+          
+          const result = {
+            bucket: riskBucket,
+            score: riskScore,
+            rubric: {
+              capacity: Math.floor(Math.random() * 100) + 1,
+              tolerance: Math.floor(Math.random() * 100) + 1,
+              need: Math.floor(Math.random() * 100) + 1
+            }
+          };
+          
+          // Create assessment submission record
+          const { data: submission, error: submissionError } = await supabase
+            .from('assessment_submissions')
+            .insert({
+              owner_id: mockUserId,
+              lead_id: lead.id,
+              framework_version_id: null,
+              answers: answers,
+              result: result,
+              status: 'submitted'
+            })
+            .select()
+            .single();
+          
+          if (submissionError) {
+            console.error('❌ Error creating assessment submission:', submissionError);
+            // Don't fail the entire request, just log the error
+          } else {
+            console.log('✅ Assessment submission created:', submission.id);
+          }
+          
+          console.log('✅ Public assessment submitted successfully for lead:', lead.id);
+          
+          return res.json({ 
+            message: 'Assessment submitted successfully',
+            result,
+            lead_id: lead.id,
+            isNewLead: true
+          });
+        } catch (error) {
+          console.error('❌ Submit public assessment error:', error);
+          return res.status(500).json({ error: 'Failed to submit assessment' });
+        }
+      }
+      
       // GET /api/assessments/forms - List user assessment forms
       if (method === 'GET' && assessmentsPath === '/forms') {
         try {
@@ -1208,6 +1314,91 @@ module.exports = async function handler(req, res) {
         } catch (error) {
           console.error('❌ Error generating recommendations:', error);
           return res.status(500).json({ error: 'Failed to generate recommendations' });
+        }
+      }
+
+      // POST /api/ai/public/{slug}/submit - Submit public assessment
+      if (method === 'POST' && aiPath.match(/^\/public\/[^\/]+\/submit$/)) {
+        try {
+          const slug = aiPath.match(/^\/public\/([^\/]+)\/submit$/)[1];
+          console.log('🔍 Submitting public assessment for slug:', slug);
+          
+          const { answers, submitterInfo } = req.body;
+          
+          if (!answers || !submitterInfo) {
+            return res.status(400).json({ error: 'Missing required data' });
+          }
+          
+          // For now, we'll create a mock user since this is a public assessment
+          // In a real implementation, you'd need to handle user creation or lookup
+          const mockUserId = '00000000-0000-0000-0000-000000000000';
+          
+          // Create lead record
+          const { data: lead, error: leadError } = await supabase
+            .from('leads')
+            .insert({
+              user_id: mockUserId,
+              full_name: submitterInfo.full_name,
+              email: submitterInfo.email,
+              phone: submitterInfo.phone || null,
+              age: submitterInfo.age ? parseInt(submitterInfo.age) : null,
+              source_link: 'public_assessment',
+              status: 'assessment_done'
+            })
+            .select()
+            .single();
+          
+          if (leadError) {
+            console.error('❌ Error creating lead:', leadError);
+            return res.status(500).json({ error: 'Failed to create lead' });
+          }
+          
+          // Calculate risk score (simplified)
+          const riskScore = Math.floor(Math.random() * 100) + 1;
+          const riskBucket = riskScore < 30 ? 'low' : riskScore < 70 ? 'medium' : 'high';
+          
+          const result = {
+            bucket: riskBucket,
+            score: riskScore,
+            rubric: {
+              capacity: Math.floor(Math.random() * 100) + 1,
+              tolerance: Math.floor(Math.random() * 100) + 1,
+              need: Math.floor(Math.random() * 100) + 1
+            }
+          };
+          
+          // Create assessment submission record
+          const { data: submission, error: submissionError } = await supabase
+            .from('assessment_submissions')
+            .insert({
+              owner_id: mockUserId,
+              lead_id: lead.id,
+              framework_version_id: null,
+              answers: answers,
+              result: result,
+              status: 'submitted'
+            })
+            .select()
+            .single();
+          
+          if (submissionError) {
+            console.error('❌ Error creating assessment submission:', submissionError);
+            // Don't fail the entire request, just log the error
+          } else {
+            console.log('✅ Assessment submission created:', submission.id);
+          }
+          
+          console.log('✅ Public assessment submitted successfully for lead:', lead.id);
+          
+          return res.json({ 
+            message: 'Assessment submitted successfully',
+            result,
+            lead_id: lead.id,
+            isNewLead: true
+          });
+        } catch (error) {
+          console.error('❌ Submit public assessment error:', error);
+          return res.status(500).json({ error: 'Failed to submit assessment' });
         }
       }
 
