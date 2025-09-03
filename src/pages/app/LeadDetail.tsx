@@ -446,9 +446,23 @@ export default function LeadDetail() {
       });
     } catch (error: any) {
       console.error('Failed to save SIP forecast:', error);
+      
+      // Extract error message from different possible sources
+      let errorMessage = "Failed to save SIP forecast. Please try again.";
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.details) {
+        errorMessage = Array.isArray(error.response.data.details) 
+          ? error.response.data.details.map((d: any) => d.message).join(', ')
+          : error.response.data.details;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to save SIP forecast. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

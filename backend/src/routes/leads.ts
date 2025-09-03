@@ -807,7 +807,16 @@ router.put('/:id', authenticateUser, [
   body('notes').optional().isLength({ max: 500 }).withMessage('Notes cannot exceed 500 characters'),
   body('cfa_goals').optional().isLength({ max: 1000 }).withMessage('CFA goals cannot exceed 1000 characters'),
   body('cfa_min_investment').optional().isLength({ max: 100 }).withMessage('CFA min investment cannot exceed 100 characters'),
-  body('cfa_investment_horizon').optional().isIn(['short_term', 'medium_term', 'long_term']).withMessage('Invalid investment horizon value')
+  body('cfa_investment_horizon').optional().isIn(['short_term', 'medium_term', 'long_term']).withMessage('Invalid investment horizon value'),
+  body('sip_forecast').optional().custom((value) => {
+    if (value === undefined || value === null) return true;
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return false;
+    }
+    // Check if it has the required fields
+    const requiredFields = ['monthly_investment', 'years', 'expected_return_pct', 'inflation_pct', 'saved_at'];
+    return requiredFields.every(field => value.hasOwnProperty(field));
+  }).withMessage('SIP forecast must be a valid object with required fields: monthly_investment, years, expected_return_pct, inflation_pct, saved_at')
 ], async (req: express.Request, res: express.Response) => {
   try {
     const errors = validationResult(req);
@@ -823,7 +832,7 @@ router.put('/:id', authenticateUser, [
     }
 
     const { id } = req.params;
-    const { full_name, email, phone, age, notes, cfa_goals, cfa_min_investment, cfa_investment_horizon } = req.body;
+    const { full_name, email, phone, age, notes, cfa_goals, cfa_min_investment, cfa_investment_horizon, sip_forecast } = req.body;
     const clerkUserId = req.user!.clerk_id;
 
     // Get the actual user UUID from the users table using the Clerk ID
@@ -855,7 +864,8 @@ router.put('/:id', authenticateUser, [
         notes, 
         cfa_goals, 
         cfa_min_investment, 
-        cfa_investment_horizon 
+        cfa_investment_horizon,
+        sip_forecast
       })
       .eq('id', id)
       .eq('user_id', user_id)
@@ -869,7 +879,16 @@ router.put('/:id', authenticateUser, [
     return res.json({ lead: data });
   } catch (error) {
     console.error('Lead update error:', error);
-    return res.status(500).json({ error: 'Failed to update lead' });
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      body: req.body,
+      params: req.params
+    });
+    return res.status(500).json({ 
+      error: 'Failed to update lead',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });
 

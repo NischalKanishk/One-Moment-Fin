@@ -59,7 +59,8 @@ CREATE TABLE leads (
     source_link TEXT DEFAULT 'Manually Added',
     status TEXT DEFAULT 'lead' CHECK (status IN ('lead', 'assessment_done', 'meeting_scheduled', 'converted', 'dropped')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    notes TEXT
+    notes TEXT,
+    sip_forecast JSONB DEFAULT NULL
 );
 
 -- Function to get user_id from clerk_id
@@ -90,6 +91,9 @@ CREATE POLICY "Service role can manage all leads" ON leads
     FOR ALL USING (auth.role() = 'service_role');
 
 ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
+
+-- Create index on sip_forecast column for better query performance
+CREATE INDEX idx_leads_sip_forecast ON leads USING GIN (sip_forecast);
 
 -- 3. Meetings table
 CREATE TABLE meetings (
