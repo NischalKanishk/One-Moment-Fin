@@ -219,6 +219,13 @@ export const leadsAPI = {
     cfa_goals?: string;
     cfa_min_investment?: string;
     cfa_investment_horizon?: string;
+    sip_forecast?: {
+      monthly_investment: number;
+      years: number;
+      expected_return_pct: number;
+      inflation_pct: number;
+      saved_at: string;
+    };
   }) => {
     const authApi = createAuthenticatedApi(token);
     const response = await authApi.put(`/api/leads/${id}`, data);

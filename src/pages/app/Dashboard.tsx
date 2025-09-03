@@ -2,33 +2,13 @@ import { Helmet } from "react-helmet-async";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-} from "recharts";
 import { Users, Calendar, ClipboardList, TrendingUp, Plus, Send, Clock, Video, ExternalLink } from "lucide-react";
 import { useUser, useAuth } from "@clerk/clerk-react";
 import { leadsAPI } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { useChartTheme } from "@/components/charts/ThemeProvider";
 import { useNavigate } from "react-router-dom";
-
-const spark = Array.from({ length: 24 }, (_, i) => ({
-  x: i,
-  y: Math.round(60 + Math.sin(i / 2) * 20 + Math.random() * 10),
-}));
 
 interface Meeting {
   id: string;
@@ -45,7 +25,6 @@ export default function Dashboard() {
   const { user } = useUser();
   const { getToken } = useAuth();
   const { toast } = useToast();
-  const chartTheme = useChartTheme();
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     total: 0,
@@ -212,19 +191,6 @@ export default function Dashboard() {
     }
   };
 
-  const riskData = [
-    { name: "Conservative", value: stats.byStatus.lead },
-    { name: "Balanced", value: stats.byStatus.assessment_done },
-    { name: "Aggressive", value: stats.byStatus.converted },
-  ];
-
-  const funnelData = [
-    { stage: "Leads", value: stats.total },
-    { stage: "Assessment Done", value: stats.byStatus.assessment_done },
-    { stage: "Meetings", value: stats.byStatus.meeting_scheduled },
-    { stage: "Converted", value: stats.byStatus.converted },
-  ];
-
   return (
     <div className="space-y-8">
       <Helmet>
@@ -292,82 +258,6 @@ export default function Dashboard() {
             <p className="text-xs text-muted-foreground">
               {stats.total > 0 ? `${Math.round((stats.byStatus.converted / stats.total) * 100)}% success rate` : 'No leads yet'}
             </p>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* Charts Section */}
-      <section className="grid gap-6 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Risk Profile Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={riskData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={60}
-                  paddingAngle={2}
-                >
-                  {riskData.map((_, i) => (
-                    <Cell 
-                      key={i} 
-                      fill={[chartTheme.colors.primary, chartTheme.colors.success, chartTheme.colors.muted][i % 3]} 
-                    />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{
-                    backgroundColor: chartTheme.colors.tooltip.background,
-                    border: `1px solid ${chartTheme.colors.tooltip.border}`,
-                    borderRadius: '8px',
-                    boxShadow: chartTheme.shadows.tooltip
-                  }}
-                />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Lead Conversion Funnel</CardTitle>
-          </CardHeader>
-          <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={funnelData}>
-                <XAxis 
-                  dataKey="stage" 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: chartTheme.colors.axis, fontSize: 12 }}
-                />
-                <YAxis 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: chartTheme.colors.axis, fontSize: 12 }}
-                />
-                <Tooltip 
-                  contentStyle={{
-                    backgroundColor: chartTheme.colors.tooltip.background,
-                    border: `1px solid ${chartTheme.colors.tooltip.border}`,
-                    borderRadius: '8px',
-                    boxShadow: chartTheme.shadows.tooltip
-                  }}
-                />
-                <Bar 
-                  dataKey="value" 
-                  fill={chartTheme.colors.primary} 
-                  radius={[4, 4, 0, 0]} 
-                />
-              </BarChart>
-            </ResponsiveContainer>
           </CardContent>
         </Card>
       </section>

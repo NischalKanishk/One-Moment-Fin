@@ -84,6 +84,13 @@ interface Lead {
     status: string;
   }>;
   meetings?: any[];
+  sip_forecast?: {
+    monthly_investment: number;
+    years: number;
+    expected_return_pct: number;
+    inflation_pct: number;
+    saved_at: string;
+  };
 }
 
 interface EditFormData {
@@ -95,30 +102,29 @@ interface EditFormData {
 
 // Question mapping for better display
 const CFA_QUESTION_MAPPING: Record<string, string> = {
-  // Capacity Questions
-  'primary_goal': 'What is your primary financial goal?',
-  'investment_horizon': 'What is your investment time horizon?',
-  'age': 'What is your age?',
-  'dependents': 'How many dependents do you have?',
-  'income': 'What is your annual income?',
-  'emergency_fund': 'Do you have an emergency fund?',
-  'debt_level': 'What is your current debt level?',
-  
-  // Tolerance Questions
-  'market_experience': 'What is your experience with market investments?',
-  'volatility_comfort': 'How comfortable are you with market volatility?',
-  'loss_tolerance': 'What is your tolerance for investment losses?',
-  'drawdown_comfort': 'How would you react to a 20% portfolio decline?',
+  // Profile Questions
+  'name': 'Name',
+  'contact_no': 'Contact No',
+  'email_address': 'Email Address',
   
   // Need Questions
-  'return_expectation': 'What is your expected annual return?',
-  'liquidity_needs': 'How quickly might you need to access your investments?',
-  'tax_considerations': 'How important are tax considerations?',
-  'inflation_protection': 'How concerned are you about inflation?',
+  'investment_goals': 'Investment Goals (Select 5 that are the most important)',
+  'primary_reason_for_investing': 'What is your primary reason for investing in mutual funds?',
   
-  // Knowledge Questions
-  'investment_knowledge': 'How would you rate your investment knowledge?',
-  'product_familiarity': 'How familiar are you with investment products?',
+  // Capacity Questions
+  'investment_horizon': 'Investment Horizon',
+  'financial_situation': 'What is your current financial situation?',
+  'investment_experience': 'What is your investment experience?',
+  'access_to_funds_timeline': 'How soon do you anticipate needing access to the invested funds?',
+  'monthly_investment_amount': 'How much money are you willing to set aside every month for investments?',
+  'lumpsum_investment': 'Do you have a lumpsum amount/savings that you are willing to invest? If Yes, then what is the amount?',
+  
+  // Tolerance Questions
+  'risk_tolerance': 'Risk Tolerance (High Risk=High Return)',
+  'comfort_with_fluctuations': 'How comfortable are you with fluctuations in the value of your investments?',
+  'attitude_towards_risk': 'What is your attitude towards risk?',
+  'reaction_to_20_percent_drop': 'How would you react if the value of your investment dropped by 20% in a short period?',
+  'continue_investing_during_downturn': 'In the event of an economic downturn, how likely are you to continue investing?',
   
   // Fallback for any other questions
   'other': 'Additional Question'
@@ -834,176 +840,148 @@ export default function LeadDetail() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Tabs */}
+        {/* Enhanced Tabs */}
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 bg-white border border-gray-200 rounded-xl p-1 h-16 shadow-sm">
-            <TabsTrigger 
-              value="overview" 
-              className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:border-blue-200 data-[state=active]:shadow-sm rounded-lg h-14 transition-all duration-200 font-medium"
-            >
-              Overview
-            </TabsTrigger>
-            <TabsTrigger 
-              value="risk" 
-              className="data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 data-[state=active]:border-purple-200 data-[state=active]:shadow-sm rounded-lg h-14 transition-all duration-200 font-medium"
-            >
-              Risk Assessment
-            </TabsTrigger>
-            <TabsTrigger 
-              value="meetings" 
-              className="data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:border-green-200 data-[state=active]:shadow-sm rounded-lg h-14 transition-all duration-200 font-medium"
-            >
-              Meetings ({lead?.meetings?.length || 0})
-            </TabsTrigger>
-            <TabsTrigger 
-              value="notes" 
-              className="data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:border-amber-200 data-[state=active]:shadow-sm rounded-lg h-14 transition-all duration-200 font-medium"
-            >
-              Notes
-            </TabsTrigger>
-            <TabsTrigger 
-              value="sip" 
-              className="data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:border-emerald-200 data-[state=active]:shadow-sm rounded-lg h-14 transition-all duration-200 font-medium"
-            >
-              SIP Forecaster
-            </TabsTrigger>
-          </TabsList>
+          <div className="mb-8">
+            <TabsList className="grid w-full grid-cols-5 bg-gray-50/80 backdrop-blur-sm border border-gray-200/60 rounded-2xl p-2 h-20 shadow-lg shadow-gray-200/50">
+              <TabsTrigger 
+                value="overview" 
+                className="group relative data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:border-blue-200 data-[state=active]:shadow-lg data-[state=active]:shadow-blue-100/50 rounded-xl h-16 transition-all duration-300 font-semibold text-gray-600 hover:text-gray-800 hover:bg-white/60 data-[state=active]:scale-105"
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <User className="w-5 h-5 group-data-[state=active]:text-blue-600 transition-colors" />
+                  <span className="text-sm">Overview</span>
+                </div>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="risk" 
+                className="group relative data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:border-purple-200 data-[state=active]:shadow-lg data-[state=active]:shadow-purple-100/50 rounded-xl h-16 transition-all duration-300 font-semibold text-gray-600 hover:text-gray-800 hover:bg-white/60 data-[state=active]:scale-105"
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <TrendingUp className="w-5 h-5 group-data-[state=active]:text-purple-600 transition-colors" />
+                  <span className="text-sm">Risk Assessment</span>
+                </div>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="meetings" 
+                className="group relative data-[state=active]:bg-white data-[state=active]:text-green-700 data-[state=active]:border-green-200 data-[state=active]:shadow-lg data-[state=active]:shadow-green-100/50 rounded-xl h-16 transition-all duration-300 font-semibold text-gray-600 hover:text-gray-800 hover:bg-white/60 data-[state=active]:scale-105"
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <Calendar className="w-5 h-5 group-data-[state=active]:text-green-600 transition-colors" />
+                  <span className="text-sm">Meetings</span>
+                  {lead?.meetings && lead.meetings.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                      {lead.meetings.length}
+                    </span>
+                  )}
+                </div>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="notes" 
+                className="group relative data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:border-amber-200 data-[state=active]:shadow-lg data-[state=active]:shadow-amber-100/50 rounded-xl h-16 transition-all duration-300 font-semibold text-gray-600 hover:text-gray-800 hover:bg-white/60 data-[state=active]:scale-105"
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <FileText className="w-5 h-5 group-data-[state=active]:text-amber-600 transition-colors" />
+                  <span className="text-sm">Notes</span>
+                </div>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="sip" 
+                className="group relative data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:border-emerald-200 data-[state=active]:shadow-lg data-[state=active]:shadow-emerald-100/50 rounded-xl h-16 transition-all duration-300 font-semibold text-gray-600 hover:text-gray-800 hover:bg-white/60 data-[state=active]:scale-105"
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <TrendingUp className="w-5 h-5 group-data-[state=active]:text-emerald-600 transition-colors" />
+                  <span className="text-sm">SIP Forecaster</span>
+                </div>
+              </TabsTrigger>
+            </TabsList>
+          </div>
           
-          <TabsContent value="overview" className="space-y-6 mt-8">
-            {/* Side by side layout: Lead Information and Risk Profile Summary */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Lead Information - Left side */}
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <User className="w-5 h-5 text-gray-600" />
+          <TabsContent value="overview" className="space-y-8">
+            {/* Enhanced Overview Content */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Lead Information - Enhanced */}
+              <div className="bg-white rounded-2xl p-8 shadow-xl shadow-gray-200/50 border border-gray-100 hover:shadow-2xl hover:shadow-gray-300/50 transition-all duration-300">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl flex items-center justify-center shadow-lg">
+                      <User className="w-6 h-6 text-blue-600" />
                     </div>
-                    <h3 className="text-xl font-semibold text-gray-900">Lead Information</h3>
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-900">Lead Information</h3>
+                      <p className="text-gray-600 text-sm">Personal and contact details</p>
+                    </div>
                   </div>
-                          <Button
-          onClick={() => window.open(`/smart-summary/${lead.id}`, '_blank')}
-          size="sm"
-          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
-        >
-          Smart Summary
-        </Button>
+                  <Button
+                    onClick={() => window.open(`/smart-summary/${lead.id}`, '_blank')}
+                    size="sm"
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                  >
+                    Smart Summary
+                  </Button>
                 </div>
                 
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">Full Name</span>
-                    <span className="text-sm font-semibold text-gray-900">{lead.full_name}</span>
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center py-4 border-b border-gray-100 hover:bg-gray-50 px-3 rounded-lg transition-colors">
+                    <span className="text-sm font-semibold text-gray-600">Full Name</span>
+                    <span className="text-sm font-bold text-gray-900">{lead.full_name}</span>
                   </div>
-                  <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">Age</span>
-                    <span className="text-sm font-semibold text-gray-900">{lead.age ? `${lead.age} years` : 'N/A'}</span>
+                  <div className="flex justify-between items-center py-4 border-b border-gray-100 hover:bg-gray-50 px-3 rounded-lg transition-colors">
+                    <span className="text-sm font-semibold text-gray-600">Age</span>
+                    <span className="text-sm font-bold text-gray-900">{lead.age ? `${lead.age} years` : 'N/A'}</span>
                   </div>
-                  <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">Email</span>
-                    <span className="text-sm font-semibold text-gray-900">{lead.email || 'N/A'}</span>
+                  <div className="flex justify-between items-center py-4 border-b border-gray-100 hover:bg-gray-50 px-3 rounded-lg transition-colors">
+                    <span className="text-sm font-semibold text-gray-600">Email</span>
+                    <span className="text-sm font-bold text-gray-900">{lead.email || 'N/A'}</span>
                   </div>
-                  <div className="flex justify-between items-center py-3">
-                    <span className="text-sm font-medium text-gray-600">Phone</span>
-                    <span className="text-sm font-semibold text-gray-900">{lead.phone || 'N/A'}</span>
+                  <div className="flex justify-between items-center py-4 hover:bg-gray-50 px-3 rounded-lg transition-colors">
+                    <span className="text-sm font-semibold text-gray-600">Phone</span>
+                    <span className="text-sm font-bold text-gray-900">{lead.phone || 'N/A'}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Risk Profile Summary - Right side */}
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="w-5 h-5 text-purple-600" />
+              {/* Risk Profile Summary - Enhanced */}
+              <div className="bg-white rounded-2xl p-8 shadow-xl shadow-gray-200/50 border border-gray-100 hover:shadow-2xl hover:shadow-gray-300/50 transition-all duration-300">
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl flex items-center justify-center shadow-lg">
+                    <TrendingUp className="w-6 h-6 text-purple-600" />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900">Risk Profile</h3>
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900">Risk Profile</h3>
+                    <p className="text-gray-600 text-sm">Assessment-based risk analysis</p>
+                  </div>
                 </div>
                 
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {/* Risk Score and Category Row */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-bold text-purple-700">RS</span>
+                  <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200 shadow-sm">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg">
+                        <span className="text-sm font-bold text-white">RS</span>
                       </div>
                       <div>
-                        <div className="text-sm text-gray-600">Risk Score</div>
-                        <div className="text-lg font-bold text-gray-900">
+                        <div className="text-sm text-purple-600 font-medium">Risk Score</div>
+                        <div className="text-2xl font-bold text-gray-900">
                           {lead.assessment_submissions?.[0]?.result?.score || lead.risk_score || 0}
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm text-gray-600">Category</div>
-                      <Badge className={`text-xs px-2 py-1 ${
-                        (lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket) === 'Low' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-                        (lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket) === 'Medium' ? 'bg-green-100 text-green-800 border-green-200' :
-                        (lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket) === 'High' ? 'bg-red-100 text-red-800 border-red-200' :
-                        'bg-gray-100 text-gray-600 border-gray-200'
-                      }`}>
-                        {lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket || 'Not Assessed'}
-                      </Badge>
-                    </div>
-                  </div>
-                  
-                  {/* Assessment Details */}
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                      <FileText className="w-4 h-4 text-gray-500" />
-                      <div>
-                        <div className="text-gray-600">Questions</div>
-                        <div className="font-semibold text-gray-900">
-                          {lead.assessment_submissions?.[0]?.answers ? Object.keys(lead.assessment_submissions[0].answers).length : 0}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                      <Calendar className="w-4 h-4 text-gray-500" />
-                      <div>
-                        <div className="text-gray-600">Completed</div>
-                        <div className="font-semibold text-gray-900">
-                          {lead.assessment_submissions?.[0]?.submitted_at ? 
-                            new Date(lead.assessment_submissions[0].submitted_at).toLocaleDateString('en-IN', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric'
-                            }) : 
-                            new Date(lead.created_at).toLocaleDateString('en-IN', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric'
-                            })
-                          }
-                        </div>
+                      <div className="text-sm text-purple-600 font-medium">Risk Category</div>
+                      <div className="text-lg font-bold text-gray-900 capitalize">
+                        {lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket || 'N/A'}
                       </div>
                     </div>
                   </div>
-                  
-                  {/* Question Count Summary */}
-                  {lead.assessment_submissions?.[0]?.answers && (
-                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-blue-600" />
-                          <span className="text-sm font-medium text-blue-800">Assessment Questions</span>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-lg font-bold text-blue-900">
-                            {Object.keys(lead.assessment_submissions[0].answers).length}
-                          </div>
-                          <div className="text-xs text-blue-600">Total Questions</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                   
                   {/* Risk Profile Summary - Clean and Simple */}
                   {(lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket) && (
-                    <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                    <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200 shadow-sm">
                       <div className="flex items-center gap-3">
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <div className="w-3 h-3 bg-green-500 rounded-full shadow-sm"></div>
                         <div className="text-sm font-medium text-green-800">
-                          Risk Profile: <span className="font-semibold capitalize">{lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket}</span>
+                          Risk Profile: <span className="font-bold capitalize">{lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket}</span>
                         </div>
                       </div>
                     </div>
@@ -1013,38 +991,38 @@ export default function LeadDetail() {
             </div>
           </TabsContent>
           
-          <TabsContent value="risk" className="space-y-6 mt-8">
-            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center">
+          <TabsContent value="risk" className="space-y-8">
+            <div className="bg-white rounded-2xl p-8 shadow-xl shadow-gray-200/50 border border-gray-100">
+              <div className="flex items-center gap-4 mb-8">
+                <div className="w-14 h-14 bg-gradient-to-br from-purple-100 to-pink-100 rounded-2xl flex items-center justify-center shadow-lg">
                   <TrendingUp className="w-7 h-7 text-purple-600" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Risk Assessment</h2>
-                  <p className="text-gray-600">Detailed analysis of the lead's risk profile</p>
+                  <h2 className="text-3xl font-bold text-gray-900">Risk Assessment</h2>
+                  <p className="text-gray-600 text-lg">Detailed analysis of the lead's risk profile and investment preferences</p>
                 </div>
               </div>
               
               {/* Always show the assessment section, but conditionally render content */}
               <div className="space-y-8">
-                {/* Assessment Summary - Now at the top */}
+                {/* Assessment Summary - Enhanced */}
                 {(() => {
                   const assessmentData = getAssessmentData(lead);
                   
                   if (!assessmentData || !assessmentData.answers) {
                       return (
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                              <FileText className="w-5 h-5 text-blue-600" />
+                        <div className="space-y-6">
+                          <div className="flex items-center gap-4 mb-6">
+                            <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl flex items-center justify-center shadow-lg">
+                              <FileText className="w-6 h-6 text-blue-600" />
                             </div>
-                            <h3 className="text-xl font-semibold text-gray-900">Assessment Questions & Answers</h3>
+                            <h3 className="text-2xl font-bold text-gray-900">Assessment Questions & Answers</h3>
                           </div>
-                                                      <div className="text-center py-8 text-gray-500">
-                              <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                              <p>No assessment responses available</p>
-                              <p className="text-sm">This lead hasn't completed a risk assessment yet.</p>
-                            </div>
+                          <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-300">
+                            <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                            <p className="text-lg font-medium mb-2">No assessment responses available</p>
+                            <p className="text-gray-400">This lead hasn't completed a risk assessment yet.</p>
+                          </div>
                         </div>
                       );
                     }
@@ -1068,62 +1046,72 @@ export default function LeadDetail() {
                     
                     return (
                       <div className="space-y-8">
-                        {/* Assessment Summary - Now at the top */}
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
-                          <div className="text-lg font-semibold text-blue-900 mb-4">Assessment Summary</div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
-                              <div className="text-2xl font-bold text-blue-600">{Object.keys(assessmentData.answers).length}</div>
-                              <div className="text-blue-700 font-medium text-sm">Total Questions</div>
+                        {/* Assessment Summary - Enhanced */}
+                        <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-2xl p-8 border border-blue-200 shadow-lg">
+                          <div className="text-2xl font-bold text-blue-900 mb-6 text-center">Assessment Summary</div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                            <div className="text-center p-6 bg-white rounded-xl border border-blue-200 shadow-lg hover:shadow-xl transition-all duration-200">
+                              <div className="text-3xl font-bold text-blue-600 mb-2">{Object.keys(assessmentData.answers).length}</div>
+                              <div className="text-blue-700 font-semibold text-sm">Total Questions</div>
                             </div>
-                            <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
-                              <div className="text-2xl font-bold text-blue-600">{Object.keys(answersByModule).length}</div>
-                              <div className="text-blue-700 font-medium text-sm">Categories</div>
+                            <div className="text-center p-6 bg-white rounded-xl border border-blue-200 shadow-lg hover:shadow-xl transition-all duration-200">
+                              <div className="text-3xl font-bold text-blue-600 mb-2">{Object.keys(answersByModule).length}</div>
+                              <div className="text-blue-700 font-semibold text-sm">Categories</div>
                             </div>
-                            <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
-                              <div className="text-2xl font-bold text-blue-600">{lead.assessment_submissions?.[0]?.result?.score || lead.risk_score || 0}</div>
-                              <div className="text-blue-700 font-medium text-sm">Risk Score</div>
+                            <div className="text-center p-6 bg-white rounded-xl border border-blue-200 shadow-lg hover:shadow-xl transition-all duration-200">
+                              <div className="text-3xl font-bold text-blue-600 mb-2">{lead.assessment_submissions?.[0]?.result?.score || lead.risk_score || 0}</div>
+                              <div className="text-blue-700 font-semibold text-sm">Risk Score</div>
                             </div>
-                            <div className="text-center p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
-                              <div className="text-2xl font-bold text-blue-600">{lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket || 'N/A'}</div>
-                              <div className="text-blue-700 font-medium text-sm">Risk Level</div>
+                            <div className="text-center p-6 bg-white rounded-xl border border-blue-200 shadow-lg hover:shadow-xl transition-all duration-200">
+                              <div className="text-3xl font-bold text-blue-600 mb-2">{lead.assessment_submissions?.[0]?.result?.bucket || lead.risk_bucket || 'N/A'}</div>
+                              <div className="text-blue-700 font-semibold text-sm">Risk Level</div>
                             </div>
                           </div>
                         </div>
 
-                        {/* Questions and Answers */}
-                        <div className="space-y-6">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                              <FileText className="w-5 h-5 text-blue-600" />
+                        {/* Questions and Answers - Enhanced */}
+                        <div className="space-y-8">
+                          <div className="flex items-center gap-4 mb-6">
+                            <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl flex items-center justify-center shadow-lg">
+                              <FileText className="w-6 h-6 text-blue-600" />
                             </div>
-                            <h3 className="text-xl font-semibold text-gray-900">Assessment Questions & Answers</h3>
+                            <h3 className="text-2xl font-bold text-gray-900">Assessment Questions & Answers</h3>
                           </div>
                           
-                          {/* Module-based organization */}
+                          {/* Module-based organization - Enhanced */}
                           {Object.entries(answersByModule).map(([module, answers]) => (
-                            <div key={module} className="space-y-4">
-                              <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                                <h4 className="font-semibold text-blue-800 text-sm uppercase tracking-wide">{module}</h4>
-                                <div className="ml-auto text-xs text-blue-600 bg-white px-2 py-1 rounded-full">
+                            <div key={module} className="space-y-6">
+                              <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-sm">
+                                <div className="w-4 h-4 bg-blue-500 rounded-full shadow-sm"></div>
+                                <h4 className="font-bold text-blue-800 text-lg uppercase tracking-wide">{module}</h4>
+                                <div className="ml-auto text-sm text-blue-600 bg-white px-3 py-1 rounded-full font-semibold shadow-sm">
                                   {answers.length} question{answers.length !== 1 ? 's' : ''}
                                 </div>
                               </div>
-                              <div className="space-y-4 ml-5">
+                              <div className="space-y-4 ml-6">
                                 {answers.map(([questionKey, answer], index) => {
-                                  const questionText = CFA_QUESTION_MAPPING[questionKey] || questionKey;
+                                  const questionText = CFA_QUESTION_MAPPING[questionKey] || questionKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                  
+                                  // Handle multiple choice answers (arrays)
+                                  let displayAnswer = answer;
+                                  if (Array.isArray(answer)) {
+                                    displayAnswer = answer.join(', ');
+                                  } else if (typeof answer === 'string' && answer.includes(',')) {
+                                    // Handle comma-separated strings
+                                    displayAnswer = answer;
+                                  }
+                                  
                                   return (
-                                    <div key={index} className="bg-gradient-to-r from-gray-50 to-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200">
-                                      <div className="flex items-start gap-3">
-                                        <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                                          <span className="text-xs font-semibold text-blue-700">{index + 1}</span>
+                                    <div key={index} className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-6 border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 group">
+                                      <div className="flex items-start gap-4">
+                                        <div className="w-8 h-8 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1 shadow-sm group-hover:shadow-md transition-all duration-300">
+                                          <span className="text-sm font-bold text-blue-700">{index + 1}</span>
                                         </div>
-                                        <div className="flex-1 space-y-3">
-                                          <h5 className="font-medium text-gray-900 text-sm leading-relaxed">{questionText}</h5>
-                                          <div className="bg-white rounded border border-gray-200 p-3">
-                                            <span className="text-sm font-medium text-gray-700">Answer:</span>
-                                            <span className="ml-2 text-sm text-gray-900 font-medium">{String(answer)}</span>
+                                        <div className="flex-1 space-y-4">
+                                          <h5 className="font-semibold text-gray-900 text-base leading-relaxed">{questionText}</h5>
+                                          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm group-hover:shadow-md transition-all duration-300">
+                                            <span className="text-sm font-semibold text-gray-700">Answer:</span>
+                                            <span className="ml-3 text-sm text-gray-900 font-medium">{String(displayAnswer)}</span>
                                           </div>
                                         </div>
                                       </div>
@@ -1137,27 +1125,25 @@ export default function LeadDetail() {
                       </div>
                     );
                   })()}
-
-
                 </div>
             </div>
           </TabsContent>
           
-          <TabsContent value="meetings" className="space-y-6 mt-8">
-            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-6">
+          <TabsContent value="meetings" className="space-y-8">
+            <div className="bg-white rounded-2xl p-8 shadow-xl shadow-gray-200/50 border border-gray-100">
+              <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center">
+                  <div className="w-14 h-14 bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl flex items-center justify-center shadow-lg">
                     <Calendar className="w-7 h-7 text-green-600" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Meetings & Appointments</h2>
-                    <p className="text-gray-600">Schedule and manage meetings with this lead</p>
+                    <h2 className="text-3xl font-bold text-gray-900">Meetings & Appointments</h2>
+                    <p className="text-gray-600 text-lg">Schedule and manage meetings with this lead</p>
                   </div>
                 </div>
                 <Button 
                   onClick={() => navigate('/app/meetings')}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
                 >
                   <Plus className="h-4 w-4" />
                   Schedule Meeting
@@ -1165,9 +1151,9 @@ export default function LeadDetail() {
               </div>
               
               {lead.meetings && lead.meetings.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {lead.meetings.map((meeting: any) => (
-                    <div key={meeting.id} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
+                    <div key={meeting.id} className="border border-gray-200 rounded-xl p-6 hover:border-gray-300 hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-white to-gray-50">
                       <div className="flex items-start justify-between">
                         <div className="space-y-3 flex-1">
                           <div className="flex items-center gap-3">
@@ -1244,19 +1230,19 @@ export default function LeadDetail() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Calendar className="h-8 w-8 text-gray-400" />
+                <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border-2 border-dashed border-gray-300">
+                  <div className="w-20 h-20 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                    <Calendar className="h-10 w-10 text-gray-500" />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Meetings Scheduled</h3>
-                  <p className="text-gray-600 max-w-md mx-auto mb-6">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-3">No Meetings Scheduled</h3>
+                  <p className="text-gray-600 max-w-md mx-auto mb-8 text-lg">
                     No meetings have been scheduled with this lead yet. Schedule a meeting to discuss their financial goals and provide personalized recommendations.
                   </p>
                   <Button 
                     onClick={() => navigate('/app/meetings')}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-3"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-5 w-5" />
                     Schedule First Meeting
                   </Button>
                 </div>
@@ -1264,26 +1250,26 @@ export default function LeadDetail() {
               
               {/* Meeting Statistics */}
               {lead.meetings && lead.meetings.length > 0 && (
-                <div className="mt-8 pt-6 border-t border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Meeting Summary</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center p-4 bg-gray-50 rounded-lg">
-                      <div className="text-2xl font-bold text-gray-900">
+                <div className="mt-8 pt-8 border-t border-gray-200">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">Meeting Summary</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300">
+                      <div className="text-3xl font-bold text-blue-600 mb-2">
                         {lead.meetings.filter((m: any) => m.status === 'scheduled').length}
                       </div>
-                      <div className="text-sm text-gray-600">Upcoming</div>
+                      <div className="text-blue-700 font-semibold">Upcoming</div>
                     </div>
-                    <div className="text-center p-4 bg-gray-50 rounded-lg">
-                      <div className="text-2xl font-bold text-gray-900">
+                    <div className="text-center p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 shadow-lg hover:shadow-xl transition-all duration-300">
+                      <div className="text-3xl font-bold text-green-600 mb-2">
                         {lead.meetings.filter((m: any) => m.status === 'completed').length}
                       </div>
-                      <div className="text-sm text-gray-600">Completed</div>
+                      <div className="text-green-700 font-semibold">Completed</div>
                     </div>
-                    <div className="text-center p-4 bg-gray-50 rounded-lg">
-                      <div className="text-2xl font-bold text-gray-900">
+                    <div className="text-center p-6 bg-gradient-to-br from-red-50 to-pink-50 rounded-xl border border-red-200 shadow-lg hover:shadow-xl transition-all duration-300">
+                      <div className="text-3xl font-bold text-red-600 mb-2">
                         {lead.meetings.filter((m: any) => m.status === 'cancelled').length}
                       </div>
-                      <div className="text-sm text-gray-600">Cancelled</div>
+                      <div className="text-red-700 font-semibold">Cancelled</div>
                     </div>
                   </div>
                 </div>
@@ -1291,24 +1277,24 @@ export default function LeadDetail() {
             </div>
           </TabsContent>
         
-        <TabsContent value="notes" className="space-y-6 mt-8">
-          <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-14 h-14 bg-amber-100 rounded-xl flex items-center justify-center">
+        <TabsContent value="notes" className="space-y-8">
+          <div className="bg-white rounded-2xl p-8 shadow-xl shadow-gray-200/50 border border-gray-100">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="w-14 h-14 bg-gradient-to-br from-amber-100 to-orange-100 rounded-2xl flex items-center justify-center shadow-lg">
                 <FileText className="w-7 h-7 text-amber-600" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Notes & Key Information</h2>
-                <p className="text-gray-600">Add and manage notes about this lead</p>
+                <h2 className="text-3xl font-bold text-gray-900">Notes & Key Information</h2>
+                <p className="text-gray-600 text-lg">Add and manage notes about this lead</p>
               </div>
             </div>
             
-            <div className="space-y-6">
+            <div className="space-y-8">
               {/* Notes Section */}
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-gray-900">Notes</h4>
-                  <span className="text-xs text-gray-500">
+                  <h4 className="text-xl font-bold text-gray-900">Notes</h4>
+                  <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
                     {lead.notes ? lead.notes.length : 0}/500 characters
                   </span>
                 </div>
@@ -1320,7 +1306,7 @@ export default function LeadDetail() {
                     }
                   }}
                   placeholder="Add notes about this lead, their preferences, or any important information..."
-                  className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full h-32 p-4 border border-gray-300 rounded-xl resize-none focus:ring-2 focus:ring-amber-500 focus:border-transparent shadow-sm hover:shadow-md transition-all duration-200"
                   maxLength={500}
                 />
                 <div className="flex justify-end">
@@ -1328,7 +1314,7 @@ export default function LeadDetail() {
                     onClick={handleSaveNotes}
                     size="sm"
                     disabled={savingNotes}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-6"
                   >
                     {savingNotes ? 'Saving...' : 'Save Changes'}
                   </Button>
@@ -1338,39 +1324,44 @@ export default function LeadDetail() {
               {/* CFA Framework Questions - Only show if CFA data exists */}
               {(lead.cfa_goals || lead.cfa_min_investment || lead.cfa_investment_horizon || 
                 (lead.assessment_submissions && lead.assessment_submissions.length > 0)) && (
-                <div className="space-y-4 pt-6 border-t border-gray-200">
-                  <h4 className="font-semibold text-gray-900">CFA Framework Questions</h4>
+                <div className="space-y-6 pt-8 border-t border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center">
+                      <FileText className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <h4 className="text-xl font-bold text-gray-900">CFA Framework Questions</h4>
+                  </div>
                   
                   {/* Goals */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Goals</label>
+                  <div className="space-y-3">
+                    <label className="text-sm font-semibold text-gray-700">Goals</label>
                     <textarea
                       value={lead.cfa_goals || ''}
                       onChange={(e) => setLead({ ...lead, cfa_goals: e.target.value })}
                       placeholder="What are the lead's primary financial goals?"
-                      className="w-full h-20 p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full h-20 p-4 border border-gray-300 rounded-xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm hover:shadow-md transition-all duration-200"
                     />
                   </div>
 
                   {/* Minimum Investment Amount */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Minimum Investment Amount</label>
+                  <div className="space-y-3">
+                    <label className="text-sm font-semibold text-gray-700">Minimum Investment Amount</label>
                     <input
                       type="text"
                       value={lead.cfa_min_investment || ''}
                       onChange={(e) => setLead({ ...lead, cfa_min_investment: e.target.value })}
                       placeholder="e.g., ₹50,000"
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm hover:shadow-md transition-all duration-200"
                     />
                   </div>
 
                   {/* Investment Horizon */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Investment Horizon</label>
+                  <div className="space-y-3">
+                    <label className="text-sm font-semibold text-gray-700">Investment Horizon</label>
                     <select
                       value={lead.cfa_investment_horizon || ''}
                       onChange={(e) => setLead({ ...lead, cfa_investment_horizon: e.target.value })}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm hover:shadow-md transition-all duration-200"
                     >
                       <option value="">Select investment horizon</option>
                       <option value="short_term">Short Term (1-3 years)</option>
@@ -1384,7 +1375,7 @@ export default function LeadDetail() {
                       onClick={handleSaveCFAInfo}
                       size="sm"
                       disabled={savingNotes}
-                      className="bg-green-600 hover:bg-green-700 text-white"
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-6"
                     >
                       {savingNotes ? 'Saving...' : 'Save CFA Information'}
                     </Button>
@@ -1395,18 +1386,18 @@ export default function LeadDetail() {
           </div>
         </TabsContent>
         
-        <TabsContent value="sip" className="space-y-6 mt-8">
-          <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center">
+        <TabsContent value="sip" className="space-y-8">
+          <div className="bg-white rounded-2xl p-8 shadow-xl shadow-gray-200/50 border border-gray-100">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="w-14 h-14 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-2xl flex items-center justify-center shadow-lg">
                 <TrendingUp className="w-7 h-7 text-emerald-600" />
               </div>
               <div>
-                <h3 className="text-xl font-semibold text-gray-900">SIP Forecaster</h3>
-                <p className="text-sm text-gray-600">Plan and forecast SIP investments for {lead?.full_name}</p>
+                <h3 className="text-3xl font-bold text-gray-900">SIP Forecaster</h3>
+                <p className="text-lg text-gray-600">Plan and forecast SIP investments for {lead?.full_name}</p>
                 {lead && (
-                  <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-xs text-blue-700">
+                  <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-sm">
+                    <p className="text-sm text-blue-700 font-medium">
                       💡 Monthly investment amount pre-filled from: {
                         lead.assessment_submissions?.[0]?.answers?.monthly_investment ? 'Assessment submission' :
                         lead.assessment_submissions?.[0]?.answers?.investment_amount ? 'Assessment submission' :
@@ -1418,16 +1409,18 @@ export default function LeadDetail() {
               </div>
             </div>
             
-            <SipForecaster 
-              defaultMonthly={lead ? extractMonthlyInvestmentAmount(lead) : 15000}
-              defaultYears={15}
-              defaultReturnPct={12}
-              defaultInflationPct={6}
-              className="border-0 shadow-none"
-              onSave={handleSaveSipForecast}
-              isSaving={savingSipForecast}
-              showSaveButton={true}
-            />
+            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-6 border border-emerald-200 shadow-lg">
+              <SipForecaster 
+                defaultMonthly={lead ? extractMonthlyInvestmentAmount(lead) : 15000}
+                defaultYears={15}
+                defaultReturnPct={12}
+                defaultInflationPct={6}
+                className="border-0 shadow-none"
+                onSave={handleSaveSipForecast}
+                isSaving={savingSipForecast}
+                showSaveButton={true}
+              />
+            </div>
           </div>
         </TabsContent>
       </Tabs>

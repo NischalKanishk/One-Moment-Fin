@@ -22,32 +22,31 @@ import { leadsAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import SipForecasterReadOnly from "@/components/SipForecasterReadOnly";
 
-// Question mapping for better display
+// Question mapping for better display - Updated to match current assessment form
 const CFA_QUESTION_MAPPING: Record<string, string> = {
-  // Capacity Questions
-  'primary_goal': 'What is your primary financial goal?',
-  'investment_horizon': 'What is your investment time horizon?',
-  'age': 'What is your age?',
-  'dependents': 'How many dependents do you have?',
-  'income': 'What is your annual income?',
-  'emergency_fund': 'Do you have an emergency fund?',
-  'debt_level': 'What is your current debt level?',
-  
-  // Tolerance Questions
-  'market_experience': 'What is your experience with market investments?',
-  'volatility_comfort': 'How comfortable are you with market volatility?',
-  'loss_tolerance': 'What is your tolerance for investment losses?',
-  'drawdown_comfort': 'How would you react to a 20% portfolio decline?',
+  // Profile Questions
+  'name': 'Name',
+  'contact_no': 'Contact No',
+  'email_address': 'Email Address',
   
   // Need Questions
-  'return_expectation': 'What is your expected annual return?',
-  'liquidity_needs': 'How quickly might you need to access your investments?',
-  'tax_considerations': 'How important are tax considerations?',
-  'inflation_protection': 'How concerned are you about inflation?',
+  'investment_goals': 'Investment Goals (Select 5 that are the most important)',
+  'primary_reason_for_investing': 'What is your primary reason for investing in mutual funds?',
   
-  // Knowledge Questions
-  'investment_knowledge': 'How would you rate your investment knowledge?',
-  'product_familiarity': 'How familiar are you with investment products?',
+  // Capacity Questions
+  'investment_horizon': 'Investment Horizon',
+  'financial_situation': 'What is your current financial situation?',
+  'investment_experience': 'What is your investment experience?',
+  'access_to_funds_timeline': 'How soon do you anticipate needing access to the invested funds?',
+  'monthly_investment_amount': 'How much money are you willing to set aside every month for investments?',
+  'lumpsum_investment': 'Do you have a lumpsum amount/savings that you are willing to invest? If Yes, then what is the amount?',
+  
+  // Tolerance Questions
+  'risk_tolerance': 'Risk Tolerance (High Risk=High Return)',
+  'comfort_with_fluctuations': 'How comfortable are you with fluctuations in the value of your investments?',
+  'attitude_towards_risk': 'What is your attitude towards risk?',
+  'reaction_to_20_percent_drop': 'How would you react if the value of your investment dropped by 20% in a short period?',
+  'continue_investing_during_downturn': 'In the event of an economic downturn, how likely are you to continue investing?',
   
   // Fallback for any other questions
   'other': 'Additional Question'
@@ -102,7 +101,6 @@ const extractMonthlyInvestmentAmount = (lead: Lead): number => {
 };
 
 interface Lead {
-  risk_category: string;
   id: string;
   full_name: string;
   email: string | null;
@@ -118,20 +116,29 @@ interface Lead {
   cfa_goals?: string;
   cfa_min_investment?: string;
   cfa_investment_horizon?: string;
-  assessment?: {
-    submission: any;
-    assessment: any;
-    questions: any[];
-    mappedAnswers: Array<{
-      question: string;
-      answer: string;
-      type: string;
-      options: any;
-      module: string;
-    }>;
-  };
-  assessment_submissions?: any[];
+  assessment_submissions?: Array<{
+    id: string;
+    submitted_at: string;
+    answers: Record<string, any>;
+    result: {
+      bucket: string;
+      score: number;
+      rubric: {
+        capacity: number;
+        tolerance: number;
+        need: number;
+      };
+    };
+    status: string;
+  }>;
   meetings?: any[];
+  sip_forecast?: {
+    monthly_investment: number;
+    years: number;
+    expected_return_pct: number;
+    inflation_pct: number;
+    saved_at: string;
+  };
 }
 
 export default function SmartSummary() {
@@ -253,7 +260,7 @@ export default function SmartSummary() {
       
       // Debug: Log lead data to console
       console.log('Generating PDF for lead:', lead);
-      console.log('Lead assessment data:', lead.assessment);
+              console.log('Lead assessment data:', lead.assessment_submissions);
       console.log('Lead notes:', lead.notes);
       console.log('Lead CFA data:', {
         goals: lead.cfa_goals,
@@ -274,25 +281,30 @@ export default function SmartSummary() {
       const leadAge = lead.age || 'Not provided';
       const leadStatus = lead.status ? lead.status.replace('_', ' ') : 'Unknown';
       const leadCreatedAt = lead.created_at ? new Date(lead.created_at).toLocaleDateString() : 'Unknown';
-      const leadRiskCategory = lead.risk_category || 'Not assessed';
+      const leadRiskCategory = lead.risk_bucket || 'Not assessed';
       const leadRiskScore = lead.risk_score || 'Not assessed';
       const leadNotes = lead.notes || '';
       
       // Check if assessment data exists
-      const hasAssessment = lead.assessment && lead.assessment.mappedAnswers;
-      const hasAssessmentSubmissions = lead.assessment_submissions && lead.assessment_submissions.length > 0;
-      const mappedAnswers = hasAssessment ? lead.assessment.mappedAnswers : [];
-      const isCFA = lead.assessment?.assessment?.framework === 'CFA';
+      const hasAssessment = lead.assessment_submissions && lead.assessment_submissions.length > 0;
+      const mappedAnswers = hasAssessment ? lead.assessment_submissions.map((sub) => ({
+        question: formatQuestionText(Object.keys(sub.answers)[0]), // Assuming only one question per submission for simplicity
+        answer: String(Object.values(sub.answers)[0]),
+        type: 'text',
+        options: null,
+        module: 'Assessment'
+      })) : [];
+      const isCFA = lead.assessment_submissions?.[0]?.result?.bucket; // Check if the first submission has a bucket
       
       // If no mapped answers but have assessment submissions, create a basic structure for PDF
       let pdfAnswers = mappedAnswers;
-      if (!hasAssessment && hasAssessmentSubmissions) {
-        pdfAnswers = Object.entries(lead.assessment_submissions[0].answers).map(([question, answer]) => ({
+      if (!hasAssessment) {
+        pdfAnswers = Object.entries(lead.assessment_submissions?.[0]?.answers || {}).map(([question, answer]) => ({
           question: formatQuestionText(question),
           answer: String(answer),
           type: 'text',
           options: null,
-          module: 'assessment'
+          module: 'Assessment'
         }));
       }
       pdfContent.innerHTML = `
@@ -563,21 +575,15 @@ export default function SmartSummary() {
                   {/* Assessment Details */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="p-3 bg-gray-50 rounded-lg">
-                      <div className="text-sm text-gray-600 mb-1">Questions Answered</div>
-                      <div className="text-lg font-semibold text-gray-900">
-                        {lead.assessment?.mappedAnswers?.length || lead.assessment_submissions?.[0]?.answers ? Object.keys(lead.assessment_submissions[0].answers).length : 0}
-                      </div>
+                                              <div className="text-sm text-gray-600 mb-1">Questions Answered</div>
+                        <div className="text-lg font-semibold text-gray-900">
+                          {lead.assessment_submissions?.[0]?.answers ? Object.keys(lead.assessment_submissions[0].answers).length : 0}
+                        </div>
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="text-sm text-gray-600 mb-1">Completed</div>
                       <div className="text-lg font-semibold text-gray-900">
-                        {lead.assessment?.submission?.submitted_at ? 
-                          new Date(lead.assessment.submission.submitted_at).toLocaleDateString('en-IN', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          }) :
-                          lead.assessment_submissions?.[0]?.submitted_at ?
+                        {lead.assessment_submissions?.[0]?.submitted_at ? 
                           new Date(lead.assessment_submissions[0].submitted_at).toLocaleDateString('en-IN', {
                             month: 'short',
                             day: 'numeric',
@@ -637,38 +643,33 @@ export default function SmartSummary() {
                 </TabsList>
                 
                 <TabsContent value="questions" className="p-6">
-                  {(lead.assessment?.mappedAnswers?.length > 0 || lead.assessment_submissions?.[0]?.answers) ? (
+                  {(lead.assessment_submissions?.length > 0) ? (
                     <div className="space-y-6">
                       {/* Group answers by module for better organization */}
                       {(() => {
-                        const answers = lead.assessment?.mappedAnswers || [];
+                        const answers = lead.assessment_submissions || [];
                         const answersByModule: Record<string, Array<[string, any]>> = {};
                         
-                        if (answers.length > 0) {
-                          // Use mapped answers if available
-                          answers.forEach((answer: any) => {
-                            let module = answer.module || 'General';
-                            if (!answersByModule[module]) {
-                              answersByModule[module] = [];
-                            }
-                            answersByModule[module].push([answer.question, answer.answer]);
-                          });
-                        } else if (lead.assessment_submissions?.[0]?.answers) {
-                          // Fallback to assessment submissions
-                          Object.entries(lead.assessment_submissions[0].answers).forEach(([questionKey, answer]) => {
-                            let module = 'General';
-                            if (questionKey.includes('primary_goal') || questionKey.includes('horizon')) module = 'Profile';
-                            if (questionKey.includes('age') || questionKey.includes('dependents') || questionKey.includes('income')) module = 'Capacity';
-                            if (questionKey.includes('market_knowledge') || questionKey.includes('experience')) module = 'Knowledge';
-                            if (questionKey.includes('drawdown') || questionKey.includes('loss')) module = 'Behavior';
-                            if (questionKey.includes('return') || questionKey.includes('liquidity')) module = 'Needs & Constraints';
-                            
-                            if (!answersByModule[module]) {
-                              answersByModule[module] = [];
-                            }
-                            answersByModule[module].push([questionKey, answer]);
-                          });
-                        }
+                                                 if (answers.length > 0) {
+                           // Process assessment submissions
+                           answers.forEach((sub) => {
+                             if (sub.answers) {
+                               Object.entries(sub.answers).forEach(([questionKey, answer]) => {
+                                 let module = 'General';
+                                 if (questionKey.includes('investment_goals') || questionKey.includes('primary_reason_for_investing')) module = 'Needs';
+                                 if (questionKey.includes('investment_horizon') || questionKey.includes('financial_situation') || questionKey.includes('investment_experience') || questionKey.includes('access_to_funds_timeline') || questionKey.includes('monthly_investment_amount')) module = 'Capacity';
+                                 if (questionKey.includes('risk_tolerance') || questionKey.includes('comfort_with_fluctuations') || questionKey.includes('attitude_towards_risk')) module = 'Tolerance';
+                                 if (questionKey.includes('reaction_to_20_percent_drop') || questionKey.includes('continue_investing_during_downturn')) module = 'Behavior';
+                                 if (questionKey.includes('lumpsum_investment')) module = 'Investment';
+                                 
+                                 if (!answersByModule[module]) {
+                                   answersByModule[module] = [];
+                                 }
+                                 answersByModule[module].push([questionKey, answer]);
+                               });
+                             }
+                           });
+                         }
                         
                         return Object.entries(answersByModule).map(([module, moduleAnswers]) => (
                           <div key={module} className="space-y-4">
