@@ -30,11 +30,11 @@
     },
     {
       "source": "/api/meetings/(.*)",
-      "destination": "/api/[...path].js"
+      "destination": "/api/meetings.js"
     },
     {
       "source": "/api/meetings",
-      "destination": "/api/[...path].js"
+      "destination": "/api/meetings.js"
     },
     {
       "source": "/api/ai/(.*)",
