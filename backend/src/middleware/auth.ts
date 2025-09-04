@@ -207,9 +207,9 @@ export const authenticateUser = async (
         // Create a new user in the database
         const newUserData = {
           clerk_id: clerkUserId,
-          full_name: clerkUser.fullName || 'New User',
-          email: clerkUser.primaryEmailAddress?.emailAddress || 'user@example.com',
-          phone: clerkUser.primaryPhoneNumber?.phoneNumber || '+91 99999 99999',
+          full_name: clerkUser.firstName && clerkUser.lastName ? `${clerkUser.firstName} ${clerkUser.lastName}` : 'New User',
+          email: clerkUser.emailAddresses?.[0]?.emailAddress || 'user@example.com',
+          phone: clerkUser.phoneNumbers?.[0]?.phoneNumber || '+91 99999 99999',
           auth_provider: 'clerk',
           role: 'mfd',
           referral_link: `/r/${clerkUserId.slice(-8)}` // Generate referral link
