@@ -18,12 +18,10 @@ export class ClerkSupabaseSync {
   private static syncDisabled = false;
 
   static disableSync() {
-    console.log('🔍 ClerkSupabaseSync: Sync disabled globally');
     this.syncDisabled = true;
   }
 
   static enableSync() {
-    console.log('🔍 ClerkSupabaseSync: Sync enabled globally');
     this.syncDisabled = false;
   }
 
@@ -34,7 +32,6 @@ export class ClerkSupabaseSync {
   static async syncUserToSupabase(clerkUserData: ClerkUserData, supabaseClient: SupabaseClient) {
     // Check if sync is disabled
     if (this.syncDisabled) {
-      console.log('🔍 ClerkSupabaseSync: Sync is disabled, returning null');
       return null;
     }
     try {
@@ -45,7 +42,6 @@ export class ClerkSupabaseSync {
         .limit(1)
       
       if (testError) {
-        console.error('Supabase connection test failed:', testError)
         return null
       }
 
@@ -57,8 +53,7 @@ export class ClerkSupabaseSync {
         .single()
 
       if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Error fetching existing user:', fetchError)
-      }
+        }
 
       if (existingUser) {
         return await this.updateUserInSupabase(clerkUserData, existingUser.id, supabaseClient)
@@ -66,7 +61,6 @@ export class ClerkSupabaseSync {
         return await this.createUserInSupabase(clerkUserData, supabaseClient)
       }
     } catch (error) {
-      console.error('Error syncing user to Supabase:', error)
       return null
     }
   }
@@ -90,15 +84,6 @@ export class ClerkSupabaseSync {
         .join(' ') || 
         clerkUserData.fullName || 
         'User';
-
-      console.log('🔍 ClerkSupabaseSync: Creating user with data:', {
-        email,
-        phone,
-        fullName,
-        firstName: clerkUserData.firstName,
-        lastName: clerkUserData.lastName,
-        fullNameFromData: clerkUserData.fullName
-      });
 
       // Generate unique referral link locally to avoid frontend database calls
       const referralLink = this.generateReferralLinkLocally(clerkUserData.firstName || 'user', clerkUserData.id)
@@ -130,13 +115,8 @@ export class ClerkSupabaseSync {
         throw new Error(error?.message || 'Failed to create user');
       }
 
-
-
       return newUser
     } catch (error) {
-      console.error('Error creating user in Supabase:', error)
-      console.error('Error details:', error)
-      console.error('User data being inserted:', clerkUserData)
       return null
     }
   }
@@ -155,11 +135,8 @@ export class ClerkSupabaseSync {
         .single()
 
       if (fetchError) {
-        console.error('Error fetching existing user:', fetchError)
         return null
       }
-
-      console.log('🔍 ClerkSupabaseSync: Existing user data:', existingUser);
 
       // Build update data - ONLY update fields that are completely missing (null/undefined/empty)
       const updateData: any = {
@@ -175,8 +152,7 @@ export class ClerkSupabaseSync {
           'User'
         if (fullName && fullName !== 'User') {
           updateData.full_name = fullName
-          console.log('🔍 ClerkSupabaseSync: Updating missing full_name:', fullName)
-        }
+          }
       }
 
       // Only update email if it's completely missing
@@ -186,8 +162,7 @@ export class ClerkSupabaseSync {
                      ''
         if (email) {
           updateData.email = email
-          console.log('🔍 ClerkSupabaseSync: Updating missing email:', email)
-        }
+          }
       }
 
       // Only update phone if it's completely missing
@@ -197,32 +172,26 @@ export class ClerkSupabaseSync {
                      null
         if (phone) {
           updateData.phone = phone
-          console.log('🔍 ClerkSupabaseSync: Updating missing phone:', phone)
-        }
+          }
       }
 
       // Only update profile_image_url if it's completely missing
       if (!existingUser.profile_image_url || existingUser.profile_image_url.trim() === '') {
         if (clerkUserData.imageUrl) {
           updateData.profile_image_url = clerkUserData.imageUrl
-          console.log('🔍 ClerkSupabaseSync: Updating missing profile_image_url:', clerkUserData.imageUrl)
-        }
+          }
       }
 
       // Only update assessment_link if it's completely missing
       if (!existingUser.assessment_link || existingUser.assessment_link.trim() === '') {
         const assessmentLink = this.generateAssessmentLinkLocally(clerkUserData.id)
         updateData.assessment_link = assessmentLink
-        console.log('🔍 ClerkSupabaseSync: Updating missing assessment_link:', assessmentLink)
-      }
+        }
 
       // If no fields to update, just return the existing user
       if (Object.keys(updateData).length === 1) { // Only has updated_at
-        console.log('🔍 ClerkSupabaseSync: No fields to update, returning existing user unchanged')
         return existingUser
       }
-
-      console.log('🔍 ClerkSupabaseSync: Updating fields:', updateData);
 
       const { data: updatedUser, error } = await supabaseClient
         .from('users')
@@ -232,14 +201,11 @@ export class ClerkSupabaseSync {
         .single()
 
       if (error) {
-        console.error('Error updating user in Supabase:', error)
         return null
       }
 
-      console.log('🔍 ClerkSupabaseSync: Update successful, returning updated user');
       return updatedUser
     } catch (error) {
-      console.error('Error in updateUserInSupabase:', error)
       return null
     }
   }
@@ -295,13 +261,11 @@ export class ClerkSupabaseSync {
         .single()
 
       if (error) {
-        console.error('Error fetching user from Supabase:', error)
         return null
       }
 
       return user
     } catch (error) {
-      console.error('Error in getUserByClerkId:', error)
       return null
     }
   }
@@ -317,13 +281,11 @@ export class ClerkSupabaseSync {
         .eq('clerk_id', clerkId)
 
       if (error) {
-        console.error('Error deleting user from Supabase:', error)
         return false
       }
 
       return true
     } catch (error) {
-      console.error('Error in deleteUserFromSupabase:', error)
       return false
     }
   }

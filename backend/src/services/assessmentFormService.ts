@@ -168,12 +168,6 @@ export class AssessmentFormService {
     };
   }
 
-
-
-
-
-
-
   /**
    * Get the effective form and version for a lead
    */

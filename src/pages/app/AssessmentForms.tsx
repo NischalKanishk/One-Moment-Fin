@@ -220,7 +220,6 @@ export default function AssessmentForms() {
         await createDefaultAssessment(token);
       }
     } catch (error: any) {
-      console.error("Failed to load assessments:", error);
       toast({
         title: "Error",
         description: "Failed to load assessments. Please try again.",
@@ -273,7 +272,6 @@ export default function AssessmentForms() {
         setPreviewUrl(`${window.location.origin}${user.referral_link}`);
       }
     } catch (error: any) {
-      console.error("Failed to create default assessment:", error);
       toast({
         title: "Error",
         description: "Failed to create default assessment. Please try again.",
@@ -411,7 +409,6 @@ export default function AssessmentForms() {
         description: "Assessment saved successfully! New version created.",
       });
     } catch (error: any) {
-      console.error("Failed to save assessment:", error);
       toast({
         title: "Error",
         description: "Failed to save assessment. Please try again.",
@@ -1157,7 +1154,6 @@ export default function AssessmentForms() {
                   )}
                 </div>
               </div>
-
 
             </div>
           )}

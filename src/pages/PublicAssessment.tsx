@@ -85,53 +85,36 @@ export default function PublicAssessment() {
   const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
-    console.log('🔍 useEffect triggered with:', {
-      pathname: location.pathname,
-      slug,
-      referralCode,
-      assessmentCode
-    });
-    
     // Determine assessment type based on URL
     if (location.pathname.startsWith('/assessment/')) {
-      console.log('🔍 Assessment type: assessment');
       setAssessmentType('assessment');
       if (assessmentCode) {
         loadAssessmentByCode(assessmentCode);
       }
     } else if (location.pathname.startsWith('/r/')) {
-      console.log('🔍 Assessment type: referral');
       setAssessmentType('referral');
       if (referralCode) {
         loadReferralAssessment(referralCode);
       }
     } else if (location.pathname.startsWith('/a/')) {
-      console.log('🔍 Assessment type: assessment code (user assessment link)');
       setAssessmentType('assessment');
       // Extract the assessment code from the pathname since it's a user assessment link
       const pathCode = location.pathname.split('/')[2]; // /a/code -> ['', 'a', 'code']
-      console.log('🔍 Extracted assessment code from pathname:', pathCode);
       if (pathCode && pathCode.trim() !== '') {
-        console.log('🔍 Calling loadAssessmentByCode with:', pathCode);
         loadAssessmentByCode(pathCode);
       } else {
-        console.error('❌ No assessment code found in pathname or code is empty');
         setIsLoading(false);
       }
     } else if (slug) {
-      console.log('🔍 Assessment type: public (fallback)');
       setAssessmentType('public');
       loadAssessment(slug);
     } else {
-      console.log('❌ No matching route found');
-    }
+      }
   }, [slug, referralCode, assessmentCode, location.pathname]);
 
   const loadAssessmentByCode = async (assessmentCode: string) => {
     try {
       setIsLoading(true);
-      console.log('🔍 Loading assessment by code:', assessmentCode);
-      
       // Call the API endpoint that matches our API structure
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/assessment/${assessmentCode}`);
       
@@ -140,12 +123,9 @@ export default function PublicAssessment() {
       }
       
       const data = await response.json();
-      console.log('✅ Assessment data loaded by code:', data);
-      
       setAssessment(data.assessment);
       setQuestions(data.questions);
     } catch (error) {
-      console.error('Failed to load assessment by code:', error);
       toast({
         title: "Error",
         description: "Failed to load assessment. Please check the link and try again.",
@@ -178,7 +158,6 @@ export default function PublicAssessment() {
       setAssessment(data.assessment);
       setQuestions(data.questions);
     } catch (error) {
-      console.error('Failed to load referral assessment:', error);
       toast({
         title: "Error",
         description: "Failed to load assessment. Please check the link and try again.",
@@ -192,8 +171,6 @@ export default function PublicAssessment() {
   const loadAssessment = async (assessmentSlug: string) => {
     try {
       setIsLoading(true);
-      console.log('🔍 Loading assessment for slug:', assessmentSlug);
-      
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://one-moment-fin.vercel.app'}/api/assessments/public/${assessmentSlug}`);
       
       if (!response.ok) {
@@ -201,12 +178,9 @@ export default function PublicAssessment() {
       }
       
       const data = await response.json();
-      console.log('✅ Assessment data loaded:', data);
-      
       setAssessment(data.assessment);
       setQuestions(data.questions);
     } catch (error) {
-      console.error('Failed to load assessment:', error);
       toast({
         title: "Error",
         description: "Failed to load assessment. Please check the link and try again.",
@@ -240,7 +214,6 @@ export default function PublicAssessment() {
 
     // If there's no user_id, skip the existing lead check and proceed directly to questions
     if (!assessment.user_id) {
-      console.log('⚠️ No user_id found in assessment, skipping existing lead check');
       setCurrentStep('questions');
       return;
     }
@@ -273,7 +246,6 @@ export default function PublicAssessment() {
         setCurrentStep('questions');
       }
     } catch (error) {
-      console.error('Failed to verify existing lead:', error);
       toast({
         title: "Error",
         description: "Failed to verify existing lead. Please try again.",
@@ -425,15 +397,6 @@ export default function PublicAssessment() {
         throw new Error('Invalid assessment configuration');
       }
       
-      console.log('🔍 Submitting assessment with data:', {
-        submitUrl,
-        submitData,
-        assessmentType,
-        assessmentCode,
-        slug,
-        pathname: location.pathname
-      });
-      
       const response = await fetch(submitUrl, {
         method: 'POST',
         headers: {
@@ -457,7 +420,6 @@ export default function PublicAssessment() {
         variant: "default",
       });
     } catch (error: any) {
-      console.error('Failed to submit assessment:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to submit assessment. Please try again.",

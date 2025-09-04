@@ -9,7 +9,6 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { authAPI } from "@/lib/api";
 
-
 export default function Profile() {
   const { user: clerkUser } = useUser();
   const { getToken } = useAuth();
@@ -41,15 +40,12 @@ export default function Profile() {
         setIsLoadingProfile(true);
         const token = await getToken();
         if (!token) {
-          console.log('🔍 No token available yet, waiting...');
           return; // Don't throw error, just wait for token
         }
         
         // Fetch current profile data from database
         const result = await authAPI.getProfileWithToken(token);
         const dbUser = result.user;
-        
-        console.log('🔍 Fetched profile data from database:', dbUser);
         
         // Store the user ID to prevent unnecessary re-fetches
         setCurrentUserId(dbUser.clerk_id);
@@ -86,9 +82,7 @@ export default function Profile() {
           mfd_registration_number: dbUser.mfd_registration_number || ''
         });
         
-        console.log('🔍 Profile data loaded from database:', newProfileData);
-      } catch (error) {
-        console.error('Failed to fetch profile data:', error);
+        } catch (error) {
         toast.error('Failed to load profile data. Please refresh the page.');
       } finally {
         setIsLoadingProfile(false);
@@ -101,16 +95,12 @@ export default function Profile() {
     }
   }, [clerkUser, getToken, currentUserId]);
 
-
-
   // Check if form has changes
   const hasChanges = () => {
     return profileData.full_name !== originalData.full_name || 
            profileData.phone !== originalData.phone ||
            profileData.mfd_registration_number !== originalData.mfd_registration_number;
   };
-
-
 
   // Validate form data
   const validateForm = () => {
@@ -137,22 +127,15 @@ export default function Profile() {
     
     setIsSaving(true);
     try {
-      console.log('🔍 Starting profile update...');
-      console.log('Profile data to update:', profileData);
-      
       // Get phone number
       const fullPhoneNumber = profileData.phone ? `${countryCode}${profileData.phone}` : '';
-      console.log('Full phone number:', fullPhoneNumber);
-      
       // Get JWT token - use default token since supabase template may not be configured
       let token = null;
       
       try {
         // Try to get the default Clerk token
         token = await getToken();
-        console.log('✅ Got default Clerk token');
-      } catch (tokenError) {
-        console.error('❌ Failed to get Clerk token:', tokenError);
+        } catch (tokenError) {
         throw new Error('Failed to generate authentication token. Please try signing out and signing back in.');
       }
       
@@ -160,16 +143,12 @@ export default function Profile() {
         throw new Error('Failed to generate authentication token');
       }
       
-      console.log('✅ JWT token obtained, length:', token.length);
-      
       // Call the API to update the profile
       const result = await authAPI.updateProfileWithToken(token, {
         full_name: profileData.full_name.trim(),
         phone: fullPhoneNumber,
         mfd_registration_number: profileData.mfd_registration_number.trim()
       });
-      
-      console.log('✅ Profile update API call successful');
       
       // Update local state with the response data
       const updatedUser = result.user;
@@ -208,8 +187,6 @@ export default function Profile() {
         const refreshedResult = await authAPI.getProfileWithToken(token);
         const refreshedUser = refreshedResult.user;
         
-        console.log('🔍 Refreshed profile data from database:', refreshedUser);
-        
         // Extract phone number without country code for display
         let refreshedDisplayPhone = '';
         if (refreshedUser.phone && refreshedUser.phone !== null) {
@@ -238,17 +215,13 @@ export default function Profile() {
           phone: refreshedDisplayPhone
         });
         
-        console.log('🔍 Profile data refreshed and updated:', refreshedProfileData);
-      } catch (refreshError) {
-        console.error('Failed to refresh profile data:', refreshError);
+        } catch (refreshError) {
         // If refresh fails, still show success but log the error
       }
       
       toast.success('Profile updated successfully!');
       
     } catch (error) {
-      console.error('Profile update error:', error);
-      
       // Provide more specific error messages
       let errorMessage = 'Update failed';
       if (error instanceof Error) {
@@ -437,7 +410,6 @@ export default function Profile() {
           >
             {isSaving ? 'Saving...' : 'Save Changes'}
           </Button>
-          
 
         </div>
       </div>

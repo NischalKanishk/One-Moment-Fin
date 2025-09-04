@@ -24,7 +24,6 @@ router.post('/logout', authenticateUser, async (req: express.Request, res: expre
   try {
     return res.json({ message: 'Auth disabled' });
   } catch (error) {
-    console.error('Logout error:', error);
     return res.status(500).json({ error: 'Logout failed' });
   }
 });
@@ -32,16 +31,12 @@ router.post('/logout', authenticateUser, async (req: express.Request, res: expre
 // GET /api/auth/test - Test authentication endpoint
 router.get('/test', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
-    console.log('🔍 Test endpoint called');
-    console.log('Authenticated user:', req.user);
-    
     return res.json({ 
       message: 'Authentication working',
       user: req.user,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Test endpoint error:', error);
     return res.status(500).json({ error: 'Test failed' });
   }
 });
@@ -80,23 +75,19 @@ router.get('/me', authenticateUser, async (req: express.Request, res: express.Re
         .single();
 
       if (createError) {
-        console.error('Error creating user:', createError);
         return res.status(500).json({ error: 'Failed to create user profile' });
       }
 
       // Automatically create default assessment for new user
       try {
         await DefaultAssessmentService.createDefaultAssessment(newUser.id);
-        console.log(`Created default assessment for new user ${newUser.id}`);
-      } catch (assessmentError) {
-        console.error('Warning: Failed to create default assessment:', assessmentError);
+        } catch (assessmentError) {
         // Don't fail the user creation if assessment creation fails
         // The user can still use the system and create assessments manually
       }
 
       userData = newUser;
     } else if (error) {
-      console.error('Database error:', error);
       return res.status(500).json({ error: 'Failed to fetch user data from database' });
     }
 
@@ -107,7 +98,6 @@ router.get('/me', authenticateUser, async (req: express.Request, res: express.Re
     // If we still don't have user data, return error
     return res.status(404).json({ error: 'User not found in database' });
   } catch (error) {
-    console.error('Get user error:', error);
     return res.status(500).json({ error: 'Failed to get user data' });
   }
 });
@@ -136,14 +126,9 @@ router.put('/profile', authenticateUser, [
 
 ], async (req:express.Request, res: express.Response) => {
   try {
-    console.log('🔍 Profile update request received');
-    console.log('Request body:', req.body);
-    console.log('Authenticated user:', req.user);
-    console.log('User ID from auth middleware:', req.user?.clerk_id);
-    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('❌ Validation errors:', errors.array());
+      );
       return res.status(400).json({ 
         error: 'Validation failed',
         details: errors.array()
@@ -151,18 +136,11 @@ router.put('/profile', authenticateUser, [
     }
 
     const { full_name, phone, mfd_registration_number } = req.body;
-    console.log('🔍 Extracted data:', { full_name, phone, mfd_registration_number });
-    
     // Get the actual Clerk ID from the authenticated user
     const clerkId = req.user!.clerk_id;
-    console.log('🔍 Clerk ID from request:', clerkId);
-
     // Handle phone field - convert empty string to null
     const phoneValue = phone === '' ? null : phone;
-    console.log('🔍 Phone value after processing:', phoneValue);
-
     // First, check if user exists in database
-    console.log('🔍 Checking if user exists in database with clerk_id:', clerkId);
     let { data: existingUser, error: fetchError } = await supabase
       .from('users')
       .select('*')
@@ -170,7 +148,6 @@ router.put('/profile', authenticateUser, [
       .single();
 
     if (fetchError && fetchError.code === 'PGRST116') {
-      console.log('📝 User does not exist, creating new user...');
       // User doesn't exist, create them
       
       const { data: newUser, error: createError } = await supabase
@@ -190,18 +167,14 @@ router.put('/profile', authenticateUser, [
         .single();
 
       if (createError) {
-        console.error('❌ Error creating user:', createError);
         return res.status(500).json({ error: 'Failed to create user profile' });
       }
 
-      console.log('✅ New user created successfully:', newUser);
       existingUser = newUser;
     } else if (fetchError) {
-      console.error('❌ Error fetching user:', fetchError);
       return res.status(500).json({ error: 'Failed to fetch user profile' });
     } else {
-      console.log('✅ Existing user found:', existingUser);
-    }
+      }
 
     // Prepare update data - only update fields that are provided
     const updateData: any = {
@@ -212,11 +185,7 @@ router.put('/profile', authenticateUser, [
     if (phoneValue !== undefined) updateData.phone = phoneValue;
     if (mfd_registration_number !== undefined) updateData.mfd_registration_number = mfd_registration_number;
 
-
-    console.log('🔍 Update data prepared:', updateData);
-
     // Now update the user profile
-    console.log('🚀 Updating user profile in database...');
     const { data, error } = await supabase
       .from('users')
       .update(updateData)
@@ -225,20 +194,11 @@ router.put('/profile', authenticateUser, [
       .single();
 
     if (error) {
-      console.error('❌ Profile update error:', error);
-      console.error('❌ Error details:', {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      });
       return res.status(500).json({ error: 'Profile update failed' });
     }
 
-    console.log('✅ Profile updated successfully:', data);
     return res.json({ user: data });
   } catch (error) {
-    console.error('❌ Profile update error:', error);
     return res.status(500).json({ error: 'Profile update failed' });
   }
 });
@@ -277,7 +237,6 @@ router.post('/migrate-user', authenticateUser, [
 
     return res.json(result);
   } catch (error) {
-    console.error('User migration error:', error);
     return res.status(500).json({ error: 'Migration failed' });
   }
 });
@@ -298,7 +257,6 @@ router.get('/orphaned-users', authenticateUser, async (req: express.Request, res
 
     return res.json(result);
   } catch (error) {
-    console.error('Get orphaned users error:', error);
     return res.status(500).json({ error: 'Failed to fetch orphaned users' });
   }
 });
@@ -329,17 +287,12 @@ router.post('/bulk-migrate', authenticateUser, [
 
     return res.json(result);
   } catch (error) {
-    console.error('Bulk migrate error:', error);
     return res.status(500).json({ error: 'Migration failed' });
   }
 });
 
 // Debug route to catch all requests
 router.all('*', (req: express.Request, res: express.Response) => {
-  console.log('🔍 Auth route debug - Method:', req.method, 'Path:', req.path, 'URL:', req.url);
-  console.log('🔍 Auth route debug - Headers:', req.headers);
-  console.log('🔍 Auth route debug - Body:', req.body);
-  
   if (req.method === 'OPTIONS') {
     // Handle preflight request
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');

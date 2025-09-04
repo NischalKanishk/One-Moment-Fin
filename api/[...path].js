@@ -21,8 +21,6 @@ module.exports = async function handler(req, res) {
     const urlObj = new URL(url, `http://localhost`);
     const path = urlObj.pathname;
     
-    console.log(`🔍 API Request: ${method} ${path} - v2.1`);
-    
     // ============================================================================
     // HEALTH CHECK
     // ============================================================================
@@ -40,8 +38,6 @@ module.exports = async function handler(req, res) {
     // ============================================================================
     if (path === '/api/test-db') {
       try {
-        console.log('🔍 Testing database queries...');
-        
         // Test basic connection
         const { data: testData, error: testError } = await supabase
           .from('users')
@@ -49,14 +45,11 @@ module.exports = async function handler(req, res) {
           .limit(1);
         
         if (testError) {
-          console.error('❌ Basic connection test failed:', testError);
           return res.status(500).json({ 
             error: 'Basic connection failed', 
             details: testError.message 
           });
         }
-        
-        console.log('✅ Basic connection test successful');
         
         // Test risk_frameworks table
         const { data: frameworks, error: frameworkError } = await supabase
@@ -64,14 +57,11 @@ module.exports = async function handler(req, res) {
           .select('*');
         
         if (frameworkError) {
-          console.error('❌ Frameworks query failed:', frameworkError);
           return res.status(500).json({ 
             error: 'Frameworks query failed', 
             details: frameworkError.message 
           });
         }
-        
-        console.log(`✅ Found ${frameworks?.length || 0} frameworks`);
         
         // Test framework_questions table
         const { data: questions, error: questionsError } = await supabase
@@ -80,14 +70,13 @@ module.exports = async function handler(req, res) {
           .limit(5);
         
         if (questionsError) {
-          console.error('❌ Questions query failed:', questionsError);
           return res.status(500).json({ 
             error: 'Questions query failed', 
             details: questionsError.message 
           });
         }
         
-        console.log(`✅ Found ${questions?.length || 0} questions (showing first 5)`);
+        `);
         
         return res.json({
           status: 'OK',
@@ -102,7 +91,6 @@ module.exports = async function handler(req, res) {
         });
         
       } catch (error) {
-        console.error('❌ Database test failed:', error);
         return res.status(500).json({ 
           error: 'Database test failed', 
           details: error.message 
@@ -115,8 +103,6 @@ module.exports = async function handler(req, res) {
     // ============================================================================
     if (path === '/api/check-env') {
       try {
-        console.log('🔍 Checking environment variables...');
-        
         const envCheck = {
           SUPABASE_URL: {
             present: !!process.env.SUPABASE_URL,
@@ -138,8 +124,6 @@ module.exports = async function handler(req, res) {
           VERCEL_ENV: process.env.VERCEL_ENV || 'Not set'
         };
         
-        console.log('🔍 Environment check results:', envCheck);
-        
         const allRequiredPresent = envCheck.SUPABASE_URL.present && 
                                   envCheck.SUPABASE_SERVICE_ROLE_KEY.present && 
                                   envCheck.SUPABASE_ANON_KEY.present;
@@ -152,7 +136,6 @@ module.exports = async function handler(req, res) {
         });
         
       } catch (error) {
-        console.error('❌ Environment check failed:', error);
         return res.status(500).json({ 
           error: 'Environment check failed', 
           details: error.message 
@@ -185,8 +168,6 @@ module.exports = async function handler(req, res) {
             return res.status(400).json({ error: 'User not properly authenticated' });
           }
 
-          console.log('🔍 Fetching meetings for user:', user.supabase_user_id);
-
           const { data: meetings, error } = await supabase
             .from('meetings')
             .select(`
@@ -203,14 +184,11 @@ module.exports = async function handler(req, res) {
             .order('start_time', { ascending: false });
 
           if (error) {
-            console.error('❌ Error fetching meetings:', error);
             return res.status(500).json({ error: 'Failed to fetch meetings' });
           }
 
-          console.log(`✅ Found ${meetings?.length || 0} meetings for user ${user.supabase_user_id}`);
           return res.json({ meetings: meetings || [] });
         } catch (error) {
-          console.error('❌ Error in meetings fetch:', error);
           return res.status(500).json({ error: 'Failed to fetch meetings' });
         }
       }
@@ -224,8 +202,6 @@ module.exports = async function handler(req, res) {
           }
 
           const leadId = meetingsPath.replace('/lead/', '');
-          console.log('🔍 Fetching meetings for lead:', leadId, 'user:', user.supabase_user_id);
-
           const { data: meetings, error } = await supabase
             .from('meetings')
             .select(`
@@ -243,14 +219,11 @@ module.exports = async function handler(req, res) {
             .order('start_time', { ascending: false });
 
           if (error) {
-            console.error('❌ Error fetching lead meetings:', error);
             return res.status(500).json({ error: 'Failed to fetch lead meetings' });
           }
 
-          console.log(`✅ Found ${meetings?.length || 0} meetings for lead ${leadId}`);
           return res.json({ meetings: meetings || [] });
         } catch (error) {
-          console.error('❌ Error in lead meetings fetch:', error);
           return res.status(500).json({ error: 'Failed to fetch lead meetings' });
         }
       }
@@ -277,8 +250,6 @@ module.exports = async function handler(req, res) {
           if (platform === 'calendly' && !calendly_link) {
             return res.status(400).json({ error: 'Calendly link is required when platform is calendly' });
           }
-
-          console.log('🔍 Creating meeting for user:', user.supabase_user_id, 'lead:', lead_id);
 
           // Create meeting record
           const { data: meeting, error } = await supabase
@@ -308,7 +279,6 @@ module.exports = async function handler(req, res) {
             .single();
 
           if (error) {
-            console.error('❌ Error creating meeting:', error);
             return res.status(500).json({ error: 'Failed to create meeting' });
           }
 
@@ -318,13 +288,10 @@ module.exports = async function handler(req, res) {
             // For now, commenting out as it's not in the original file
             // await updateLeadStatus(lead_id, 'meeting_scheduled'); 
           } catch (statusError) {
-            console.error('⚠️ Failed to update lead status:', statusError);
-          }
+            }
 
-          console.log('✅ Meeting created successfully:', meeting.id);
           return res.status(201).json({ meeting });
         } catch (error) {
-          console.error('❌ Error in meeting creation:', error);
           return res.status(500).json({ error: 'Failed to create meeting' });
         }
       }
@@ -339,8 +306,6 @@ module.exports = async function handler(req, res) {
 
           const meetingId = meetingsPath.replace('/', '');
           const { title, start_time, end_time, description, attendees, calendly_link } = req.body;
-
-          console.log('🔍 Updating meeting:', meetingId, 'for user:', user.supabase_user_id);
 
           // Get existing meeting to check ownership
           const { data: existingMeeting, error: fetchError } = await supabase
@@ -387,14 +352,11 @@ module.exports = async function handler(req, res) {
             .single();
 
           if (error) {
-            console.error('❌ Error updating meeting:', error);
             return res.status(500).json({ error: 'Failed to update meeting' });
           }
 
-          console.log('✅ Meeting updated successfully:', meetingId);
           return res.json({ meeting: updatedMeeting });
         } catch (error) {
-          console.error('❌ Error in meeting update:', error);
           return res.status(500).json({ error: 'Failed to update meeting' });
         }
       }
@@ -409,8 +371,6 @@ module.exports = async function handler(req, res) {
 
           const meetingId = meetingsPath.replace('/cancel', '').replace('/', '');
           const { reason } = req.body;
-
-          console.log('🔍 Cancelling meeting:', meetingId, 'for user:', user.supabase_user_id);
 
           // Get existing meeting to check ownership
           const { data: existingMeeting, error: fetchError } = await supabase
@@ -446,14 +406,11 @@ module.exports = async function handler(req, res) {
             .single();
 
           if (error) {
-            console.error('❌ Error cancelling meeting:', error);
             return res.status(500).json({ error: 'Failed to cancel meeting' });
           }
 
-          console.log('✅ Meeting cancelled successfully:', meetingId);
           return res.json({ meeting: updatedMeeting });
         } catch (error) {
-          console.error('❌ Error in meeting cancellation:', error);
           return res.status(500).json({ error: 'Failed to cancel meeting' });
         }
       }
@@ -473,8 +430,6 @@ module.exports = async function handler(req, res) {
             return res.status(400).json({ error: 'Invalid status. Must be scheduled, completed, or cancelled' });
           }
 
-          console.log('🔍 Updating meeting status:', meetingId, 'to', status, 'for user:', user.supabase_user_id);
-
           // Update meeting status
           const { data: updatedMeeting, error } = await supabase
             .from('meetings')
@@ -491,10 +446,8 @@ module.exports = async function handler(req, res) {
             return res.status(404).json({ error: 'Meeting not found' });
           }
 
-          console.log('✅ Meeting status updated successfully:', meetingId, 'to', status);
           return res.json({ meeting: updatedMeeting });
         } catch (error) {
-          console.error('❌ Error in meeting status update:', error);
           return res.status(500).json({ error: 'Failed to update meeting status' });
         }
       }
@@ -510,8 +463,6 @@ module.exports = async function handler(req, res) {
       if (method === 'GET' && assessmentPath && !assessmentPath.includes('/')) {
         try {
           const assessmentCode = assessmentPath;
-          console.log('🔍 Loading assessment by code:', assessmentCode);
-          
           // Find user by assessment_link
           const { data: user, error: userError } = await supabase
             .from('users')
@@ -520,11 +471,8 @@ module.exports = async function handler(req, res) {
             .single();
           
           if (userError || !user) {
-            console.error('❌ User not found for assessment code:', assessmentCode, userError);
             return res.status(404).json({ error: 'Assessment not found' });
           }
-          
-          console.log('✅ Found user:', user.id);
           
           // Get the CFA framework ID
           const { data: framework, error: frameworkError } = await supabase
@@ -534,7 +482,6 @@ module.exports = async function handler(req, res) {
             .single();
           
           if (frameworkError || !framework) {
-            console.error('❌ Error fetching CFA framework:', frameworkError);
             return res.status(500).json({ error: 'Framework not found' });
           }
           
@@ -546,12 +493,10 @@ module.exports = async function handler(req, res) {
             .order('order_index');
           
           if (questionsError) {
-            console.error('❌ Error fetching framework questions:', questionsError);
             return res.status(500).json({ error: 'Failed to fetch questions' });
           }
           
           if (!questions || questions.length === 0) {
-            console.warn('⚠️ No questions found for CFA framework');
             return res.status(404).json({ error: 'No questions found' });
           }
           
@@ -564,13 +509,11 @@ module.exports = async function handler(req, res) {
             user_name: user.full_name
           };
           
-          console.log(`✅ Returning assessment with ${questions.length} questions for user ${user.id}`);
           return res.json({ 
             assessment,
             questions 
           });
         } catch (error) {
-          console.error('❌ Get assessment by code error:', error);
           return res.status(500).json({ error: 'Failed to load assessment' });
         }
       }
@@ -579,8 +522,6 @@ module.exports = async function handler(req, res) {
       if (method === 'POST' && assessmentPath.includes('/submit')) {
         try {
           const assessmentCode = assessmentPath.replace('/submit', '');
-          console.log('🔍 Submitting assessment for code:', assessmentCode);
-          
           const { answers, submitterInfo } = req.body;
           
           if (!answers || !submitterInfo) {
@@ -595,7 +536,6 @@ module.exports = async function handler(req, res) {
             .single();
           
           if (userError || !user) {
-            console.error('❌ User not found for assessment code:', assessmentCode);
             return res.status(404).json({ error: 'Assessment not found' });
           }
           
@@ -615,7 +555,6 @@ module.exports = async function handler(req, res) {
             .single();
           
           if (leadError) {
-            console.error('❌ Error creating lead:', leadError);
             return res.status(500).json({ error: 'Failed to create lead' });
           }
           
@@ -648,13 +587,9 @@ module.exports = async function handler(req, res) {
             .single();
           
           if (submissionError) {
-            console.error('❌ Error creating assessment submission:', submissionError);
             // Don't fail the entire request, just log the error
           } else {
-            console.log('✅ Assessment submission created:', submission.id);
-          }
-          
-          console.log('✅ Assessment submitted successfully for lead:', lead.id);
+            }
           
           // Create notification for assessment completion
           try {
@@ -675,13 +610,10 @@ module.exports = async function handler(req, res) {
               });
             
             if (notificationError) {
-              console.error('Failed to create assessment notification:', notificationError);
-            } else {
-              console.log('✅ Notification created for assessment completion');
-            }
+              } else {
+              }
           } catch (notificationErr) {
-            console.error('Assessment notification creation error:', notificationErr);
-          }
+            }
           
           return res.json({ 
             message: 'Assessment submitted successfully',
@@ -689,7 +621,6 @@ module.exports = async function handler(req, res) {
             lead_id: lead.id
           });
         } catch (error) {
-          console.error('❌ Submit assessment error:', error);
           return res.status(500).json({ error: 'Failed to submit assessment' });
         }
       }
@@ -733,7 +664,6 @@ module.exports = async function handler(req, res) {
           const { data: notifications, error } = await query;
 
           if (error) {
-            console.error('Error fetching notifications:', error);
             return res.status(500).json({ error: 'Failed to fetch notifications' });
           }
 
@@ -754,7 +684,6 @@ module.exports = async function handler(req, res) {
             }
           });
         } catch (error) {
-          console.error('❌ Get notifications error:', error);
           return res.status(500).json({ error: 'Failed to fetch notifications' });
         }
       }
@@ -774,13 +703,11 @@ module.exports = async function handler(req, res) {
             .eq('is_read', false);
 
           if (error) {
-            console.error('Error fetching notification count:', error);
             return res.status(500).json({ error: 'Failed to fetch notification count' });
           }
 
           return res.json({ unread_count: count || 0 });
         } catch (error) {
-          console.error('❌ Get notification count error:', error);
           return res.status(500).json({ error: 'Failed to fetch notification count' });
         }
       }
@@ -805,13 +732,11 @@ module.exports = async function handler(req, res) {
             .eq('user_id', user.supabase_user_id);
 
           if (error) {
-            console.error('Error marking notification as read:', error);
             return res.status(500).json({ error: 'Failed to mark notification as read' });
           }
 
           return res.json({ success: true });
         } catch (error) {
-          console.error('❌ Mark notification read error:', error);
           return res.status(500).json({ error: 'Failed to mark notification as read' });
         }
       }
@@ -834,13 +759,11 @@ module.exports = async function handler(req, res) {
             .eq('is_read', false);
 
           if (error) {
-            console.error('Error marking all notifications as read:', error);
             return res.status(500).json({ error: 'Failed to mark all notifications as read' });
           }
 
           return res.json({ success: true });
         } catch (error) {
-          console.error('❌ Mark all notifications read error:', error);
           return res.status(500).json({ error: 'Failed to mark all notifications as read' });
         }
       }
@@ -874,13 +797,11 @@ module.exports = async function handler(req, res) {
             .single();
 
           if (error) {
-            console.error('Error creating notification:', error);
             return res.status(500).json({ error: 'Failed to create notification' });
           }
 
           return res.status(201).json(notification);
         } catch (error) {
-          console.error('❌ Create notification error:', error);
           return res.status(500).json({ error: 'Failed to create notification' });
         }
       }
@@ -903,9 +824,6 @@ module.exports = async function handler(req, res) {
           //   return res.status(400).json({ error: 'User not properly authenticated' });
           // }
 
-          console.log('🔍 Getting CFA framework questions from database...');
-          console.log('🔍 Supabase client initialized:', !!supabase);
-          
           // Get the CFA framework ID
           const { data: framework, error: frameworkError } = await supabase
             .from('risk_frameworks')
@@ -914,12 +832,8 @@ module.exports = async function handler(req, res) {
             .single();
           
           if (frameworkError || !framework) {
-            console.error('❌ Error fetching CFA framework:', frameworkError);
-            console.error('❌ Framework data:', framework);
             return res.status(500).json({ error: 'CFA framework not found', details: frameworkError?.message });
           }
-          
-          console.log(`✅ Found CFA framework: ${framework.id}`);
           
           // Fetch questions from framework_questions table
           const { data: questions, error: questionsError } = await supabase
@@ -929,19 +843,15 @@ module.exports = async function handler(req, res) {
             .order('order_index');
           
           if (questionsError) {
-            console.error('❌ Error fetching framework questions:', questionsError);
             return res.status(500).json({ error: 'Failed to fetch framework questions', details: questionsError?.message });
           }
           
           if (!questions || questions.length === 0) {
-            console.warn('⚠️ No questions found for CFA framework');
             return res.json({ questions: [] });
           }
           
-          console.log(`✅ Returning ${questions.length} CFA framework questions from database`);
           return res.json({ questions });
         } catch (error) {
-          console.error('❌ Get CFA questions error:', error);
           return res.status(500).json({ error: 'Failed to fetch CFA questions' });
         }
       }
@@ -950,8 +860,6 @@ module.exports = async function handler(req, res) {
       if (method === 'POST' && assessmentsPath.match(/^\/public\/[^\/]+\/submit$/)) {
         try {
           const slug = assessmentsPath.match(/^\/public\/([^\/]+)\/submit$/)[1];
-          console.log('🔍 Submitting public assessment for slug:', slug);
-          
           const { answers, submitterInfo } = req.body;
           
           if (!answers || !submitterInfo) {
@@ -978,7 +886,6 @@ module.exports = async function handler(req, res) {
             .single();
           
           if (leadError) {
-            console.error('❌ Error creating lead:', leadError);
             return res.status(500).json({ error: 'Failed to create lead' });
           }
           
@@ -1011,13 +918,9 @@ module.exports = async function handler(req, res) {
             .single();
           
           if (submissionError) {
-            console.error('❌ Error creating assessment submission:', submissionError);
             // Don't fail the entire request, just log the error
           } else {
-            console.log('✅ Assessment submission created:', submission.id);
-          }
-          
-          console.log('✅ Public assessment submitted successfully for lead:', lead.id);
+            }
           
           return res.json({ 
             message: 'Assessment submitted successfully',
@@ -1026,7 +929,6 @@ module.exports = async function handler(req, res) {
             isNewLead: true
           });
         } catch (error) {
-          console.error('❌ Submit public assessment error:', error);
           return res.status(500).json({ error: 'Failed to submit assessment' });
         }
       }
@@ -1040,7 +942,7 @@ module.exports = async function handler(req, res) {
           //   return res.status(400).json({ error: 'User not properly authenticated' });
           // }
 
-          console.log('🔍 Getting assessment forms (bypassing auth for testing)');
+          ');
 
           // Get the CFA framework ID
           const { data: framework, error: frameworkError } = await supabase
@@ -1050,7 +952,6 @@ module.exports = async function handler(req, res) {
             .single();
           
           if (frameworkError || !framework) {
-            console.error('❌ Error fetching CFA framework:', frameworkError);
             return res.status(500).json({ error: 'CFA framework not found' });
           }
           
@@ -1062,7 +963,6 @@ module.exports = async function handler(req, res) {
             .order('order_index');
           
           if (questionsError) {
-            console.error('❌ Error fetching framework questions:', questionsError);
             return res.status(500).json({ error: 'Failed to fetch framework questions' });
           }
 
@@ -1085,10 +985,8 @@ module.exports = async function handler(req, res) {
             })) : []
           };
 
-          console.log(`✅ Returning CFA form with ${questions?.length || 0} questions from database`);
           return res.json({ forms: [defaultForm] });
         } catch (error) {
-          console.error('❌ Get forms error:', error);
           return res.status(500).json({ error: 'Failed to fetch forms' });
         }
       }
@@ -1155,7 +1053,6 @@ module.exports = async function handler(req, res) {
             lead_id
           });
         } catch (error) {
-          console.error('❌ Error analyzing assessment:', error);
           return res.status(500).json({ error: 'Failed to analyze assessment' });
         }
       }
@@ -1200,7 +1097,6 @@ module.exports = async function handler(req, res) {
             recommendations
           });
         } catch (error) {
-          console.error('❌ Error generating recommendations:', error);
           return res.status(500).json({ error: 'Failed to generate recommendations' });
         }
       }
@@ -1209,8 +1105,6 @@ module.exports = async function handler(req, res) {
       if (method === 'POST' && aiPath.match(/^\/public\/[^\/]+\/submit$/)) {
         try {
           const slug = aiPath.match(/^\/public\/([^\/]+)\/submit$/)[1];
-          console.log('🔍 Submitting public assessment for slug:', slug);
-          
           const { answers, submitterInfo } = req.body;
           
           if (!answers || !submitterInfo) {
@@ -1237,7 +1131,6 @@ module.exports = async function handler(req, res) {
             .single();
           
           if (leadError) {
-            console.error('❌ Error creating lead:', leadError);
             return res.status(500).json({ error: 'Failed to create lead' });
           }
           
@@ -1270,13 +1163,9 @@ module.exports = async function handler(req, res) {
             .single();
           
           if (submissionError) {
-            console.error('❌ Error creating assessment submission:', submissionError);
             // Don't fail the entire request, just log the error
           } else {
-            console.log('✅ Assessment submission created:', submission.id);
-          }
-          
-          console.log('✅ Public assessment submitted successfully for lead:', lead.id);
+            }
           
           return res.json({ 
             message: 'Assessment submitted successfully',
@@ -1285,7 +1174,6 @@ module.exports = async function handler(req, res) {
             isNewLead: true
           });
         } catch (error) {
-          console.error('❌ Submit public assessment error:', error);
           return res.status(500).json({ error: 'Failed to submit assessment' });
         }
       }
@@ -1395,7 +1283,6 @@ module.exports = async function handler(req, res) {
             result 
           });
         } catch (error) {
-          console.error('❌ SIP Forecast error:', error);
           return res.status(500).json({
             ok: false,
             error: { 
@@ -1418,7 +1305,6 @@ module.exports = async function handler(req, res) {
     });
     
   } catch (error) {
-    console.error('❌ API Error:', error);
     return res.status(500).json({
       error: 'Internal server error',
       message: 'Something went wrong in the API handler'

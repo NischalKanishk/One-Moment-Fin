@@ -84,7 +84,6 @@ export class AssessmentService {
 
       return assessment as Assessment;
     } catch (error) {
-      console.error('Error creating assessment:', error);
       throw error;
     }
   }
@@ -115,7 +114,6 @@ export class AssessmentService {
         try {
           await this.generateSnapshot(assessmentId, data.framework_id);
         } catch (error) {
-          console.warn(`Warning: Could not generate snapshot for framework ${data.framework_id}:`, error);
           // Continue with the update even if snapshot generation fails
         }
       }
@@ -138,7 +136,6 @@ export class AssessmentService {
 
       return assessment as Assessment;
     } catch (error) {
-      console.error('Error updating assessment:', error);
       throw error;
     }
   }
@@ -161,7 +158,6 @@ export class AssessmentService {
 
       return data as Assessment;
     } catch (error) {
-      console.error('Error fetching assessment:', error);
       return null;
     }
   }
@@ -191,7 +187,6 @@ export class AssessmentService {
         .order('order_index');
 
       if (snapshotError) {
-        console.error('Error fetching snapshot:', snapshotError);
         return null;
       }
 
@@ -200,7 +195,6 @@ export class AssessmentService {
         snapshot: snapshot as AssessmentSnapshot[]
       };
     } catch (error) {
-      console.error('Error fetching assessment by slug:', error);
       return null;
     }
   }
@@ -222,7 +216,6 @@ export class AssessmentService {
 
       return (data || []) as Assessment[];
     } catch (error) {
-      console.error('Error fetching user assessments:', error);
       throw error;
     }
   }
@@ -236,7 +229,6 @@ export class AssessmentService {
       const questions = await getCFAFrameworkQuestions();
       
       if (questions.length === 0) {
-        console.warn(`Warning: No questions found for CFA framework`);
         // Don't throw error, just clear existing snapshot and return
         await supabase
           .from('assessment_question_snapshots')
@@ -270,7 +262,6 @@ export class AssessmentService {
         throw new Error(error.message);
       }
     } catch (error) {
-      console.error('Error generating snapshot:', error);
       throw error;
     }
   }
@@ -285,8 +276,6 @@ export class AssessmentService {
     sourceLink?: string
   ): Promise<{ submission: AssessmentSubmission; leadId: string; isNewLead: boolean }> {
     try {
-      console.log('🔍 submitAssessment called with:', { assessmentId, answers, submitterInfo, sourceLink });
-      
       // Get assessment details
       const { data: assessment, error: assessmentError } = await supabase
         .from('assessments')
@@ -296,31 +285,18 @@ export class AssessmentService {
         .single();
 
       if (assessmentError || !assessment) {
-        console.error('❌ Assessment error:', assessmentError);
         throw new Error('Assessment not found or not published');
       }
       
-      console.log('✅ Assessment found:', assessment.title);
-
       // Get CFA framework config and score
-      console.log('🔍 Getting CFA framework config');
       const frameworkConfig = await getCFAFrameworkConfig();
       if (!frameworkConfig) {
-        console.error('❌ CFA framework config not found');
         throw new Error('CFA framework configuration not found');
       }
       
-      console.log('✅ Framework config found, engine:', frameworkConfig.engine);
-
       // Import scoring function
-      console.log('🔍 Importing scoring function...');
       const { scoreSubmission } = await import('./riskScoring');
-      console.log('✅ Scoring function imported');
-      
-      console.log('🔍 Scoring submission...');
       const result = scoreSubmission(frameworkConfig, answers);
-      console.log('✅ Scoring completed, result:', result);
-
       // Create submission using existing assessment_submissions table
       const { data: submission, error: submissionError } = await supabase
         .from('assessment_submissions')
@@ -339,11 +315,8 @@ export class AssessmentService {
         .single();
 
       if (submissionError || !submission) {
-        console.error('❌ Submission creation error:', submissionError);
         throw new Error(submissionError?.message || 'Failed to create assessment submission');
       }
-
-      console.log('✅ Submission created:', submission.id);
 
       // Check if lead with same email already exists for this user
       let lead;
@@ -434,15 +407,12 @@ export class AssessmentService {
         .update({ lead_id: lead.id })
         .eq('id', submission.id);
 
-      console.log('✅ Lead linked to submission:', lead.id);
-
       return {
         submission: submission as AssessmentSubmission,
         leadId: lead.id,
         isNewLead
       };
     } catch (error) {
-      console.error('Error submitting assessment:', error);
       throw error;
     }
   }
@@ -476,7 +446,6 @@ export class AssessmentService {
 
       return (data || []) as AssessmentSubmission[];
     } catch (error) {
-      console.error('Error fetching assessment submissions:', error);
       throw error;
     }
   }
@@ -522,7 +491,6 @@ export class AssessmentService {
         snapshot: this.schemaToQuestions(latestVersion.schema)
       };
     } catch (error) {
-      console.error('Error fetching assessment by ID:', error);
       return null;
     }
   }
@@ -536,7 +504,6 @@ export class AssessmentService {
       const questions = await getCFAFrameworkQuestions();
       
       if (!questions || questions.length === 0) {
-        console.error('No CFA framework questions found');
         return null;
       }
 
@@ -592,7 +559,6 @@ export class AssessmentService {
         snapshot: questions
       };
     } catch (error) {
-      console.error('Error fetching default assessment:', error);
       return null;
     }
   }
@@ -634,7 +600,6 @@ export class AssessmentService {
 
       return data as AssessmentSubmission;
     } catch (error) {
-      console.error('Error fetching submission:', error);
       return null;
     }
   }
@@ -667,7 +632,6 @@ export class AssessmentService {
 
       return assessment;
     } catch (error) {
-      console.error('Error creating default assessment:', error);
       throw error;
     }
   }

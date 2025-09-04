@@ -87,7 +87,6 @@ export function scoreSubmission(cfg: FrameworkConfig, answers: Record<string, an
       throw new Error(`Unsupported scoring engine: ${(cfg as any).engine}`);
     }
   } catch (error) {
-    console.error('Error scoring submission:', error);
     return {
       score: null,
       bucket: null,
@@ -329,13 +328,11 @@ export async function getCFAFrameworkConfig(): Promise<FrameworkConfig | null> {
       .single();
 
     if (error || !data) {
-      console.error('Error fetching CFA framework config:', error);
       return null;
     }
 
     return data.config as FrameworkConfig;
   } catch (error) {
-    console.error('Error fetching CFA framework config:', error);
     return null;
   }
 }
@@ -361,13 +358,11 @@ export async function getQuestionDetails(qkey: string): Promise<any | null> {
       .single();
 
     if (error || !data) {
-      console.error('Error fetching question details:', error);
       return null;
     }
 
     return data;
   } catch (error) {
-    console.error('Error fetching question details:', error);
     return null;
   }
 }
@@ -388,13 +383,11 @@ export async function getCFAFrameworkQuestions(): Promise<any[]> {
       .order('order_index');
 
     if (error) {
-      console.error('Error fetching CFA framework questions:', error);
       return [];
     }
 
     return data || [];
   } catch (error) {
-    console.error('Error fetching CFA framework questions:', error);
     return [];
   }
 }

@@ -202,7 +202,6 @@ export default function LeadDetail() {
     inflationPct: number;
   } | null>(null);
 
-
   const form = useForm<EditFormData>({
     defaultValues: {
       full_name: '',
@@ -253,8 +252,6 @@ export default function LeadDetail() {
       const leadData = await leadsAPI.getById(token, id);
       setLead(leadData);
     } catch (error: any) {
-      console.error('Failed to load lead:', error);
-      
       // Provide more specific error messages
       let errorMessage = "Failed to load lead details. Please try again.";
       
@@ -313,7 +310,6 @@ export default function LeadDetail() {
       setEditDialogOpen(false);
       loadLead();
     } catch (error) {
-      console.error('Failed to update lead:', error);
       toast({
         title: "Error",
         description: "Failed to update lead. Please try again.",
@@ -321,8 +317,6 @@ export default function LeadDetail() {
       });
     }
   };
-
-
 
   const handleDelete = async () => {
     try {
@@ -340,7 +334,6 @@ export default function LeadDetail() {
 
       navigate('/app/leads');
     } catch (error) {
-      console.error('Failed to delete lead:', error);
       toast({
         title: "Error",
         description: "Failed to delete lead. Please try again.",
@@ -367,7 +360,6 @@ export default function LeadDetail() {
       });
       loadLead();
     } catch (error) {
-      console.error('Failed to change status:', error);
       toast({
         title: "Error",
         description: "Failed to change lead status. Please try again.",
@@ -406,7 +398,6 @@ export default function LeadDetail() {
         description: "Notes saved successfully!",
       });
     } catch (error: any) {
-      console.error('Failed to save notes:', error);
       toast({
         title: "Error",
         description: "Failed to save notes. Please try again.",
@@ -443,8 +434,6 @@ export default function LeadDetail() {
         description: "SIP forecast saved successfully!",
       });
     } catch (error: any) {
-      console.error('Failed to save SIP forecast:', error);
-      
       // Extract error message from different possible sources
       let errorMessage = "Failed to save SIP forecast. Please try again.";
       
@@ -489,7 +478,6 @@ export default function LeadDetail() {
         description: "CFA information saved successfully!",
       });
     } catch (error: any) {
-      console.error('Failed to save CFA information:', error);
       toast({
         title: "Error",
         description: "Failed to save CFA information. Please try again.",
@@ -499,7 +487,6 @@ export default function LeadDetail() {
       setSavingNotes(false);
     }
   };
-
 
   if (loading) {
     return (
@@ -621,7 +608,6 @@ export default function LeadDetail() {
               
               <div className="flex gap-3">
 
-                
                 {/* Enhanced Status Change Button */}
                 <Dialog>
                   <DialogTrigger asChild>
@@ -1064,7 +1050,6 @@ export default function LeadDetail() {
                   </p>
                 </div>
               </div>
-              
 
             </div>
           </TabsContent>

@@ -69,7 +69,6 @@ export default function Dashboard() {
         throw new Error('Invalid stats data structure');
       }
     } catch (error) {
-      console.error('Failed to load stats:', error);
       // Use empty data instead of mock data
       setStats({
         total: 0,
@@ -117,16 +116,13 @@ export default function Dashboard() {
             
             setMeetings(upcomingMeetings);
           } else {
-            console.warn('Meetings data is not an array:', meetingsData);
             setMeetings([]);
           }
         } catch (jsonError) {
-          console.error('Failed to parse meetings JSON:', jsonError);
           setMeetings([]);
         }
       }
     } catch (error) {
-      console.error('Failed to load meetings:', error);
       // Set empty array on error to prevent undefined errors
       setMeetings([]);
     }
@@ -154,16 +150,13 @@ export default function Dashboard() {
           if (Array.isArray(leadsData)) {
             setRecentLeads(leadsData);
           } else {
-            console.warn('Leads data is not an array:', leadsData);
             setRecentLeads([]);
           }
         } catch (jsonError) {
-          console.error('Failed to parse leads JSON:', jsonError);
           setRecentLeads([]);
         }
       }
     } catch (error) {
-      console.error('Failed to load recent leads:', error);
       // Set empty array on error to prevent undefined errors
       setRecentLeads([]);
     }

@@ -27,13 +27,10 @@ export const authenticateUser = async (
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ Auth: No valid authorization header');
       return res.status(401).json({ error: 'No valid authorization header' });
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-    console.log('🔍 Auth: Token received, length:', token.length);
-    
     // For development, allow any token that looks like a JWT
     if (process.env.NODE_ENV === 'development') {
       // Check if it looks like a JWT (3 parts separated by dots)
@@ -41,17 +38,14 @@ export const authenticateUser = async (
         try {
           // Try to decode the JWT payload
           const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-          console.log('🔍 Auth: JWT payload decoded (dev mode):', payload);
+          :', payload);
           
           // Extract Clerk user ID from the token
           // Clerk JWT tokens have 'sub' field with the user ID
           const clerkUserId = payload.sub || payload.user_id || payload.clerk_id || 'dev-user-id';
           
           if (!payload.sub) {
-            console.warn('⚠️ Auth: JWT token missing "sub" field, using fallback ID');
-          }
-          
-          console.log('🔍 Auth: Looking up user with clerk_id:', clerkUserId);
+            }
           
           // Look up the corresponding Supabase user ID
           const { data: userData, error: userError } = await supabase
@@ -61,16 +55,13 @@ export const authenticateUser = async (
             .single();
           
           if (userError) {
-            console.error('❌ Auth: Database error during user lookup:', userError);
             if (userError.code === 'PGRST116') {
-              console.log('ℹ️ Auth: User not found in database, will create new user');
-            } else {
+              } else {
               return res.status(500).json({ error: 'Database lookup failed' });
             }
           }
           
           if (!userData) {
-            console.log('⚠️ Auth: User not found in database, creating new user');
             // Create a new user in the database
             const newUserData = {
               clerk_id: clerkUserId,
@@ -82,8 +73,6 @@ export const authenticateUser = async (
               referral_link: `/r/${clerkUserId.slice(-8)}` // Generate referral link
             };
             
-            console.log('🔍 Auth: Creating user with data:', newUserData);
-            
             const { data: newUser, error: createError } = await supabase
               .from('users')
               .insert(newUserData)
@@ -91,12 +80,10 @@ export const authenticateUser = async (
               .single();
             
             if (createError) {
-              console.error('❌ Auth: Error creating new user:', createError);
-              console.error('❌ Auth: User data that failed:', newUserData);
               return res.status(500).json({ error: 'User creation failed' });
             }
             
-            console.log('✅ Auth: New user created successfully:', (newUser as any)?.id);
+            ?.id);
             
             req.user = {
               clerk_id: clerkUserId,
@@ -106,7 +93,6 @@ export const authenticateUser = async (
               role: newUser.role
             };
           } else {
-            console.log('✅ Auth: User found in database:', userData.id);
             req.user = {
               clerk_id: clerkUserId,
               supabase_user_id: userData.id,
@@ -116,10 +102,9 @@ export const authenticateUser = async (
             };
           }
           
-          console.log('✅ Auth: User authenticated (dev mode):', req.user);
+          :', req.user);
           return next();
         } catch (decodeError) {
-          console.warn('⚠️ Auth: JWT decode failed in dev mode, using default user');
           // In development, allow the request to continue with a default user
           req.user = {
             clerk_id: 'dev-user-id',
@@ -132,7 +117,7 @@ export const authenticateUser = async (
         }
       } else {
         // Token doesn't look like a JWT
-        console.log('❌ Auth: Token format invalid (not JWT)');
+        ');
         return res.status(401).json({ error: 'Invalid token format' });
       }
     }
@@ -141,7 +126,6 @@ export const authenticateUser = async (
     try {
       // Verify the JWT token with Clerk
       if (!isClerkConfigured()) {
-        console.error('❌ Auth: Clerk not configured, cannot verify JWT');
         return res.status(500).json({ error: 'Authentication service not configured' });
       }
 
@@ -150,41 +134,26 @@ export const authenticateUser = async (
       try {
         // First, try to verify as a JWT token by decoding it
         const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-        console.log('🔍 Auth: JWT payload decoded:', payload);
-
         if (!payload.sub) {
-          console.error('❌ Auth: JWT missing "sub" field');
           return res.status(401).json({ error: 'Invalid token - missing sub field' });
         }
 
         // Verify the user exists in Clerk
         const clerkUser = await clerkClient.users.getUser(payload.sub);
-        console.log('🔍 Auth: User verified with Clerk:', clerkUser.id);
-
         clerkUserId = payload.sub;
       } catch (jwtError) {
-        console.log('⚠️ Auth: JWT decode failed, trying session token...');
-        
         try {
           // Try to verify as a session token
           const session = await clerkClient.sessions.getSession(token);
-          console.log('🔍 Auth: Session verified with Clerk, session:', session.id);
-
           if (!session.userId) {
-            console.error('❌ Auth: Session verification failed - no user ID in session');
             return res.status(401).json({ error: 'Invalid token - no user ID' });
           }
 
           clerkUserId = session.userId;
         } catch (sessionError) {
-          console.error('❌ Auth: Both JWT decode and session verification failed');
-          console.error('JWT error:', jwtError);
-          console.error('Session error:', sessionError);
           return res.status(401).json({ error: 'Invalid or expired token' });
         }
       }
-
-      console.log('🔍 Auth: Looking up user with clerk_id:', clerkUserId);
 
       // Look up the corresponding Supabase user ID
       const { data: userData, error: userError } = await supabase
@@ -194,13 +163,10 @@ export const authenticateUser = async (
         .single();
       
       if (userError && userError.code !== 'PGRST116') {
-        console.error('❌ Auth: Error looking up user in database:', userError);
         return res.status(500).json({ error: 'Database lookup failed' });
       }
       
       if (!userData) {
-        console.log('⚠️ Auth: User not found in database, creating new user');
-        
         // Get user details from Clerk
         const clerkUser = await clerkClient.users.getUser(clerkUserId);
         
@@ -215,8 +181,6 @@ export const authenticateUser = async (
           referral_link: `/r/${clerkUserId.slice(-8)}` // Generate referral link
         };
         
-        console.log('🔍 Auth: Creating user with data:', newUserData);
-        
         const { data: newUser, error: createError } = await supabase
           .from('users')
           .insert(newUserData)
@@ -224,12 +188,10 @@ export const authenticateUser = async (
           .single();
         
         if (createError) {
-          console.error('❌ Auth: Error creating new user:', createError);
-          console.error('❌ Auth: User data that failed:', newUserData);
           return res.status(500).json({ error: 'User creation failed' });
         }
         
-        console.log('✅ Auth: New user created successfully:', (newUser as any)?.id);
+        ?.id);
         
         req.user = {
           clerk_id: clerkUserId,
@@ -239,8 +201,6 @@ export const authenticateUser = async (
           role: newUser.role
         };
       } else {
-        console.log('✅ Auth: User found in database:', userData.id);
-
         // Set user information from database
         req.user = {
           clerk_id: clerkUserId,
@@ -251,11 +211,8 @@ export const authenticateUser = async (
         };
       }
 
-      console.log('✅ Auth: User authenticated:', req.user);
       return next();
     } catch (tokenError) {
-      console.error('❌ Auth: Token verification error:', tokenError);
-      
       // Check if it's a Clerk-specific error
       if (tokenError instanceof Error) {
         if (tokenError.message.includes('jwt')) {
@@ -266,7 +223,6 @@ export const authenticateUser = async (
       return res.status(401).json({ error: 'Authentication failed' });
     }
   } catch (error) {
-    console.error('❌ Auth: Authentication error:', error);
     return res.status(500).json({ error: 'Authentication failed' });
   }
 };

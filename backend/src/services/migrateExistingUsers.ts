@@ -7,24 +7,18 @@ export class MigrateExistingUsersService {
    */
   static async migrateAllUsers(): Promise<{ success: boolean; migrated: number; errors: string[] }> {
     try {
-      console.log('Starting migration of existing users to default assessments...');
-      
       // Get all users
       const { data: users, error: usersError } = await supabase
         .from('users')
         .select('id, full_name, email');
 
       if (usersError) {
-        console.error('Failed to fetch users:', usersError);
         throw new Error('Failed to fetch users');
       }
 
       if (!users || users.length === 0) {
-        console.log('No users found to migrate');
         return { success: true, migrated: 0, errors: [] };
       }
-
-      console.log(`Found ${users.length} users to check for migration`);
 
       let migrated = 0;
       const errors: string[] = [];
@@ -35,29 +29,23 @@ export class MigrateExistingUsersService {
           const hasDefault = await DefaultAssessmentService.hasDefaultAssessment(user.id);
           
           if (!hasDefault) {
-            console.log(`Creating default assessment for user: ${user.full_name} (${user.email})`);
+            `);
             await DefaultAssessmentService.createDefaultAssessment(user.id);
             migrated++;
-            console.log(`✓ Successfully created default assessment for user: ${user.full_name}`);
-          } else {
-            console.log(`User ${user.full_name} already has default assessment, skipping`);
-          }
+            } else {
+            }
         } catch (error) {
           const errorMsg = `Failed to migrate user ${user.full_name} (${user.id}): ${error}`;
-          console.error(errorMsg);
           errors.push(errorMsg);
         }
       }
 
-      console.log(`Migration completed. Migrated: ${migrated}, Errors: ${errors.length}`);
-      
       return {
         success: errors.length === 0,
         migrated,
         errors
       };
     } catch (error) {
-      console.error('Migration failed:', error);
       throw error;
     }
   }
@@ -93,7 +81,6 @@ export class MigrateExistingUsersService {
         message: `Successfully created default assessment for user: ${user.full_name}` 
       };
     } catch (error) {
-      console.error(`Failed to migrate user ${userId}:`, error);
       return { 
         success: false, 
         message: `Failed to create default assessment: ${error}` 
@@ -162,7 +149,6 @@ export class MigrateExistingUsersService {
         details
       };
     } catch (error) {
-      console.error('Failed to get migration status:', error);
       throw error;
     }
   }

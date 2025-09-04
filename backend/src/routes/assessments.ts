@@ -22,28 +22,21 @@ router.get('/', authenticateUser, async (req: express.Request, res: express.Resp
     }
 
     // Get user's assessments from the assessments table (legacy system)
-    console.log('🔍 Querying assessments for user:', req.user.supabase_user_id);
     const { data: assessments, error: assessmentsError } = await supabase
       .from('assessments')
       .select('*')
       .eq('user_id', req.user.supabase_user_id);
 
     if (assessmentsError) {
-      console.error('❌ Get assessments error:', assessmentsError);
       return res.status(500).json({ error: 'Failed to fetch assessments' });
     }
 
-    console.log('✅ Assessments found:', assessments?.length || 0);
-
     if (!assessments || assessments.length === 0) {
-      console.log('ℹ️ No assessments found, returning empty array');
       return res.json({ assessments: [] });
     }
 
-    console.log('✅ Returning assessments:', assessments.length);
     return res.json({ assessments });
   } catch (error) {
-    console.error('Get assessments error:', error);
     return res.status(500).json({ error: 'Failed to fetch assessments' });
   }
 });
@@ -74,7 +67,6 @@ router.post('/', authenticateUser, [
 
     return res.status(201).json({ assessment });
   } catch (error) {
-    console.error('Create assessment error:', error);
     return res.status(500).json({ error: 'Failed to create assessment' });
   }
 });
@@ -105,7 +97,6 @@ router.post('/forms', authenticateUser, [
 
     return res.status(201).json({ form });
   } catch (error) {
-    console.error('Create form error:', error);
     return res.status(500).json({ error: 'Failed to create assessment form' });
   }
 });
@@ -149,7 +140,6 @@ router.post('/forms/:formId/versions', authenticateUser, [
 
     return res.status(201).json({ version });
   } catch (error) {
-    console.error('Create version error:', error);
     return res.status(500).json({ error: 'Failed to create form version' });
   }
 });
@@ -157,40 +147,27 @@ router.post('/forms/:formId/versions', authenticateUser, [
 // GET /api/assessments/forms - List user assessment forms with versions
 router.get('/forms', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
-    console.log('🔍 Forms endpoint called');
-    console.log('User:', req.user);
-    console.log('User supabase_user_id:', req.user?.supabase_user_id);
-    
     if (!req.user?.supabase_user_id) {
-      console.error('❌ No supabase_user_id in request');
       return res.status(400).json({ error: 'User not properly authenticated' });
     }
 
     // Get user's assessment forms from the assessment_forms table
-    console.log('🔍 Querying assessment forms for user:', req.user.supabase_user_id);
     const { data: forms, error: formsError } = await supabase
       .from('assessment_forms')
       .select('*')
       .eq('user_id', req.user.supabase_user_id);
 
     if (formsError) {
-      console.error('❌ Get forms error:', formsError);
       return res.status(500).json({ error: 'Failed to fetch assessment forms' });
     }
 
-    console.log('✅ Assessment forms found:', forms?.length || 0);
-
     if (!forms || forms.length === 0) {
-      console.log('ℹ️ No assessment forms found, returning empty array');
       return res.json({ forms: [] });
     }
 
     // For each form, get the latest version and extract questions from the schema
-    console.log('🔍 Fetching versions and questions for forms...');
     const formsWithQuestions = await Promise.all(
       forms.map(async (form) => {
-        console.log(`🔍 Fetching version for form: ${form.id}`);
-        
         // Get the latest version of the form
         const { data: versions, error: versionsError } = await supabase
           .from('assessment_form_versions')
@@ -200,7 +177,6 @@ router.get('/forms', authenticateUser, async (req: express.Request, res: express
           .limit(1);
 
         if (versionsError) {
-          console.error('❌ Error fetching versions for form:', form.id, versionsError);
           return {
             id: form.id,
             name: form.name,
@@ -212,8 +188,6 @@ router.get('/forms', authenticateUser, async (req: express.Request, res: express
         }
 
         const latestVersion = versions?.[0];
-        console.log(`✅ Latest version found for form ${form.id}:`, latestVersion?.version || 'none');
-
         // Extract questions from the schema
         let questions: Array<{
           id: string;
@@ -233,8 +207,6 @@ router.get('/forms', authenticateUser, async (req: express.Request, res: express
           }));
         }
 
-        console.log(`✅ Questions extracted for form ${form.id}:`, questions.length);
-
         return {
           id: form.id,
           name: form.name,
@@ -246,10 +218,8 @@ router.get('/forms', authenticateUser, async (req: express.Request, res: express
       })
     );
 
-    console.log('✅ Final result:', formsWithQuestions.length, 'forms with questions');
     return res.json({ forms: formsWithQuestions });
   } catch (error) {
-    console.error('❌ Get forms error:', error);
     return res.status(500).json({ error: 'Failed to fetch forms' });
   }
 });
@@ -265,7 +235,6 @@ router.get('/forms/:formId', authenticateUser, async (req: express.Request, res:
     const form = await AssessmentFormService.getFormWithVersions(formId, req.user.supabase_user_id);
     return res.json({ form });
   } catch (error) {
-    console.error('Get form error:', error);
     if (error instanceof Error && error.message === 'Form not found') {
       return res.status(404).json({ error: 'Form not found' });
     }
@@ -317,13 +286,11 @@ router.put('/forms/:formId', authenticateUser, [
       .single();
 
     if (updateError) {
-      console.error('Update form error:', updateError);
       return res.status(500).json({ error: 'Failed to update form' });
     }
 
     return res.json({ form: updatedForm });
   } catch (error) {
-    console.error('Update form error:', error);
     return res.status(500).json({ error: 'Failed to update assessment form' });
   }
 });
@@ -359,12 +326,9 @@ router.post('/users/default', authenticateUser, [
     await AssessmentFormService.setDefaultForm(req.user.supabase_user_id, formId);
     return res.json({ message: 'Default form updated successfully' });
   } catch (error) {
-    console.error('Set default form error:', error);
     return res.status(500).json({ error: 'Failed to set default form' });
   }
 });
-
-
 
 // POST /api/assessments/assign - Assign form to a lead
 router.post('/assign', authenticateUser, [
@@ -411,7 +375,6 @@ router.post('/assign', authenticateUser, [
     await AssessmentFormService.assignFormToLead(req.user.supabase_user_id, leadId, formId, versionId);
     return res.json({ message: 'Form assigned to lead successfully' });
   } catch (error) {
-    console.error('Assign form error:', error);
     return res.status(500).json({ error: 'Failed to assign form to lead' });
   }
 });
@@ -462,7 +425,6 @@ router.post('/links', authenticateUser, [
       message: 'Assessment link created successfully'
     });
   } catch (error) {
-    console.error('Create link error:', error);
     return res.status(500).json({ error: 'Failed to create assessment link' });
   }
 });
@@ -521,7 +483,6 @@ router.post('/manual-submit', authenticateUser, [
       message: 'Assessment submitted successfully'
     });
   } catch (error) {
-    console.error('Manual submit error:', error);
     return res.status(500).json({ error: 'Failed to submit assessment' });
   }
 });
@@ -550,7 +511,6 @@ router.get('/submissions/:leadId', authenticateUser, async (req: express.Request
     const submissions = await AssessmentFormService.getLeadSubmissions(req.user.supabase_user_id, leadId);
     return res.json({ submissions });
   } catch (error) {
-    console.error('Get submissions error:', error);
     return res.status(500).json({ error: 'Failed to fetch submissions' });
   }
 });
@@ -582,7 +542,6 @@ router.patch('/submissions/:submissionId/status', authenticateUser, [
 
     return res.json({ message: 'Submission status updated successfully' });
   } catch (error) {
-    console.error('Update submission status error:', error);
     return res.status(500).json({ error: 'Failed to update submission status' });
   }
 });
@@ -661,7 +620,6 @@ router.post('/submit', [
       .single();
 
     if (submissionError) {
-      console.error('Assessment submission error:', submissionError);
       return res.status(500).json({ error: 'Failed to submit assessment' });
     }
 
@@ -679,7 +637,6 @@ router.post('/submit', [
       message: 'Assessment submitted successfully'
     });
   } catch (error) {
-    console.error('Public assessment submission error:', error);
     return res.status(500).json({ error: 'Failed to submit assessment' });
   }
 });
@@ -742,7 +699,6 @@ router.get('/public/:referralCode', async (req: express.Request, res: express.Re
       }
     });
   } catch (error) {
-    console.error('Public assessment error:', error);
     return res.status(500).json({ error: 'Failed to load assessment' });
   }
 });
@@ -782,7 +738,6 @@ router.get('/token/:token', async (req: express.Request, res: express.Response) 
       }
     });
   } catch (error) {
-    console.error('Token assessment error:', error);
     return res.status(500).json({ error: 'Failed to load assessment' });
   }
 });
@@ -863,7 +818,6 @@ router.post('/token/:token/submit', [
       message: 'Assessment submitted successfully'
     });
   } catch (error) {
-    console.error('Token submit error:', error);
     return res.status(500).json({ error: 'Failed to submit assessment' });
   }
 });
@@ -893,7 +847,6 @@ router.get('/public/:slug', async (req: express.Request, res: express.Response) 
       .order('created_at', { ascending: true });
 
     if (questionsError) {
-      console.error('Error fetching questions:', questionsError);
       return res.status(500).json({ error: 'Failed to fetch assessment questions' });
     }
 
@@ -919,7 +872,6 @@ router.get('/public/:slug', async (req: express.Request, res: express.Response) 
       questions: transformedQuestions
     });
   } catch (error) {
-    console.error('Get public assessment error:', error);
     return res.status(500).json({ error: 'Failed to fetch assessment' });
   }
 });
@@ -1047,7 +999,6 @@ router.post('/public/:slug/submit', [
       .single();
 
     if (riskError || !riskAssessment) {
-      console.error('Failed to create risk assessment:', riskError);
       // Don't fail the whole request if risk assessment creation fails
     }
 
@@ -1067,7 +1018,6 @@ router.post('/public/:slug/submit', [
       submissionId: riskAssessment?.id || 'unknown'
     });
   } catch (error: any) {
-    console.error('Submit public assessment error:', error);
     return res.status(500).json({ error: error.message || 'Failed to submit assessment' });
   }
 });
@@ -1107,7 +1057,6 @@ router.get('/token/:token', async (req: express.Request, res: express.Response) 
       }
     });
   } catch (error) {
-    console.error('Token assessment error:', error);
     return res.status(500).json({ error: 'Failed to load assessment' });
   }
 });
@@ -1188,7 +1137,6 @@ router.post('/token/:token/submit', [
       message: 'Assessment submitted successfully'
     });
   } catch (error) {
-    console.error('Token submit error:', error);
     return res.status(500).json({ error: 'Failed to submit assessment' });
   }
 });
@@ -1218,7 +1166,6 @@ router.get('/public/:slug', async (req: express.Request, res: express.Response) 
       .order('created_at', { ascending: true });
 
     if (questionsError) {
-      console.error('Error fetching questions:', questionsError);
       return res.status(500).json({ error: 'Failed to fetch assessment questions' });
     }
 
@@ -1244,7 +1191,6 @@ router.get('/public/:slug', async (req: express.Request, res: express.Response) 
       questions: transformedQuestions
     });
   } catch (error) {
-    console.error('Get public assessment error:', error);
     return res.status(500).json({ error: 'Failed to fetch assessment' });
   }
 });
@@ -1263,7 +1209,6 @@ router.get('/forms', authenticateUser, async (req: express.Request, res: express
     // Return empty forms array for now (legacy compatibility)
     return res.json({ forms: [] });
   } catch (error) {
-    console.error('Get assessment forms error:', error);
     return res.status(500).json({ error: 'Failed to fetch assessment forms' });
   }
 });
@@ -1275,8 +1220,6 @@ router.get('/cfa/questions', authenticateUser, async (req: express.Request, res:
       return res.status(400).json({ error: 'User not properly authenticated' });
     }
 
-    console.log('🔍 Getting CFA framework questions...');
-    
     // Get questions from framework_questions table
     const { data: questions, error: questionsError } = await supabase
       .from('framework_questions')
@@ -1284,15 +1227,11 @@ router.get('/cfa/questions', authenticateUser, async (req: express.Request, res:
       .order('order_index');
 
     if (questionsError) {
-      console.error('❌ Error fetching questions:', questionsError);
       return res.status(500).json({ error: 'Failed to fetch questions' });
     }
 
-    console.log(`✅ Found ${questions?.length || 0} questions`);
-    
     return res.json({ questions: questions || [] });
   } catch (error) {
-    console.error('Get CFA questions error:', error);
     return res.status(500).json({ error: 'Failed to fetch CFA questions' });
   }
 });
@@ -1321,7 +1260,6 @@ router.get('/frameworks', authenticateUser, async (req: express.Request, res: ex
     
     return res.json({ frameworks });
   } catch (error) {
-    console.error('Get frameworks error:', error);
     return res.status(500).json({ error: 'Failed to fetch frameworks' });
   }
 });
@@ -1352,7 +1290,6 @@ router.post('/', authenticateUser, [
 
     return res.status(201).json({ assessment });
   } catch (error) {
-    console.error('Create assessment error:', error);
     return res.status(500).json({ error: 'Failed to create assessment' });
   }
 });
@@ -1380,7 +1317,6 @@ router.patch('/:id', authenticateUser, [
 
     return res.json({ assessment });
   } catch (error) {
-    console.error('Update assessment error:', error);
     return res.status(500).json({ error: 'Failed to update assessment' });
   }
 });
@@ -1401,7 +1337,6 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
 
     return res.json({ assessment });
   } catch (error) {
-    console.error('Get assessment error:', error);
     return res.status(500).json({ error: 'Failed to fetch assessment' });
   }
 });
@@ -1418,7 +1353,6 @@ router.get('/:id/submissions', authenticateUser, async (req: express.Request, re
 
     return res.json({ submissions });
   } catch (error) {
-    console.error('Get submissions error:', error);
     return res.status(500).json({ error: 'Failed to fetch submissions' });
   }
 });
@@ -1439,7 +1373,6 @@ router.get('/submissions/:id', authenticateUser, async (req: express.Request, re
 
     return res.json({ submission });
   } catch (error) {
-    console.error('Get submission error:', error);
     return res.status(500).json({ error: 'Failed to fetch submission' });
   }
 });
@@ -1457,15 +1390,12 @@ router.get('/frameworks/:frameworkId/questions', authenticateUser, async (req: e
     const questions = await getCFAFrameworkQuestions();
     
     if (!questions || questions.length === 0) {
-      console.error('❌ No CFA framework questions found');
       return res.status(500).json({ error: 'No questions found for this framework' });
     }
 
-    console.log(`✅ Found ${questions.length} questions for framework ${frameworkId}`);
     return res.json({ questions });
 
   } catch (error) {
-    console.error('❌ Get framework questions error:', error);
     return res.status(500).json({ error: 'Failed to fetch framework questions' });
   }
 });
@@ -1476,7 +1406,6 @@ router.get('/cfa/questions', authenticateUser, async (req: express.Request, res:
     const questions = await getCFAFrameworkQuestions();
     return res.json({ questions });
   } catch (error) {
-    console.error('Get CFA questions error:', error);
     return res.status(500).json({ error: 'Failed to fetch CFA questions' });
   }
 });
@@ -1487,8 +1416,6 @@ router.get('/debug/frameworks', authenticateUser, async (req: express.Request, r
     if (!req.user?.supabase_user_id) {
       return res.status(400).json({ error: 'User not properly authenticated' });
     }
-
-    console.log('🔍 Debug frameworks endpoint called');
 
     // Check what's in the framework tables
     const [
@@ -1517,7 +1444,6 @@ router.get('/debug/frameworks', authenticateUser, async (req: express.Request, r
     });
 
   } catch (error) {
-    console.error('❌ Debug frameworks error:', error);
     return res.status(500).json({ error: 'Failed to debug frameworks' });
   }
 });
@@ -1529,8 +1455,6 @@ router.get('/debug/frameworks', authenticateUser, async (req: express.Request, r
 // GET /api/assessments/health - Health check endpoint (no auth required)
 router.get('/health', async (req: express.Request, res: express.Response) => {
   try {
-    console.log('🔍 Health check endpoint called');
-    
     // Test basic database connection
     const { data: testData, error: testError } = await supabase
       .from('assessments')
@@ -1538,7 +1462,6 @@ router.get('/health', async (req: express.Request, res: express.Response) => {
       .limit(1);
     
     if (testError) {
-      console.error('❌ Health check database error:', testError);
       return res.status(500).json({ 
         status: 'unhealthy',
         error: 'Database connection failed',
@@ -1552,7 +1475,6 @@ router.get('/health', async (req: express.Request, res: express.Response) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('❌ Health check error:', error);
     return res.status(500).json({ 
       status: 'unhealthy',
       error: 'Health check failed' 
@@ -1563,10 +1485,6 @@ router.get('/health', async (req: express.Request, res: express.Response) => {
 // GET /api/assessments/test - Test endpoint to verify database connectivity
 router.get('/test', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
-    console.log('🔍 Test endpoint called');
-    console.log('User:', req.user);
-    console.log('User supabase_user_id:', req.user?.supabase_user_id);
-    
     // Test basic database connection
     const { data: testData, error: testError } = await supabase
       .from('assessments')
@@ -1574,7 +1492,6 @@ router.get('/test', authenticateUser, async (req: express.Request, res: express.
       .limit(1);
     
     if (testError) {
-      console.error('Database test error:', testError);
       return res.status(500).json({ 
         error: 'Database connection failed',
         details: testError.message 
@@ -1587,7 +1504,6 @@ router.get('/test', authenticateUser, async (req: express.Request, res: express.
       testData
     });
   } catch (error) {
-    console.error('Test endpoint error:', error);
     return res.status(500).json({ error: 'Test failed' });
   }
 });
@@ -1599,8 +1515,6 @@ router.post('/default', authenticateUser, async (req: express.Request, res: expr
       return res.status(400).json({ error: 'User not properly authenticated' });
     }
 
-    console.log('🔍 Creating default assessment for user:', req.user.supabase_user_id);
-
     // Check if user already has a default assessment
     const { data: existingAssessment, error: checkError } = await supabase
       .from('assessments')
@@ -1610,7 +1524,6 @@ router.post('/default', authenticateUser, async (req: express.Request, res: expr
       .single();
 
     if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
-      console.error('❌ Error checking existing assessment:', checkError);
       return res.status(500).json({ error: 'Failed to check existing assessments' });
     }
 
@@ -1620,8 +1533,6 @@ router.post('/default', authenticateUser, async (req: express.Request, res: expr
 
     // Create default assessment using AssessmentService
     const assessment = await AssessmentService.createDefaultAssessment(req.user.supabase_user_id);
-
-    console.log('✅ Default assessment created successfully:', assessment.id);
 
     return res.json({ 
       success: true, 
@@ -1634,8 +1545,6 @@ router.post('/default', authenticateUser, async (req: express.Request, res: expr
     });
 
   } catch (error: any) {
-    console.error('❌ Create default assessment error:', error);
-    
     let errorMessage = 'Failed to create default assessment';
     if (error.message) {
       errorMessage = error.message;

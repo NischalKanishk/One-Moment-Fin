@@ -5,9 +5,6 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('❌ Missing required Supabase environment variables:');
-  console.error('❌ SUPABASE_URL:', supabaseUrl ? 'Present' : 'Missing');
-  console.error('❌ SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceKey ? 'Present' : 'Missing');
   throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables');
 }
 
@@ -24,10 +21,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 // Log which key is being used
-console.log('🔍 Supabase client configuration:');
-console.log('🔍 URL:', supabaseUrl);
-console.log('🔍 Service Role Key:', supabaseServiceKey ? 'Present' : 'Missing');
-console.log('🔍 Using key: Service Role (bypasses RLS)');
+');
 
 // Create public client for auth operations (if needed)
 const supabasePublic = createClient(supabaseUrl, supabaseAnonKey);

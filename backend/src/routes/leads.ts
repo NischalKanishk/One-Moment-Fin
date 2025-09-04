@@ -7,8 +7,6 @@ import { AIService } from '../services/ai';
 
 const router = express.Router();
 
-
-
 // POST /api/leads (Authenticated endpoint for logged-in MFD to create a lead)
 router.post('/', authenticateUser, [
   body('full_name').notEmpty().withMessage('Full name is required'),
@@ -31,7 +29,7 @@ router.post('/', authenticateUser, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.error('Validation errors:', errors.array());
+      );
       return res.status(400).json({ 
         error: 'Validation failed',
         details: errors.array().map(err => ({
@@ -60,7 +58,6 @@ router.post('/', authenticateUser, [
       
       user_id = (userData as { id: string }).id;
     } catch (error) {
-      console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
     }
 
@@ -80,13 +77,11 @@ router.post('/', authenticateUser, [
       .single();
 
     if (leadError) {
-      console.error('Lead creation error:', leadError);
       return res.status(500).json({ error: 'Failed to create lead' });
     }
 
     return res.json({ message: 'Lead created successfully', lead: leadData });
   } catch (error) {
-    console.error('Lead creation error:', error);
     return res.status(500).json({ error: 'Lead creation failed' });
   }
 });
@@ -133,7 +128,7 @@ router.post('/create', [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.error('Validation errors:', errors.array());
+      );
       return res.status(400).json({ 
         error: 'Validation failed',
         details: errors.array().map(err => ({
@@ -158,7 +153,6 @@ router.post('/create', [
         throw new Error('Invalid user ID provided');
       }
     } catch (error) {
-      console.error('User validation error:', error);
       return res.status(400).json({ error: 'Invalid user ID provided' });
     }
 
@@ -178,13 +172,11 @@ router.post('/create', [
       .single();
 
     if (leadError) {
-      console.error('Lead creation error:', leadError);
       return res.status(500).json({ error: 'Failed to create lead' });
     }
 
     return res.json({ message: 'Lead created successfully', lead: leadData });
   } catch (error) {
-    console.error('Lead creation error:', error);
     return res.status(500).json({ error: 'Lead creation failed' });
   }
 });
@@ -200,15 +192,11 @@ router.get('/', authenticateUser, [
   query('search').optional().isString().isLength({ max: 100 }).withMessage('Search term too long'),
   query('source_link').optional().isString().isLength({ max: 100 }).withMessage('Source filter too long')
 ], async (req: express.Request, res: express.Response) => {
-  console.log('🔍 Leads: Route handler reached for GET /api/leads');
-  console.log('🔍 Leads: Request headers:', req.headers);
-  console.log('🔍 Leads: Request user:', req.user);
-  
   try {
     // Validate query parameters
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.error('Validation errors:', errors.array());
+      );
       return res.status(400).json({ 
         error: 'Validation failed',
         details: errors.array().map(err => ({
@@ -219,12 +207,9 @@ router.get('/', authenticateUser, [
     }
 
     const clerkUserId = req.user!.clerk_id;
-    console.log('🔍 Leads: Fetching leads for clerk user:', clerkUserId);
-
     // Get the actual user UUID from the users table using the Clerk ID
     let user_id;
     try {
-      console.log('🔍 Leads: Looking up user in database with clerk_id:', clerkUserId);
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('id')
@@ -232,14 +217,11 @@ router.get('/', authenticateUser, [
         .single();
 
       if (userError || !userData) {
-        console.error('❌ Leads: User lookup failed:', userError);
         throw new Error('User not found. Please complete your profile first.');
       }
       
       user_id = (userData as { id: string }).id;
-      console.log('✅ Leads: User found in database with ID:', user_id);
-    } catch (error) {
-      console.error('❌ Leads: User lookup error:', error);
+      } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
     }
 
@@ -254,8 +236,6 @@ router.get('/', authenticateUser, [
     const statusFilter = req.query.status as string;
     const searchTerm = req.query.search as string;
 
-    console.log('🔍 Leads: Query parameters:', { page, limit, sortBy, sortOrder, statusFilter, searchTerm, user_id });
-
     // Try to get leads from database using RLS policies
     try {
       // Get the JWT token from the request headers
@@ -266,12 +246,8 @@ router.get('/', authenticateUser, [
         throw new Error('No JWT token available');
       }
 
-      console.log('🔍 Leads: JWT token received, length:', token.length);
-
       // For now, use service role to bypass RLS policy issues
       // TODO: Fix RLS policies to work with user JWT tokens
-      console.log('🔍 Leads: Using service role to bypass RLS issues temporarily');
-      
       let query = supabase
         .from('leads')
         .select(`
@@ -296,55 +272,37 @@ router.get('/', authenticateUser, [
       // Apply filters
       if (statusFilter) {
         query = query.eq('status', statusFilter);
-        console.log('🔍 Leads: Applied status filter:', statusFilter);
-      }
+        }
 
       if (searchTerm) {
         query = query.or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
-        console.log('🔍 Leads: Applied search filter:', searchTerm);
-      }
+        }
 
       // Apply source filter
       const sourceFilter = req.query.source_link as string;
       if (sourceFilter) {
         query = query.eq('source_link', sourceFilter);
-        console.log('🔍 Leads: Applied source filter:', sourceFilter);
-      }
+        }
 
       // Apply risk bucket filter
       const riskBucketFilter = req.query.risk_bucket as string;
       if (riskBucketFilter) {
         query = query.eq('risk_bucket', riskBucketFilter);
-        console.log('🔍 Leads: Applied risk bucket filter:', riskBucketFilter);
-      }
+        }
 
       // Apply sorting and pagination
       query = query
         .order(sortBy, { ascending: sortOrder === 'asc' })
         .range(offset, offset + limit - 1);
 
-      console.log('🔍 Leads: Query prepared, executing database query with service role...');
-      console.log('🔍 Leads: Final query parameters:', { sortBy, sortOrder, offset, limit, user_id });
-      
       const { data: leads, error, count } = await query;
 
       if (error) {
-        console.error('❌ Leads: Database query error:', error);
-        console.error('❌ Leads: Error details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
         throw error;
       }
 
-      console.log('✅ Leads: Database query successful. Found leads:', leads?.length || 0);
-      console.log('✅ Leads: Total count:', count);
-
       if (leads && leads.length > 0) {
-        console.log('🔍 Leads: Sample lead data:', leads[0]);
-      }
+        }
 
       // Process leads to extract risk assessment data
       const processedLeads = (leads || []).map(lead => {
@@ -380,14 +338,12 @@ router.get('/', authenticateUser, [
         }
       });
     } catch (dbError) {
-      console.error('❌ Leads: Database error:', dbError);
       return res.status(500).json({ 
         error: 'Database query failed',
         details: dbError instanceof Error ? dbError.message : 'Unknown database error'
       });
     }
   } catch (error) {
-    console.error('❌ Leads: Unexpected error:', error);
     return res.status(500).json({ error: 'Failed to fetch leads' });
   }
 });
@@ -412,7 +368,6 @@ router.get('/stats', authenticateUser, async (req: express.Request, res: express
       
       user_id = (userData as { id: string }).id;
     } catch (error) {
-      console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
     }
 
@@ -446,7 +401,7 @@ router.get('/stats', authenticateUser, async (req: express.Request, res: express
         return res.json({ stats });
       }
     } catch (dbError) {
-      console.error('Database error (returning empty stats):', dbError);
+      :', dbError);
     }
 
     // Return empty stats when database fails
@@ -466,14 +421,12 @@ router.get('/stats', authenticateUser, async (req: express.Request, res: express
 
     return res.json({ stats: emptyStats });
   } catch (error) {
-    console.error('Lead stats error:', error);
     return res.status(500).json({ error: 'Failed to fetch lead statistics' });
   }
 });
 
 // Test route to verify routing is working
 router.get('/test', (req: express.Request, res: express.Response) => {
-  console.log('🔍 Backend: Test route hit');
   res.json({ message: 'Test route working', timestamp: new Date().toISOString() });
 });
 
@@ -554,8 +507,7 @@ router.post('/check-existing', [
           };
         }
       } catch (error) {
-        console.log('Could not fetch assessment data for existing lead');
-      }
+        }
 
       return res.json({
         exists: true,
@@ -571,7 +523,6 @@ router.post('/check-existing', [
     });
 
   } catch (error) {
-    console.error('Check existing lead error:', error);
     return res.status(500).json({ error: 'Failed to check existing lead' });
   }
 });
@@ -606,7 +557,6 @@ router.get('/search', authenticateUser, [
       
       user_id = (userData as { id: string }).id;
     } catch (error) {
-      console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
     }
 
@@ -620,13 +570,11 @@ router.get('/search', authenticateUser, [
       .order('full_name', { ascending: true });
 
     if (error) {
-      console.error('Lead search error:', error);
       return res.status(500).json({ error: 'Failed to search leads' });
     }
 
     return res.json({ leads: leads || [] });
   } catch (error) {
-    console.error('Lead search error:', error);
     return res.status(500).json({ error: 'Failed to search leads' });
   }
 });
@@ -638,14 +586,9 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
     const user_id = req.user!.supabase_user_id;
 
     if (!user_id) {
-      console.error('User ID not found in request');
       return res.status(400).json({ error: 'User not found. Please complete your profile first.' });
     }
 
-    console.log('🔍 Backend: Using user_id from auth middleware:', user_id);
-
-
-    
     // Use service role to bypass RLS policy issues temporarily
     const { data: lead, error } = await supabase
       .from('leads')
@@ -668,15 +611,12 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
       .single();
 
     if (error || !lead) {
-      console.error('Lead query failed:', error);
       return res.status(404).json({ error: 'Lead not found' });
     }
 
     // Fetch assessment submission details for this lead
     let assessmentSubmissions: any[] = [];
     let updatedLead = { ...lead };
-    
-    console.log('🔍 Backend: Fetching assessment submissions for lead:', lead.id);
     
     try {
       const { data: submissions, error: submissionsError } = await supabase
@@ -692,10 +632,7 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
         `)
         .eq('lead_id', lead.id);
 
-      console.log('🔍 Backend: Submissions query result:', { submissions, submissionsError });
-
       if (!submissionsError && submissions && submissions.length > 0) {
-        console.log('🔍 Backend: Found submissions, processing...');
         assessmentSubmissions = submissions.map(submission => ({
           id: submission.id,
           submitted_at: submission.submitted_at,
@@ -704,19 +641,13 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
           status: submission.status
         }));
         
-        console.log('🔍 Backend: Processed submissions:', assessmentSubmissions);
-        
         // Note: Risk profile data is stored in assessment_submissions table
         // The lead table doesn't have risk_bucket, risk_score, or risk_profile_id fields
       } else {
-        console.log('🔍 Backend: No submissions found or error occurred');
-      }
+        }
     } catch (assessmentError) {
-      console.log('🔍 Backend: Could not fetch assessment submissions:', assessmentError);
       // Continue without assessment data
     }
-
-
 
     const finalResponse = {
       lead: {
@@ -725,15 +656,8 @@ router.get('/:id', authenticateUser, async (req: express.Request, res: express.R
       }
     };
     
-    console.log('🔍 Backend: Final response:', {
-      leadId: finalResponse.lead.id,
-      assessmentSubmissionsCount: finalResponse.lead.assessment_submissions?.length || 0,
-      hasAssessmentSubmissions: !!finalResponse.lead.assessment_submissions?.length
-    });
-    
     return res.json(finalResponse);
   } catch (error) {
-    console.error('Lead fetch error:', error);
     return res.status(500).json({ error: 'Failed to fetch lead' });
   }
 });
@@ -746,7 +670,7 @@ router.patch('/:id/status', authenticateUser, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.error('Validation errors:', errors.array());
+      );
       return res.status(400).json({ 
         error: 'Validation failed',
         details: errors.array().map(err => ({
@@ -775,7 +699,6 @@ router.patch('/:id/status', authenticateUser, [
       
       user_id = (userData as { id: string }).id;
     } catch (error) {
-      console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
     }
 
@@ -793,7 +716,6 @@ router.patch('/:id/status', authenticateUser, [
 
     return res.json({ lead: data });
   } catch (error) {
-    console.error('Lead status update error:', error);
     return res.status(500).json({ error: 'Failed to update lead status' });
   }
 });
@@ -821,7 +743,7 @@ router.put('/:id', authenticateUser, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.error('Validation errors:', errors.array());
+      );
       return res.status(400).json({ 
         error: 'Validation failed',
         details: errors.array().map(err => ({
@@ -850,7 +772,6 @@ router.put('/:id', authenticateUser, [
       
       user_id = (userData as { id: string }).id;
     } catch (error) {
-      console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
     }
 
@@ -878,13 +799,6 @@ router.put('/:id', authenticateUser, [
 
     return res.json({ lead: data });
   } catch (error) {
-    console.error('Lead update error:', error);
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      body: req.body,
-      params: req.params
-    });
     return res.status(500).json({ 
       error: 'Failed to update lead',
       details: error instanceof Error ? error.message : 'Unknown error'
@@ -913,7 +827,6 @@ router.delete('/:id', authenticateUser, async (req: express.Request, res: expres
       
       user_id = (userData as { id: string }).id;
     } catch (error) {
-      console.error('User lookup error:', error);
       return res.status(400).json({ error: error instanceof Error ? error.message : 'User lookup failed' });
     }
 
@@ -924,13 +837,11 @@ router.delete('/:id', authenticateUser, async (req: express.Request, res: expres
       .eq('user_id', user_id);
 
     if (error) {
-      console.error('Lead deletion error:', error);
       return res.status(500).json({ error: 'Failed to delete lead' });
     }
 
     return res.json({ message: 'Lead deleted successfully' });
   } catch (error) {
-    console.error('Lead deletion error:', error);
     return res.status(500).json({ error: 'Failed to delete lead' });
   }
 });
@@ -939,8 +850,6 @@ router.delete('/:id', authenticateUser, async (req: express.Request, res: expres
 router.get('/debug', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
     const clerkUserId = req.user!.clerk_id;
-    console.log('🔍 Debug: Testing database connectivity for user:', clerkUserId);
-
     const results: any = {};
 
     // Test 1: Check if user exists
@@ -1006,11 +915,9 @@ router.get('/debug', authenticateUser, async (req: express.Request, res: express
         results.rls_status = { error: error instanceof Error ? error.message : 'Unknown error' };
       }
 
-    console.log('🔍 Debug: Results:', results);
     return res.json({ debug: results });
 
   } catch (error) {
-    console.error('❌ Debug: Unexpected error:', error);
     return res.status(500).json({ error: 'Debug failed', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });

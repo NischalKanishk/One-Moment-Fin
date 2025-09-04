@@ -87,13 +87,8 @@ export default function AssessmentsV2() {
   const loadAssessments = async () => {
     try {
       setIsLoading(true);
-      console.log('🔍 Frontend: Starting to load assessments...');
-      
       const token = await getToken();
-      console.log('🔍 Frontend: Got token, length:', token?.length);
-      
       if (!token) {
-        console.error('❌ Frontend: No token available');
         toast({
           title: "Authentication Error",
           description: "Please sign in again to access assessments",
@@ -102,37 +97,25 @@ export default function AssessmentsV2() {
         return;
       }
 
-      console.log('🔍 Frontend: Creating authenticated API...');
       const api = createAuthenticatedApi(token);
       
-      console.log('🔍 Frontend: Making API call to /api/assessments/forms...');
       const response = await api.get('/api/assessments/forms');
       
-      console.log('✅ Frontend: API response received:', response);
       const data = response.data;
-      console.log('✅ Frontend: Response data:', data);
-      
       if (!data.forms || data.forms.length === 0) {
-        console.log('ℹ️ Frontend: No forms in response, setting empty array');
         setAssessments([]);
         return;
       }
       
-      console.log('✅ Frontend: Setting assessments:', data.forms);
       setAssessments(data.forms);
       
       // Set the first active assessment as selected, or the first one if none active
       const activeAssessment = data.forms.find((a: Assessment) => a.is_active) || data.forms[0];
       setSelectedAssessment(activeAssessment);
-      console.log('✅ Frontend: Selected assessment:', activeAssessment);
-      
-    } catch (error: any) {
-      console.error("❌ Frontend: Failed to load assessments:", error);
-      
+      } catch (error: any) {
       let errorMessage = "Failed to load assessments. Please try again.";
       
       if (error.response) {
-        console.error('❌ Frontend: Error response:', error.response);
         if (error.response.status === 401) {
           errorMessage = "Authentication failed. Please sign in again.";
         } else if (error.response.status === 403) {
@@ -141,10 +124,8 @@ export default function AssessmentsV2() {
           errorMessage = error.response.data.error;
         }
       } else if (error.request) {
-        console.error('❌ Frontend: Network error:', error.request);
         errorMessage = "Network error. Please check your connection and try again.";
       } else if (error.message) {
-        console.error('❌ Frontend: Error message:', error.message);
         errorMessage = error.message;
       }
       
@@ -161,11 +142,8 @@ export default function AssessmentsV2() {
   const loadCFAFrameworkQuestions = async () => {
     try {
       setIsLoadingFramework(true);
-      console.log('🔍 Frontend: Loading CFA framework questions...');
-      
       const token = await getToken();
       if (!token) {
-        console.log('❌ Frontend: No token available for CFA questions');
         toast({
           title: "Authentication Error",
           description: "Please sign in again to load assessment questions",
@@ -174,20 +152,13 @@ export default function AssessmentsV2() {
         return;
       }
 
-      console.log('🔍 Frontend: Got token for CFA questions, length:', token?.length);
       const api = createAuthenticatedApi(token);
       
-      console.log('🔍 Frontend: Making API call to /api/assessments/cfa/questions...');
       const response = await api.get(`/api/assessments/cfa/questions`);
       
-      console.log('✅ Frontend: CFA questions API response received:', response);
-      console.log('✅ Frontend: CFA questions data:', response.data);
-      
       if (response.data.questions && response.data.questions.length > 0) {
-        console.log('✅ Frontend: Setting CFA framework questions:', response.data.questions.length);
         setFrameworkQuestions(response.data.questions);
       } else {
-        console.log('⚠️ Frontend: No questions in CFA response');
         setFrameworkQuestions([]);
         toast({
           title: "Warning",
@@ -196,7 +167,6 @@ export default function AssessmentsV2() {
         });
       }
     } catch (error) {
-      console.error('❌ Frontend: Failed to load CFA framework questions:', error);
       setFrameworkQuestions([]);
       
       // Show user-friendly error message
@@ -245,7 +215,6 @@ export default function AssessmentsV2() {
 
   const createAssessmentLink = async () => {
     try {
-      console.log('🔍 Frontend: Creating assessment link...');
       const token = await getToken();
       if (!token) {
         toast({
@@ -269,8 +238,6 @@ export default function AssessmentsV2() {
         throw new Error('Failed to create assessment form');
       }
 
-      console.log('✅ Frontend: Assessment form created:', formResponse.data.assessment.id);
-      
       // Then create the assessment link
       const linkResponse = await api.post('/api/assessments/links', {
         form_id: formResponse.data.assessment.id,
@@ -278,20 +245,13 @@ export default function AssessmentsV2() {
       });
 
       if (linkResponse.data.link) {
-        console.log('✅ Frontend: Assessment link created:', linkResponse.data.link);
-        console.log('🔍 Frontend: Link token:', linkResponse.data.link.token);
-        
         // Update the user's assessment_link field
         try {
-          console.log('🔍 Frontend: Updating user profile with assessment link...');
           const updateResponse = await api.put(`/api/auth/profile`, {
             assessment_link: linkResponse.data.link.token
           });
           
-          console.log('🔍 Frontend: Profile update response:', updateResponse.data);
-          
           if (updateResponse.data.user) {
-            console.log('✅ Frontend: User profile updated with assessment link');
             toast({
               title: "Assessment Link Created",
               description: "Your assessment link has been created and profile updated successfully",
@@ -303,7 +263,6 @@ export default function AssessmentsV2() {
             throw new Error('Failed to update user profile');
           }
         } catch (updateError) {
-          console.error('❌ Frontend: Failed to update user profile:', updateError);
           toast({
             title: "Link Created but Profile Update Failed",
             description: "Assessment link created but failed to update profile. Please refresh the page.",
@@ -312,7 +271,6 @@ export default function AssessmentsV2() {
         }
       }
     } catch (error) {
-      console.error('❌ Frontend: Failed to create assessment link:', error);
       toast({
         title: "Error",
         description: "Failed to create assessment link. Please try again.",
@@ -322,9 +280,6 @@ export default function AssessmentsV2() {
   };
 
   const openAssessmentLink = () => {
-    console.log('🔍 Frontend: Opening assessment link, user:', user);
-    console.log('🔍 Frontend: Assessment link:', user?.assessment_link);
-    
     if (!user?.assessment_link) {
       toast({
         title: "Assessment Link Not Found",
@@ -335,7 +290,6 @@ export default function AssessmentsV2() {
     }
     
     const link = `/a/${user.assessment_link}`;
-    console.log('🔍 Frontend: Opening link:', link);
     window.open(link, '_blank');
   };
 
@@ -458,7 +412,6 @@ export default function AssessmentsV2() {
 
       <div className="space-y-6">
 
-
         {/* Header with Action Buttons */}
         <div className="flex items-center justify-between">
           <div>
@@ -513,8 +466,6 @@ export default function AssessmentsV2() {
             </Button>
           )}
         </div>
-
-
 
         {/* Single Column Layout */}
         <div className="space-y-4">

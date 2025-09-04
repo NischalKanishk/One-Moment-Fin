@@ -22,7 +22,6 @@ import {
 import { ChevronDown, Calendar, Edit } from 'lucide-react';
 import { formatSourceLink } from "@/lib/utils";
 
-
 interface Lead {
   id: string;
   full_name: string;
@@ -45,8 +44,6 @@ interface LeadFormData {
   phone?: string;
   age?: string;
 }
-
-
 
 interface PaginationInfo {
   page: number;
@@ -81,7 +78,6 @@ export default function Leads(){
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
-  
   const form = useForm<LeadFormData>({
     defaultValues: {
       full_name: '',
@@ -113,8 +109,6 @@ export default function Leads(){
     });
     setEditOpen(true);
   };
-
-
 
   // Handle form submission for editing
   const onSubmitEdit = async (data: LeadFormData) => {
@@ -157,7 +151,6 @@ export default function Leads(){
         });
       }
     } catch (error) {
-      console.error('Error updating lead:', error);
       toast({
         title: "Update Failed",
         description: "An error occurred while updating the lead.",
@@ -168,41 +161,30 @@ export default function Leads(){
 
   // Calculate conversion percentage based on lead status
   const calculateConversionPercentage = (status: string): { percentage: number; color: string } => {
-    // Debug: Log the status value being processed
-    console.log('🔍 Processing status:', status, 'Type:', typeof status);
-    
     if (!status) {
-      console.log('⚠️ No status provided, defaulting to 0%');
       return { percentage: 0, color: 'bg-gray-500' };
     }
     
     // Normalize the status string for comparison
     const normalizedStatus = status.toString().toLowerCase().trim();
-    console.log('🔍 Normalized status:', normalizedStatus);
     
     switch (normalizedStatus) {
       case 'lead':
       case 'new':
-        console.log('✅ Status: Lead/New -> 25%');
         return { percentage: 25, color: 'bg-blue-500' };
       case 'assessment done':
       case 'assessment_done':
       case 'assessmentdone':
-        console.log('✅ Status: Assessment Done -> 50%');
         return { percentage: 50, color: 'bg-yellow-500' };
       case 'meeting scheduled':
       case 'meeting_scheduled':
       case 'meetingscheduled':
-        console.log('✅ Status: Meeting Scheduled -> 75%');
         return { percentage: 75, color: 'bg-orange-500' };
       case 'converted':
-        console.log('✅ Status: Converted -> 100%');
         return { percentage: 100, color: 'bg-green-500' };
       case 'dropped':
-        console.log('✅ Status: Dropped -> 0%');
         return { percentage: 0, color: 'bg-red-500' };
       default:
-        console.log('⚠️ Unknown status:', normalizedStatus, '-> Defaulting to 0%');
         return { percentage: 0, color: 'bg-gray-500' };
     }
   };
@@ -241,8 +223,6 @@ export default function Leads(){
         return 'bg-gray-100 text-gray-800';
     }
   };
-
-
 
   // Authentication guard
   if (authLoading) {
@@ -344,7 +324,7 @@ export default function Leads(){
 
   const handleAddLead = async (values: LeadFormData) => {
     try {
-      console.log('Form values received:', values);
+
       const token = await getToken();
       if (!token) throw new Error('No authentication token available');
       
@@ -368,19 +348,7 @@ export default function Leads(){
           throw new Error('Age must be between 18 and 100');
         }
       }
-      
-      console.log('Submitting lead data:', leadData);
-      
-      // Debug: Log the exact data being sent
-      console.log('Data being sent to API:', {
-        full_name: leadData.full_name,
-        email: leadData.email,
-        phone: leadData.phone,
-        age: leadData.age,
-        ageType: typeof leadData.age,
-        phoneType: typeof leadData.phone
-      });
-      
+
       // Ensure all required fields are present
       if (!leadData.full_name || leadData.full_name.trim() === '') {
         throw new Error('Full name is required');
@@ -400,8 +368,6 @@ export default function Leads(){
         description: 'Lead created successfully.' 
       });
     } catch (err: any) {
-      console.error('Lead creation error:', err);
-      
       // Handle validation errors from backend
       let errorMessage = 'Failed to create lead';
       
@@ -423,8 +389,6 @@ export default function Leads(){
       });
     }
   };
-
-
 
   // Server-side filtering handles search and status filters
   const filteredLeads = leads;

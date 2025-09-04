@@ -89,7 +89,6 @@ export class DefaultAssessmentService {
         .single();
 
       if (assessmentError) {
-        console.error('Failed to create default assessment:', assessmentError);
         throw new Error('Failed to create default assessment');
       }
 
@@ -107,7 +106,6 @@ export class DefaultAssessmentService {
         .insert(questionsToInsert);
 
       if (questionsError) {
-        console.error('Failed to create default questions:', questionsError);
         // Clean up the assessment if questions fail
         await supabase
           .from('assessments')
@@ -116,14 +114,11 @@ export class DefaultAssessmentService {
         throw new Error('Failed to create default questions');
       }
 
-      console.log(`Created default assessment for user ${userId} with ${this.DEFAULT_QUESTIONS.length} questions`);
-      
       return {
         assessmentId: assessment.id,
         questionsCount: this.DEFAULT_QUESTIONS.length
       };
     } catch (error) {
-      console.error('Error creating default assessment:', error);
       throw error;
     }
   }
@@ -140,7 +135,6 @@ export class DefaultAssessmentService {
         .eq('assessment_id', assessmentId);
 
       if (deleteError) {
-        console.error('Failed to delete existing questions:', deleteError);
         throw new Error('Failed to delete existing questions');
       }
 
@@ -158,7 +152,6 @@ export class DefaultAssessmentService {
         .insert(questionsToInsert);
 
       if (insertError) {
-        console.error('Failed to insert default questions:', insertError);
         throw new Error('Failed to insert default questions');
       }
 
@@ -172,18 +165,14 @@ export class DefaultAssessmentService {
         .eq('id', assessmentId);
 
       if (updateError) {
-        console.error('Failed to update assessment details:', updateError);
         // Don't throw here as questions were created successfully
       }
 
-      console.log(`Reset assessment ${assessmentId} to default for user ${userId}`);
-      
       return {
         success: true,
         questionsCount: this.DEFAULT_QUESTIONS.length
       };
     } catch (error) {
-      console.error('Error resetting to default:', error);
       throw error;
     }
   }
@@ -208,13 +197,11 @@ export class DefaultAssessmentService {
         .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.error('Error checking default assessment:', error);
         return false;
       }
 
       return !!data;
     } catch (error) {
-      console.error('Error checking default assessment:', error);
       return false;
     }
   }

@@ -72,7 +72,6 @@ export function LeadAutocomplete({ onLeadSelect, selectedLead }: LeadAutocomplet
         setLeads(data.leads || []);
         setIsOpen(true);
       } catch (error) {
-        console.error('Failed to search leads:', error);
         setError('Failed to search leads');
         setLeads([]);
         setIsOpen(false);

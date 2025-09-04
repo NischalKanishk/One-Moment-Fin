@@ -12,7 +12,6 @@ router.get('/auth-test', authenticateUser, async (req: express.Request, res: exp
       timestamp: new Date().toISOString()
     });
   } catch (error: any) {
-    console.error('Auth test error:', error);
     return res.status(500).json({ error: 'Auth test failed' });
   }
 });
@@ -45,7 +44,6 @@ router.get('/notifications-test', authenticateUser, async (req: express.Request,
       user_id: req.user!.supabase_user_id
     });
   } catch (error: any) {
-    console.error('Notifications test error:', error);
     return res.status(500).json({ 
       error: 'Notifications test failed',
       message: error.message 

@@ -29,7 +29,6 @@ export async function getClerkTokenForSupabase(session: any): Promise<string | n
     })
     return token
   } catch (error) {
-    console.error('Error getting Clerk token for Supabase:', error)
     return null
   }
 }

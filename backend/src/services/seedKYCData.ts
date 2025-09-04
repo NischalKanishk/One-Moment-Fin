@@ -87,8 +87,6 @@ const dummyTemplates = [
 
 export async function seedKYCTemplates(userId: string) {
   try {
-    console.log('🌱 Seeding KYC templates for user:', userId);
-    
     const results = [];
     
     for (const template of dummyTemplates) {
@@ -102,18 +100,14 @@ export async function seedKYCTemplates(userId: string) {
         .single();
       
       if (error) {
-        console.error('❌ Failed to insert template:', template.name, error);
         results.push({ success: false, name: template.name, error });
       } else {
-        console.log('✅ Inserted template:', template.name);
         results.push({ success: true, name: template.name, data });
       }
     }
     
     const successCount = results.filter(r => r.success).length;
     const failureCount = results.filter(r => !r.success).length;
-    
-    console.log(`🎯 Seeding complete: ${successCount} successful, ${failureCount} failed`);
     
     return {
       success: true,
@@ -126,7 +120,6 @@ export async function seedKYCTemplates(userId: string) {
     };
     
   } catch (error) {
-    console.error('❌ Error seeding KYC templates:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -136,8 +129,6 @@ export async function seedKYCTemplates(userId: string) {
 
 export async function clearKYCTemplates(userId: string) {
   try {
-    console.log('🗑️ Clearing KYC templates for user:', userId);
-    
     const { data, error } = await supabase
       .from('kyc_templates')
       .delete()
@@ -145,15 +136,12 @@ export async function clearKYCTemplates(userId: string) {
       .select();
     
     if (error) {
-      console.error('❌ Failed to clear templates:', error);
       return { success: false, error };
     }
     
-    console.log('✅ Cleared templates:', data?.length || 0);
     return { success: true, count: data?.length || 0 };
     
   } catch (error) {
-    console.error('❌ Error clearing KYC templates:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'

@@ -12,11 +12,9 @@ export class LeadStatusService {
         .eq('id', leadId);
 
       if (error) {
-        console.error('Failed to update lead status to assessment_done:', error);
         throw error;
       }
     } catch (error) {
-      console.error('Error updating lead status to assessment_done:', error);
       throw error;
     }
   }
@@ -34,7 +32,6 @@ export class LeadStatusService {
         .single();
 
       if (leadError) {
-        console.error('Failed to fetch lead status:', leadError);
         throw leadError;
       }
 
@@ -47,12 +44,10 @@ export class LeadStatusService {
           .eq('id', leadId);
 
         if (error) {
-          console.error('Failed to update lead status to meeting_scheduled:', error);
           throw error;
         }
       }
     } catch (error) {
-      console.error('Error updating lead status to meeting_scheduled:', error);
       throw error;
     }
   }
@@ -70,7 +65,6 @@ export class LeadStatusService {
         .eq('lead_id', leadId);
 
       if (meetingsError) {
-        console.error('Failed to fetch meetings for lead:', meetingsError);
         throw meetingsError;
       }
 
@@ -79,7 +73,6 @@ export class LeadStatusService {
         await this.updateStatusToMeetingScheduled(leadId);
       }
     } catch (error) {
-      console.error('Error checking and updating meeting status:', error);
       throw error;
     }
   }
@@ -96,13 +89,11 @@ export class LeadStatusService {
         .single();
 
       if (error) {
-        console.error('Failed to fetch lead status:', error);
         throw error;
       }
 
       return lead.status;
     } catch (error) {
-      console.error('Error getting lead status:', error);
       throw error;
     }
   }

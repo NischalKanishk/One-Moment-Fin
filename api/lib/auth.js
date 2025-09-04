@@ -7,37 +7,27 @@ const authenticateUser = async (req) => {
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ Auth: No valid authorization header');
       throw new Error('No valid authorization header');
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-    console.log('🔍 Auth: Token received, length:', token.length);
-    
     // Handle Clerk JWT tokens (both development and production)
     if (token.split('.').length === 3) {
       try {
         // Try to decode the JWT payload
         const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-        console.log('🔍 Auth: JWT payload decoded:', payload);
-        
         // Extract Clerk user ID from the token
         // Clerk tokens use 'sub' as the standard claim for user ID
         const clerkUserId = payload.sub;
         
         if (!clerkUserId) {
-          console.error('❌ Auth: JWT token missing "sub" field');
-          console.log('🔍 Available payload fields:', Object.keys(payload));
+          );
           throw new Error('Invalid JWT token: missing user ID (sub)');
         }
         
         // Log additional Clerk-specific fields for debugging
-        if (payload.iss) console.log('🔍 Token issuer:', payload.iss);
-        if (payload.aud) console.log('🔍 Token audience:', payload.aud);
-        if (payload.iat) console.log('🔍 Token issued at:', new Date(payload.iat * 1000));
-        if (payload.exp) console.log('🔍 Token expires at:', new Date(payload.exp * 1000));
-        
-        console.log('🔍 Auth: Looking up user with clerk_id:', clerkUserId);
+        if (payload.iss) if (payload.aud) if (payload.iat) );
+        if (payload.exp) );
         
         // Look up the corresponding Supabase user ID
         const { data: userData, error: userError } = await supabase
@@ -47,16 +37,13 @@ const authenticateUser = async (req) => {
           .single();
         
         if (userError) {
-          console.error('❌ Auth: Database error during user lookup:', userError);
           if (userError.code === 'PGRST116') {
-            console.log('ℹ️ Auth: User not found in database, will create new user');
-          } else {
+            } else {
             throw new Error('Database lookup failed');
           }
         }
         
         if (!userData) {
-          console.log('⚠️ Auth: User not found in database, creating new user');
           // Create a new user in the database
           const newUserData = {
             clerk_id: clerkUserId,
@@ -68,8 +55,6 @@ const authenticateUser = async (req) => {
             referral_link: `/r/${clerkUserId.slice(-8)}` // Generate referral link
           };
           
-          console.log('🔍 Auth: Creating user with data:', newUserData);
-          
           const { data: newUser, error: createError } = await supabase
             .from('users')
             .insert(newUserData)
@@ -77,11 +62,9 @@ const authenticateUser = async (req) => {
             .single();
           
           if (createError) {
-            console.error('❌ Auth: Error creating new user:', createError);
             throw new Error('User creation failed');
           }
           
-          console.log('✅ Auth: New user created successfully:', newUser?.id);
           return {
             clerk_id: clerkUserId,
             supabase_user_id: newUser.id,
@@ -99,8 +82,6 @@ const authenticateUser = async (req) => {
           role: userData.role
         };
       } catch (error) {
-        console.error('❌ Auth: JWT decode error:', error);
-        
         // Provide more specific error messages for common JWT issues
         if (error.message.includes('Unexpected token')) {
           throw new Error('Invalid JWT token format: malformed payload');
@@ -114,7 +95,6 @@ const authenticateUser = async (req) => {
       throw new Error('Invalid JWT format');
     }
   } catch (error) {
-    console.error('❌ Auth: Authentication failed:', error);
     throw error;
   }
 };

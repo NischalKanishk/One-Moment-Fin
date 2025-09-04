@@ -20,9 +20,7 @@ module.exports = async function handler(req, res) {
     // Parse URL properly
     const urlObj = new URL(url, `http://localhost`);
     const path = urlObj.pathname;
-    
-    console.log(`🔍 Leads API Request: ${method} ${path}`);
-    
+
     // Remove /api/leads prefix
     const leadsPath = path.replace('/api/leads', '');
     
@@ -33,8 +31,6 @@ module.exports = async function handler(req, res) {
         if (!user?.supabase_user_id) {
           return res.status(400).json({ error: 'User not properly authenticated' });
         }
-
-        console.log(`🔍 Fetching leads for user: ${user.supabase_user_id}`);
 
         const { 
           page = 1, 
@@ -90,7 +86,6 @@ module.exports = async function handler(req, res) {
         const { data: leads, error, count } = await query;
 
         if (error) {
-          console.error('❌ Database error:', error);
           return res.status(500).json({ error: 'Database query failed', details: error.message });
         }
 
@@ -116,8 +111,6 @@ module.exports = async function handler(req, res) {
 
         const totalPages = Math.ceil((count || 0) / limitNum);
         
-        console.log(`✅ Found ${processedLeads?.length || 0} leads for user`);
-        
         return res.json({ 
           leads: processedLeads,
           pagination: {
@@ -130,7 +123,6 @@ module.exports = async function handler(req, res) {
           }
         });
       } catch (error) {
-        console.error('❌ Error fetching leads:', error);
         return res.status(500).json({ error: 'Failed to fetch leads', details: error.message });
       }
     }
@@ -145,8 +137,6 @@ module.exports = async function handler(req, res) {
 
         const leadId = leadsPath.substring(1); // Remove the leading slash
         
-        console.log(`🔍 Fetching lead ${leadId} for user: ${user.supabase_user_id}`);
-
         // First get the lead
         const { data: lead, error } = await supabase
           .from('leads')
@@ -159,27 +149,17 @@ module.exports = async function handler(req, res) {
           if (error.code === 'PGRST116') {
             return res.status(404).json({ error: 'Lead not found' });
           }
-          console.error('❌ Database error:', error);
           return res.status(500).json({ error: 'Database query failed', details: error.message });
         }
 
         // Then get the assessment submissions for this lead
-        console.log('🔍 Root API: Fetching assessment submissions for lead:', leadId);
-        
         const { data: assessmentSubmissions, error: submissionsError } = await supabase
           .from('assessment_submissions')
           .select('id, submitted_at, answers, result, status')
           .eq('lead_id', leadId)
           .order('submitted_at', { ascending: false });
 
-        console.log('🔍 Root API: Submissions query result:', { 
-          submissions: assessmentSubmissions?.length || 0, 
-          submissionsError: submissionsError?.message || null,
-          submissionsData: assessmentSubmissions
-        });
-
         if (submissionsError) {
-          console.error('❌ Error fetching assessment submissions:', submissionsError);
           // Don't fail the request, just log the error
         }
 
@@ -189,31 +169,16 @@ module.exports = async function handler(req, res) {
           assessment_submissions: assessmentSubmissions || []
         };
 
-        console.log(`✅ Found lead: ${leadWithSubmissions.full_name} with ${leadWithSubmissions.assessment_submissions.length} assessment submissions`);
-        
         // Debug: Log the actual data structure being returned
         if (leadWithSubmissions.assessment_submissions.length > 0) {
           const submission = leadWithSubmissions.assessment_submissions[0];
-          console.log('🔍 Assessment submission data structure:');
-          console.log('   - ID:', submission.id);
-          console.log('   - Submitted at:', submission.submitted_at);
-          console.log('   - Status:', submission.status);
-          console.log('   - Answers count:', submission.answers ? Object.keys(submission.answers).length : 0);
-          console.log('   - Result:', submission.result);
-          console.log('   - Sample answers:', submission.answers ? Object.keys(submission.answers).slice(0, 3) : 'None');
+          .length : 0);
+          .slice(0, 3) : 'None');
         }
         
         // Log the final response structure
-        console.log('🔍 Root API: Final response structure:', {
-          leadId: leadWithSubmissions.id,
-          assessmentSubmissionsCount: leadWithSubmissions.assessment_submissions?.length || 0,
-          hasAssessmentSubmissions: !!leadWithSubmissions.assessment_submissions?.length,
-          responseStructure: { lead: { ...leadWithSubmissions, assessment_submissions: leadWithSubmissions.assessment_submissions?.length || 0 } }
-        });
-        
         return res.json({ lead: leadWithSubmissions });
       } catch (error) {
-        console.error('❌ Error fetching lead:', error);
         return res.status(500).json({ error: 'Failed to fetch lead', details: error.message });
       }
     }
@@ -232,8 +197,6 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'Full name is required' });
         }
 
-        console.log(`🔍 Creating lead for user: ${user.supabase_user_id}`);
-
         const { data: leadData, error: leadError } = await supabase
           .from('leads')
           .insert({
@@ -249,12 +212,9 @@ module.exports = async function handler(req, res) {
           .single();
 
         if (leadError) {
-          console.error('Lead creation error:', leadError);
           return res.status(500).json({ error: 'Failed to create lead', details: leadError.message });
         }
 
-        console.log(`✅ Created lead: ${leadData.full_name}`);
-        
         // Create notification for new lead
         try {
           const { error: notificationError } = await supabase
@@ -273,17 +233,13 @@ module.exports = async function handler(req, res) {
             });
           
           if (notificationError) {
-            console.error('Failed to create notification:', notificationError);
-          } else {
-            console.log('✅ Notification created for new lead');
-          }
+            } else {
+            }
         } catch (notificationErr) {
-          console.error('Notification creation error:', notificationErr);
-        }
+          }
         
         return res.json({ message: 'Lead created successfully', lead: leadData });
       } catch (error) {
-        console.error('Lead creation error:', error);
         return res.status(500).json({ error: 'Lead creation failed', details: error.message });
       }
     }
@@ -298,8 +254,6 @@ module.exports = async function handler(req, res) {
 
         const leadId = leadsPath.substring(1);
         const updateData = req.body;
-
-        console.log(`🔍 Updating lead ${leadId} for user: ${user.supabase_user_id}`);
 
         // Check if lead exists and belongs to user
         const { data: existingLead, error: checkError } = await supabase
@@ -321,14 +275,11 @@ module.exports = async function handler(req, res) {
           .single();
 
         if (updateError) {
-          console.error('Lead update error:', updateError);
           return res.status(500).json({ error: 'Failed to update lead', details: updateError.message });
         }
 
-        console.log(`✅ Updated lead: ${updatedLead.full_name}`);
         return res.json({ message: 'Lead updated successfully', lead: updatedLead });
       } catch (error) {
-        console.error('Lead update error:', error);
         return res.status(500).json({ error: 'Failed to update lead', details: error.message });
       }
     }
@@ -347,8 +298,6 @@ module.exports = async function handler(req, res) {
         if (!status) {
           return res.status(400).json({ error: 'Status is required' });
         }
-
-        console.log(`🔍 Updating status for lead ${leadId} to: ${status}`);
 
         // Check if lead exists and belongs to user
         const { data: existingLead, error: checkError } = await supabase
@@ -375,14 +324,11 @@ module.exports = async function handler(req, res) {
           .single();
 
         if (updateError) {
-          console.error('Lead status update error:', updateError);
           return res.status(500).json({ error: 'Failed to update lead status', details: updateError.message });
         }
 
-        console.log(`✅ Updated lead status to: ${updatedLead.status}`);
         return res.json({ message: 'Lead status updated successfully', lead: updatedLead });
       } catch (error) {
-        console.error('Lead status update error:', error);
         return res.status(500).json({ error: 'Failed to update lead status', details: error.message });
       }
     }
@@ -396,8 +342,6 @@ module.exports = async function handler(req, res) {
         }
 
         const leadId = leadsPath.substring(1);
-
-        console.log(`🔍 Deleting lead ${leadId} for user: ${user.supabase_user_id}`);
 
         // Check if lead exists and belongs to user
         const { data: existingLead, error: checkError } = await supabase
@@ -417,14 +361,11 @@ module.exports = async function handler(req, res) {
           .eq('id', leadId);
 
         if (deleteError) {
-          console.error('Lead deletion error:', deleteError);
           return res.status(500).json({ error: 'Failed to delete lead', details: deleteError.message });
         }
 
-        console.log(`✅ Deleted lead: ${leadId}`);
         return res.json({ message: 'Lead deleted successfully' });
       } catch (error) {
-        console.error('Lead deletion error:', error);
         return res.status(500).json({ error: 'Failed to delete lead', details: error.message });
       }
     }
@@ -437,15 +378,12 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'User not properly authenticated' });
         }
 
-        console.log(`🔍 Fetching lead stats for user: ${user.supabase_user_id}`);
-
         const { data: leads, error } = await supabase
           .from('leads')
           .select('status, created_at')
           .eq('user_id', user.supabase_user_id);
 
         if (error) {
-          console.error('❌ Database error:', error);
           return res.status(500).json({ error: 'Database query failed', details: error.message });
         }
 
@@ -465,10 +403,8 @@ module.exports = async function handler(req, res) {
           }).length || 0
         };
 
-        console.log(`✅ Lead stats: ${stats.total} total leads`);
         return res.json({ stats });
       } catch (error) {
-        console.error('❌ Error fetching lead stats:', error);
         return res.status(500).json({ error: 'Failed to fetch lead statistics', details: error.message });
       }
     }
@@ -481,8 +417,6 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'User not properly authenticated' });
         }
 
-        console.log(`🔍 Testing leads database connection for user: ${user.supabase_user_id}`);
-
         // Test basic database connection
         const { data: testData, error: testError } = await supabase
           .from('leads')
@@ -490,7 +424,6 @@ module.exports = async function handler(req, res) {
           .limit(1);
 
         if (testError) {
-          console.error('❌ Database connection test failed:', testError);
           return res.status(500).json({ 
             error: 'Database connection test failed', 
             details: testError.message,
@@ -506,7 +439,6 @@ module.exports = async function handler(req, res) {
           .limit(5);
 
         if (userLeadsError) {
-          console.error('❌ User leads access test failed:', userLeadsError);
           return res.status(500).json({ 
             error: 'User leads access test failed', 
             details: userLeadsError.message,
@@ -522,7 +454,6 @@ module.exports = async function handler(req, res) {
           timestamp: new Date().toISOString()
         });
       } catch (error) {
-        console.error('❌ Error in leads database test:', error);
         return res.status(500).json({ 
           error: 'Leads database test failed', 
           details: error.message 
@@ -538,8 +469,6 @@ module.exports = async function handler(req, res) {
         if (!email && !phone) {
           return res.status(400).json({ error: 'Email or phone is required to check for existing leads' });
         }
-
-        console.log(`🔍 Checking for existing lead with email: ${email}, phone: ${phone}, user_id: ${user_id}`);
 
         // For public assessments, we need to check if a lead exists for the specific assessment owner
         if (user_id) {
@@ -561,20 +490,18 @@ module.exports = async function handler(req, res) {
           const { data: existingLeads, error } = await query;
 
           if (error) {
-            console.error('❌ Database error checking for existing leads:', error);
             return res.status(500).json({ error: 'Failed to check for existing leads', details: error.message });
           }
 
           const existingLead = existingLeads && existingLeads.length > 0 ? existingLeads[0] : null;
 
           if (existingLead) {
-            console.log(`✅ Found existing lead: ${existingLead.full_name} (${existingLead.email || existingLead.phone})`);
+            `);
             return res.json({
               exists: true,
               lead: existingLead
             });
           } else {
-            console.log('✅ No existing lead found');
             return res.json({
               exists: false,
               lead: null
@@ -586,8 +513,6 @@ module.exports = async function handler(req, res) {
           if (!user?.supabase_user_id) {
             return res.status(400).json({ error: 'User not properly authenticated' });
           }
-
-          console.log(`🔍 Checking for existing lead for authenticated user: ${user.supabase_user_id}`);
 
           // Build query to check for existing leads
           let query = supabase
@@ -607,20 +532,18 @@ module.exports = async function handler(req, res) {
           const { data: existingLeads, error } = await query;
 
           if (error) {
-            console.error('❌ Database error checking for existing leads:', error);
             return res.status(500).json({ error: 'Failed to check for existing leads', details: error.message });
           }
 
           const existingLead = existingLeads && existingLeads.length > 0 ? existingLeads[0] : null;
 
           if (existingLead) {
-            console.log(`✅ Found existing lead: ${existingLead.full_name} (${existingLead.email || existingLead.phone})`);
+            `);
             return res.json({
               exists: true,
               lead: existingLead
             });
           } else {
-            console.log('✅ No existing lead found');
             return res.json({
               exists: false,
               lead: null
@@ -629,7 +552,6 @@ module.exports = async function handler(req, res) {
         }
 
       } catch (error) {
-        console.error('❌ Error checking for existing leads:', error);
         return res.status(500).json({ error: 'Failed to check for existing leads', details: error.message });
       }
     }
@@ -647,8 +569,6 @@ module.exports = async function handler(req, res) {
 
           const leadId = leadsPath.substring(1);
           
-          console.log(`🔍 Recreating assessment submission for lead ${leadId}`);
-
           // Check if lead exists and belongs to user
           const { data: lead, error: leadError } = await supabase
             .from('leads')
@@ -658,7 +578,6 @@ module.exports = async function handler(req, res) {
             .single();
 
           if (leadError) {
-            console.error('❌ Lead not found or access denied:', leadError);
             return res.status(404).json({ error: 'Lead not found or access denied' });
           }
 
@@ -670,7 +589,6 @@ module.exports = async function handler(req, res) {
             .single();
 
           if (existingSubmission) {
-            console.log('✅ Assessment submission already exists');
             return res.json({ message: 'Assessment submission already exists', submissionId: existingSubmission.id });
           }
 
@@ -713,11 +631,9 @@ module.exports = async function handler(req, res) {
             .single();
 
           if (submissionError) {
-            console.error('❌ Error creating assessment submission:', submissionError);
             return res.status(500).json({ error: 'Failed to create assessment submission' });
           }
 
-          console.log('✅ Assessment submission recreated successfully');
           return res.json({ 
             message: 'Assessment submission recreated successfully',
             submissionId: submission.id,
@@ -725,7 +641,6 @@ module.exports = async function handler(req, res) {
           });
 
         } catch (error) {
-          console.error('❌ Error recreating assessment submission:', error);
           return res.status(500).json({ error: 'Failed to recreate assessment submission' });
         }
       }
@@ -739,7 +654,6 @@ module.exports = async function handler(req, res) {
     });
     
   } catch (error) {
-    console.error('❌ Leads API Error:', error);
     return res.status(500).json({
       error: 'Internal server error',
       message: 'Something went wrong in the leads API handler',

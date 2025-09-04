@@ -65,8 +65,6 @@ export const authAPI = {
   },
 
   getProfileWithToken: async (token: string) => {
-    console.log('🔍 API: getProfileWithToken called with token length:', token.length);
-    
     // Validate token format
     if (!token || token.split('.').length !== 3) {
       throw new Error('Invalid JWT token format');
@@ -76,11 +74,8 @@ export const authAPI = {
     
     try {
       const response = await authApi.get('/api/auth/me');
-      console.log('✅ API: Profile fetch successful');
       return response.data;
     } catch (error) {
-      console.error('❌ API: Profile fetch failed:', error);
-      
       // Provide more specific error information
       if (error.response) {
         const { status, data: errorData } = error.response;
@@ -108,8 +103,6 @@ export const authAPI = {
   },
 
   updateProfileWithToken: async (token: string, data: { full_name?: string; phone?: string; mfd_registration_number?: string }) => {
-    console.log('🔍 API: updateProfileWithToken called with:', { tokenLength: token.length, data });
-    
     // Validate token format
     if (!token || token.split('.').length !== 3) {
       throw new Error('Invalid JWT token format');
@@ -119,21 +112,16 @@ export const authAPI = {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       if (!payload.sub) {
-        console.warn('⚠️ API: JWT token missing "sub" field - this may cause authentication issues');
-      }
+        }
     } catch (decodeError) {
-      console.warn('⚠️ API: Could not decode JWT payload:', decodeError);
-    }
+      }
     
     const authApi = createAuthenticatedApi(token);
     
     try {
       const response = await authApi.put('/api/auth/profile', data);
-      console.log('✅ API: Profile update successful');
       return response.data;
     } catch (error) {
-      console.error('❌ API: Profile update failed:', error);
-      
       // Provide more specific error information
       if (error.response) {
         const { status, data: errorData } = error.response;
@@ -245,7 +233,6 @@ export const leadsAPI = {
       return response.data;
     } catch (error) {
       // Fallback: calculate stats from leads data
-      console.warn('Stats endpoint not available, calculating from leads data');
       try {
         const leadsResponse = await leadsAPI.getAll(token);
         const leads = leadsResponse.leads || [];
@@ -268,7 +255,6 @@ export const leadsAPI = {
         
         return { stats };
       } catch (fallbackError) {
-        console.error('Failed to calculate stats from leads:', fallbackError);
         throw new Error('Unable to load statistics');
       }
     }
@@ -428,7 +414,6 @@ export const completeOnboarding = async (token: string, data: {
     const response = await authApi.post('/api/onboarding/complete', data)
     return response.data
   } catch (error) {
-    console.error('Onboarding completion failed:', error)
     throw new Error('Failed to complete onboarding')
   }
 }
@@ -440,7 +425,6 @@ export const getOnboardingStatus = async (token: string) => {
     const response = await authApi.get('/api/onboarding/status')
     return response.data
   } catch (error) {
-    console.error('Failed to get onboarding status:', error)
     throw new Error('Failed to get onboarding status')
   }
 }

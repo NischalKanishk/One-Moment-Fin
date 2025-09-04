@@ -96,7 +96,6 @@ export default function AssessmentTest() {
       setAssessment(data.assessment);
       setQuestions(data.questions || []);
     } catch (error) {
-      console.error('Failed to load assessment:', error);
       toast({
         title: "Error",
         description: "Failed to load assessment. Please check the link and try again.",
@@ -210,7 +209,6 @@ export default function AssessmentTest() {
         variant: "default",
       });
     } catch (error: any) {
-      console.error('Failed to submit assessment:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to submit assessment. Please try again.",

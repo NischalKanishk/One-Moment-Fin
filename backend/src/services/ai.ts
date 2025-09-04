@@ -18,8 +18,6 @@ export interface RiskAssessmentResult {
   confidence: number;
 }
 
-
-
 export interface ScoringConfig {
   weights: Record<string, number>;
   scoring: Record<string, Record<string, number>>;
@@ -106,12 +104,9 @@ Respond in JSON format:
         confidence: Math.min(Math.max(result.confidence, 0), 100)
       };
     } catch (error) {
-      console.error('AI risk assessment error:', error);
       throw new Error('Failed to assess risk profile');
     }
   }
-
-
 
   static async generateLeadSummary(leadData: any, riskAssessment: any): Promise<string> {
     try {
@@ -158,7 +153,6 @@ Create a 2-3 sentence professional summary suitable for a mutual fund distributo
 
       return completion.choices[0]?.message?.content || 'Lead summary unavailable';
     } catch (error) {
-      console.error('AI summary generation error:', error);
       return 'Lead summary unavailable';
     }
   }
@@ -247,7 +241,6 @@ Focus on financial risk assessment best practices:
         reasoning: result.reasoning || 'AI-generated scoring configuration'
       };
     } catch (error) {
-      console.error('AI scoring generation error:', error);
       // Fallback to heuristic scoring
       return this.generateHeuristicScoring(questions);
     }

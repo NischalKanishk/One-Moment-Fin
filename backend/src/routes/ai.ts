@@ -22,12 +22,9 @@ router.post('/risk-score', authenticateUser, [
 
     return res.json(result);
   } catch (error) {
-    console.error('AI risk scoring error:', error);
     return res.status(500).json({ error: 'AI risk scoring failed' });
   }
 });
-
-
 
 // POST /api/ai/generate-scoring
 router.post('/generate-scoring', authenticateUser, [
@@ -48,7 +45,6 @@ router.post('/generate-scoring', authenticateUser, [
 
     return res.json({ scoring: scoringConfig });
   } catch (error) {
-    console.error('AI scoring generation error:', error);
     return res.status(500).json({ error: 'AI scoring generation failed' });
   }
 });

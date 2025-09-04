@@ -6,8 +6,6 @@ export class SeedFrameworkDataService {
    */
   static async seedCFAThreePillarFramework(): Promise<{ success: boolean; message: string }> {
     try {
-      console.log('🌱 Seeding CFA Three Pillar framework...');
-
       // 1. Create or get the CFA framework
       let cfaFramework;
       const { data: existingFramework, error: frameworkCheckError } = await supabase
@@ -18,8 +16,7 @@ export class SeedFrameworkDataService {
 
       if (existingFramework) {
         cfaFramework = existingFramework;
-        console.log('✅ CFA framework already exists:', existingFramework.id);
-      } else {
+        } else {
         const { data: newFramework, error: createFrameworkError } = await supabase
           .from('risk_frameworks')
           .insert({
@@ -37,8 +34,7 @@ export class SeedFrameworkDataService {
         }
 
         cfaFramework = newFramework;
-        console.log('✅ Created CFA framework:', newFramework.id);
-      }
+        }
 
       // 2. Create or get the framework version
       let frameworkVersion;
@@ -51,8 +47,7 @@ export class SeedFrameworkDataService {
 
       if (existingVersion) {
         frameworkVersion = existingVersion;
-        console.log('✅ CFA framework version already exists:', existingVersion.id);
-      } else {
+        } else {
         const { data: newVersion, error: createVersionError } = await supabase
           .from('risk_framework_versions')
           .insert({
@@ -121,8 +116,7 @@ export class SeedFrameworkDataService {
         }
 
         frameworkVersion = newVersion;
-        console.log('✅ Created CFA framework version:', newVersion.id);
-      }
+        }
 
       // 3. Create questions in the question bank
       const questions = [
@@ -213,8 +207,7 @@ export class SeedFrameworkDataService {
 
         if (existingQuestion) {
           createdQuestions.push(existingQuestion);
-          console.log(`✅ Question already exists: ${question.qkey}`);
-        } else {
+          } else {
           const { data: newQuestion, error: createQuestionError } = await supabase
             .from('question_bank')
             .insert(question)
@@ -222,11 +215,9 @@ export class SeedFrameworkDataService {
             .single();
 
           if (createQuestionError) {
-            console.warn(`⚠️ Failed to create question ${question.qkey}:`, createQuestionError.message);
-          } else {
+            } else {
             createdQuestions.push(newQuestion);
-            console.log(`✅ Created question: ${question.qkey}`);
-          }
+            }
         }
       }
 
@@ -254,15 +245,12 @@ export class SeedFrameworkDataService {
         throw new Error(`Failed to create question mappings: ${mappingError.message}`);
       }
 
-      console.log(`✅ Created ${questionMappings.length} question mappings`);
-
       return {
         success: true,
         message: `Successfully seeded CFA Three Pillar framework with ${createdQuestions.length} questions`
       };
 
     } catch (error) {
-      console.error('❌ Error seeding CFA framework:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -303,7 +291,6 @@ export class SeedFrameworkDataService {
         cfaFrameworkExists: !!cfaFramework.data
       };
     } catch (error) {
-      console.error('Error checking framework data:', error);
       return {
         hasFrameworks: false,
         hasQuestions: false,

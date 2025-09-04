@@ -14,8 +14,6 @@ const router = express.Router();
 router.get('/:userLink', async (req: express.Request, res: express.Response) => {
   try {
     const { userLink } = req.params;
-    console.log('🔍 Public assessment requested for user link:', userLink);
-
     // First, try to find user by assessment link from assessment_links table
     const { data: assessmentLink, error: linkError } = await supabase
       .from('assessment_links')
@@ -39,8 +37,6 @@ router.get('/:userLink', async (req: express.Request, res: express.Response) => 
     }
 
     if (!user) {
-      console.log('❌ User not found by assessment link, trying as assessment slug...');
-      
       // If not found by assessment link, try as assessment slug (fallback)
       const assessmentData = await AssessmentService.getAssessmentBySlug(userLink);
       
@@ -58,8 +54,6 @@ router.get('/:userLink', async (req: express.Request, res: express.Response) => 
       });
     }
 
-    console.log('✅ User found:', user.full_name);
-
     // Get the user's default assessment
     const { data: assessment, error: assessmentError } = await supabase
       .from('assessments')
@@ -70,19 +64,14 @@ router.get('/:userLink', async (req: express.Request, res: express.Response) => 
       .single();
 
     if (assessmentError || !assessment) {
-      console.log('❌ No default assessment found for user, using CFA framework questions');
-      
       // Use CFA framework questions directly
       try {
         const questions = await getCFAFrameworkQuestions();
         
         if (!questions || questions.length === 0) {
-          console.log('❌ No CFA framework questions found');
           return res.status(404).json({ error: 'No assessment questions found' });
         }
 
-        console.log('✅ Using CFA framework questions for user');
-        
         return res.json({
           assessment: {
             id: 'cfa-framework',
@@ -92,25 +81,19 @@ router.get('/:userLink', async (req: express.Request, res: express.Response) => 
           questions: questions
         });
       } catch (error) {
-        console.error('❌ Error getting CFA framework questions:', error);
         return res.status(500).json({ error: 'Failed to load assessment questions' });
       }
     }
 
     // If assessment exists, get its questions
-    console.log('✅ Assessment found, getting questions');
-    
     // Get CFA framework questions for the assessment
     try {
       const questions = await getCFAFrameworkQuestions();
       
       if (!questions || questions.length === 0) {
-        console.log('❌ No CFA framework questions found');
         return res.status(404).json({ error: 'No assessment questions found' });
       }
 
-      console.log('✅ CFA framework questions loaded:', questions.length);
-      
       return res.json({
         assessment: {
           id: assessment.id,
@@ -120,11 +103,9 @@ router.get('/:userLink', async (req: express.Request, res: express.Response) => 
         questions: questions
       });
     } catch (error) {
-      console.error('❌ Error getting CFA framework questions:', error);
       return res.status(500).json({ error: 'Failed to load assessment questions' });
     }
   } catch (error) {
-    console.error('❌ Public assessment error:', error);
     return res.status(500).json({ error: 'Failed to load assessment' });
   }
 });
@@ -152,8 +133,6 @@ router.post('/:userLink/submit', [
 
     const { userLink } = req.params;
     const { answers, submitterInfo } = req.body;
-    console.log('🔍 Assessment submission requested for user link:', userLink);
-
     // First, try to find user by assessment link
     const { data: user, error: userError } = await supabase
       .from('users')
@@ -165,8 +144,6 @@ router.post('/:userLink/submit', [
     let source: string;
 
     if (userError || !user) {
-      console.log('❌ User not found by assessment link, trying as assessment slug...');
-      
       // If not found by assessment link, try as assessment slug (fallback)
       const assessmentData = await AssessmentService.getAssessmentBySlug(userLink);
       if (!assessmentData) {
@@ -176,8 +153,6 @@ router.post('/:userLink/submit', [
       assessmentId = assessmentData.assessment.id;
       source = userLink; // Use the slug as source
     } else {
-      console.log('✅ User found:', user.full_name);
-      
       // Get the user's default assessment
       const { data: assessment, error: assessmentError } = await supabase
         .from('assessments')
@@ -194,8 +169,6 @@ router.post('/:userLink/submit', [
       assessmentId = assessment.id;
       source = userLink; // Use the user assessment link as source
     }
-
-    console.log('✅ Assessment ID for submission:', assessmentId);
 
     // Submit assessment and create lead
     const { submission, leadId, isNewLead } = await AssessmentService.submitAssessment(
@@ -219,7 +192,6 @@ router.post('/:userLink/submit', [
     });
 
   } catch (error) {
-    console.error('Submit assessment by user link error:', error);
     return res.status(500).json({ error: 'Failed to submit assessment' });
   }
 });

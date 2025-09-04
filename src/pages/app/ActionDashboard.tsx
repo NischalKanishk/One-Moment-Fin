@@ -164,7 +164,6 @@ const ActionDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
 
-
       {/* Modern Stats Overview */}
       <div className="px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">

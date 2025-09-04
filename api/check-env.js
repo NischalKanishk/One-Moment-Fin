@@ -13,8 +13,6 @@ module.exports = async function handler(req, res) {
   }
   
   try {
-    console.log('🔍 Checking environment variables...');
-    
     const envCheck = {
       SUPABASE_URL: {
         present: !!process.env.SUPABASE_URL,
@@ -36,8 +34,6 @@ module.exports = async function handler(req, res) {
       VERCEL_ENV: process.env.VERCEL_ENV || 'Not set'
     };
     
-    console.log('🔍 Environment check results:', envCheck);
-    
     const allRequiredPresent = envCheck.SUPABASE_URL.present && 
                               envCheck.SUPABASE_SERVICE_ROLE_KEY.present && 
                               envCheck.SUPABASE_ANON_KEY.present;
@@ -50,7 +46,6 @@ module.exports = async function handler(req, res) {
     });
     
   } catch (error) {
-    console.error('❌ Environment check failed:', error);
     return res.status(500).json({ 
       error: 'Environment check failed', 
       details: error.message 

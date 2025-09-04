@@ -42,15 +42,12 @@ export default function AppLayout() {
               </div>
             </div>
           </header>
-          
 
-          
           <main className="pt-0 pb-8 md:pb-10 px-4">
             <Outlet />
           </main>
         </SidebarInset>
       </div>
-
 
     </SidebarProvider>
   );

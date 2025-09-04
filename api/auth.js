@@ -21,8 +21,6 @@ module.exports = async function handler(req, res) {
     const urlObj = new URL(url, `http://localhost`);
     const path = urlObj.pathname;
     
-    console.log(`🔍 Auth API Request: ${method} ${path}`);
-    
     // Remove /api/auth prefix
     const authPath = path.replace('/api/auth', '');
     
@@ -43,8 +41,6 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'User not properly authenticated' });
         }
 
-        console.log(`🔍 Fetching user profile for: ${user.supabase_user_id}`);
-
         // Get full user profile from database
         const { data: userProfile, error } = await supabase
           .from('users')
@@ -53,11 +49,8 @@ module.exports = async function handler(req, res) {
           .single();
 
         if (error) {
-          console.error('❌ Database error:', error);
           return res.status(500).json({ error: 'Failed to fetch user profile', details: error.message });
         }
-
-        console.log(`✅ Found user profile: ${userProfile.full_name || userProfile.email}`);
 
         return res.json({ 
           user: {
@@ -75,7 +68,6 @@ module.exports = async function handler(req, res) {
           }
         });
       } catch (error) {
-        console.error('❌ Error fetching user profile:', error);
         return res.status(500).json({ error: 'Failed to fetch user profile', details: error.message });
       }
     }
@@ -89,8 +81,6 @@ module.exports = async function handler(req, res) {
         }
 
         const { full_name, email, phone } = req.body;
-
-        console.log(`🔍 Syncing user data for: ${user.supabase_user_id}`);
 
         // Update user profile
         const { data: updatedUser, error } = await supabase
@@ -106,18 +96,14 @@ module.exports = async function handler(req, res) {
           .single();
 
         if (error) {
-          console.error('❌ Database error:', error);
           return res.status(500).json({ error: 'Failed to sync user data', details: error.message });
         }
-
-        console.log(`✅ Synced user data: ${updatedUser.full_name || updatedUser.email}`);
 
         return res.json({ 
           message: 'User data synced successfully',
           user: updatedUser
         });
       } catch (error) {
-        console.error('❌ Error syncing user data:', error);
         return res.status(500).json({ error: 'Failed to sync user data', details: error.message });
       }
     }
@@ -126,7 +112,6 @@ module.exports = async function handler(req, res) {
     if (method === 'POST' && authPath === '/logout') {
       // For serverless functions, logout is typically handled client-side
       // But we can return a success message
-      console.log('🔍 User logout requested');
       return res.json({ message: 'Logged out successfully' });
     }
 
@@ -139,16 +124,12 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'Token is required' });
         }
 
-        console.log('🔍 Processing login with Clerk token');
-
         // Set the token in headers for authentication
         req.headers.authorization = `Bearer ${token}`;
         
         // Authenticate the user
         const user = await authenticateUser(req);
         
-        console.log(`✅ User logged in: ${user.supabase_user_id}`);
-
         return res.json({ 
           message: 'Login successful',
           user: {
@@ -159,7 +140,6 @@ module.exports = async function handler(req, res) {
           }
         });
       } catch (error) {
-        console.error('❌ Login error:', error);
         return res.status(401).json({ error: 'Login failed', details: error.message });
       }
     }
@@ -173,8 +153,6 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'Token is required' });
         }
 
-        console.log('🔍 Processing signup with Clerk token');
-
         // Set the token in headers for authentication
         req.headers.authorization = `Bearer ${token}`;
         
@@ -187,8 +165,6 @@ module.exports = async function handler(req, res) {
           if (full_name) updateData.full_name = full_name;
           if (phone) updateData.phone = phone;
 
-          console.log(`🔍 Updating user profile with additional data`);
-
           const { data: updatedUser, error: updateError } = await supabase
             .from('users')
             .update(updateData)
@@ -197,16 +173,12 @@ module.exports = async function handler(req, res) {
             .single();
 
           if (updateError) {
-            console.error('❌ User update error:', updateError);
-          } else {
+            } else {
             user.full_name = updatedUser.full_name;
             user.phone = updatedUser.phone;
-            console.log(`✅ Updated user profile: ${updatedUser.full_name || updatedUser.email}`);
-          }
+            }
         }
         
-        console.log(`✅ User signup successful: ${user.supabase_user_id}`);
-
         return res.json({ 
           message: 'Signup successful',
           user: {
@@ -219,7 +191,6 @@ module.exports = async function handler(req, res) {
           }
         });
       } catch (error) {
-        console.error('❌ Signup error:', error);
         return res.status(400).json({ error: 'Signup failed', details: error.message });
       }
     }
@@ -227,8 +198,6 @@ module.exports = async function handler(req, res) {
     // GET /api/auth/health - Health check endpoint
     if (method === 'GET' && authPath === '/health') {
       try {
-        console.log('🔍 Auth API health check requested');
-        
         // Test basic database connection
         const { data: testData, error: testError } = await supabase
           .from('users')
@@ -236,7 +205,6 @@ module.exports = async function handler(req, res) {
           .limit(1);
 
         if (testError) {
-          console.error('❌ Database health check failed:', testError);
           return res.status(500).json({ 
             status: 'Unhealthy',
             error: 'Database connection failed',
@@ -245,7 +213,6 @@ module.exports = async function handler(req, res) {
           });
         }
 
-        console.log('✅ Auth API health check passed');
         return res.json({ 
           status: 'Healthy',
           message: 'Auth API is working correctly',
@@ -253,7 +220,6 @@ module.exports = async function handler(req, res) {
           timestamp: new Date().toISOString()
         });
       } catch (error) {
-        console.error('❌ Error in auth health check:', error);
         return res.status(500).json({ 
           status: 'Unhealthy',
           error: 'Health check failed', 
@@ -271,7 +237,6 @@ module.exports = async function handler(req, res) {
     });
     
   } catch (error) {
-    console.error('❌ Auth API Error:', error);
     return res.status(500).json({
       error: 'Internal server error',
       message: 'Something went wrong in the auth API handler',

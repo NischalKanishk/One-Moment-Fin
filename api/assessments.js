@@ -22,8 +22,6 @@ module.exports = async function handler(req, res) {
     const urlObj = new URL(url, `http://localhost`);
     const path = urlObj.pathname;
     
-    console.log(`🔍 Assessments API Request: ${method} ${path}`);
-    
     // ============================================================================
     // GET /api/assessments/forms - List user assessment forms
     // ============================================================================
@@ -33,8 +31,6 @@ module.exports = async function handler(req, res) {
         if (!user?.supabase_user_id) {
           return res.status(400).json({ error: 'User not properly authenticated' });
         }
-
-        console.log('🔍 Getting assessment forms for user:', user.supabase_user_id);
 
         // Check if risk_frameworks table exists
         let framework = null;
@@ -49,13 +45,11 @@ module.exports = async function handler(req, res) {
             .single();
           
           if (frameworkError) {
-            console.log('⚠️ Risk frameworks table not found or empty, using fallback questions');
             framework = null;
           } else {
             framework = frameworkData;
           }
         } catch (error) {
-          console.log('⚠️ Risk frameworks table not accessible, using fallback questions');
           framework = null;
         }
         
@@ -69,13 +63,11 @@ module.exports = async function handler(req, res) {
               .order('order_index');
             
             if (questionsError) {
-              console.log('⚠️ Framework questions table not found, using fallback questions');
               questions = [];
             } else {
               questions = questionsData || [];
             }
           } catch (error) {
-            console.log('⚠️ Framework questions table not accessible, using fallback questions');
             questions = [];
           }
         }
@@ -173,10 +165,8 @@ module.exports = async function handler(req, res) {
           })) : fallbackQuestions
         };
 
-        console.log(`✅ Returning CFA form with ${questions?.length || 0} questions from database`);
         return res.json({ forms: [defaultForm] });
       } catch (error) {
-        console.error('❌ Get forms error:', error);
         return res.status(500).json({ error: 'Failed to fetch forms' });
       }
     }
@@ -191,9 +181,6 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ error: 'User not properly authenticated' });
         }
 
-        console.log('🔍 Getting CFA framework questions from database...');
-        console.log('🔍 Supabase client initialized:', !!supabase);
-        
         // Check if risk_frameworks table exists
         let framework = null;
         let questions = [];
@@ -207,14 +194,11 @@ module.exports = async function handler(req, res) {
             .single();
           
           if (frameworkError) {
-            console.log('⚠️ Risk frameworks table not found or empty, using fallback questions');
             framework = null;
           } else {
             framework = frameworkData;
-            console.log(`✅ Found CFA framework: ${framework.id}`);
-          }
+            }
         } catch (error) {
-          console.log('⚠️ Risk frameworks table not accessible, using fallback questions');
           framework = null;
         }
         
@@ -228,20 +212,17 @@ module.exports = async function handler(req, res) {
               .order('order_index');
             
             if (questionsError) {
-              console.log('⚠️ Framework questions table not found, using fallback questions');
               questions = [];
             } else {
               questions = questionsData || [];
             }
           } catch (error) {
-            console.log('⚠️ Framework questions table not accessible, using fallback questions');
             questions = [];
           }
         }
         
         // Use fallback questions if no questions found
         if (!questions || questions.length === 0) {
-          console.log('⚠️ No questions found, using fallback questions');
           questions = [
             {
               id: 'primary_goal',
@@ -309,10 +290,8 @@ module.exports = async function handler(req, res) {
           ];
         }
         
-        console.log(`✅ Returning ${questions.length} CFA framework questions`);
         return res.json({ questions });
       } catch (error) {
-        console.error('❌ Get CFA questions error:', error);
         return res.status(500).json({ error: 'Failed to fetch CFA questions' });
       }
     }
@@ -344,7 +323,6 @@ module.exports = async function handler(req, res) {
         
         return res.json({ frameworks });
       } catch (error) {
-        console.error('❌ Get frameworks error:', error);
         return res.status(500).json({ error: 'Failed to fetch frameworks' });
       }
     }
@@ -372,10 +350,8 @@ module.exports = async function handler(req, res) {
           created_at: new Date().toISOString()
         };
 
-        console.log('✅ Returning default CFA assessment');
         return res.json({ assessments: [defaultAssessment] });
       } catch (error) {
-        console.error('❌ Get assessments error:', error);
         return res.status(500).json({ error: 'Failed to fetch assessments' });
       }
     }
@@ -407,10 +383,8 @@ module.exports = async function handler(req, res) {
           created_at: new Date().toISOString()
         };
 
-        console.log('✅ Mock form created:', mockForm.id);
         return res.status(201).json({ form: mockForm });
       } catch (error) {
-        console.error('❌ Create form error:', error);
         return res.status(500).json({ error: 'Failed to create assessment form' });
       }
     }
@@ -444,10 +418,8 @@ module.exports = async function handler(req, res) {
           created_at: new Date().toISOString()
         };
 
-        console.log('✅ Mock assessment created:', mockAssessment.id);
         return res.status(201).json({ assessment: mockAssessment });
       } catch (error) {
-        console.error('❌ Create assessment error:', error);
         return res.status(500).json({ error: 'Failed to create assessment' });
       }
     }
@@ -463,7 +435,6 @@ module.exports = async function handler(req, res) {
     });
     
   } catch (error) {
-    console.error('❌ Assessments API Error:', error);
     return res.status(500).json({
       error: 'Internal server error',
       message: 'Something went wrong in the assessments API handler'

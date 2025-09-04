@@ -21,7 +21,6 @@ export class SeedAssessmentDataService {
         .single();
 
       if (existingForm) {
-        console.log('Default assessment form already exists for user:', userId);
         // Get the latest version
         const { data: latestVersion } = await supabase
           .from('assessment_form_versions')
@@ -144,7 +143,6 @@ export class SeedAssessmentDataService {
 
       return { form, version };
     } catch (error) {
-      console.error('Failed to create default assessment for user:', error);
       throw error;
     }
   }
@@ -162,7 +160,6 @@ export class SeedAssessmentDataService {
         .single();
 
       if (existingForm) {
-        console.log('User already has assessment forms, skipping migration');
         return;
       }
 
@@ -182,7 +179,6 @@ export class SeedAssessmentDataService {
         await this.createDefaultAssessmentForUser(userId);
       }
     } catch (error) {
-      console.error('Failed to migrate existing user:', error);
       // Fallback to creating default assessment
       await this.createDefaultAssessmentForUser(userId);
     }
@@ -228,9 +224,7 @@ export class SeedAssessmentDataService {
       // Set as default
       await AssessmentFormService.setDefaultForm(userId, form.id);
 
-      console.log(`Successfully migrated assessment ${oldAssessment.id} for user ${userId}`);
-    } catch (error) {
-      console.error('Failed to migrate old assessment:', error);
+      } catch (error) {
       // Fallback to creating default assessment
       await this.createDefaultAssessmentForUser(userId);
     }

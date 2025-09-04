@@ -4,10 +4,8 @@ import path from 'path';
 // Load environment variables first
 const result = dotenv.config({ path: path.join(__dirname, '../.env') });
 if (result.error) {
-  console.error('Error loading .env file:', result.error);
-} else {
-  console.log('Environment variables loaded successfully');
-}
+  } else {
+  }
 
 import express from 'express';
 import cors from 'cors';
@@ -27,8 +25,6 @@ import notificationsRoutes from './routes/notifications';
 
 import testRoutes from './routes/test';
 import debugRoutes from './routes/debug';
-
-
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -113,7 +109,6 @@ app.use('/api/notifications', notificationsRoutes);
 
 app.use('/api/test', testRoutes);
 app.use('/api/debug', debugRoutes);
-
 
 // Public assessment routes
 app.use('/a', userAssessmentLinksRoutes); // User assessment links (e.g., /a/1677811521d31-5477-4cf8-b718-78a64536e553RFEMC)

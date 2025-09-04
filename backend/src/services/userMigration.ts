@@ -20,7 +20,6 @@ export class UserMigrationService {
         .single();
 
       if (existingUser) {
-        console.log('User already exists in users table:', authUserId);
         return { success: true, message: 'User already exists' };
       }
 
@@ -42,14 +41,11 @@ export class UserMigrationService {
         .single();
 
       if (insertError) {
-        console.error('Failed to migrate user:', insertError);
         return { success: false, error: insertError.message };
       }
 
-      console.log('Successfully migrated user:', authUserId);
       return { success: true, user: newUser };
     } catch (error) {
-      console.error('User migration error:', error);
       return { success: false, error: 'Migration failed' };
     }
   }
@@ -63,7 +59,6 @@ export class UserMigrationService {
       const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
       
       if (authError) {
-        console.error('Failed to get auth users:', authError);
         return { success: false, error: authError.message };
       }
 
@@ -73,7 +68,6 @@ export class UserMigrationService {
         .select('id');
 
       if (dbError) {
-        console.error('Failed to get users from database:', dbError);
         return { success: false, error: dbError.message };
       }
 
@@ -82,7 +76,6 @@ export class UserMigrationService {
 
       return { success: true, orphanedUsers };
     } catch (error) {
-      console.error('Get orphaned users error:', error);
       return { success: false, error: 'Failed to get orphaned users' };
     }
   }
@@ -115,7 +108,6 @@ export class UserMigrationService {
 
       return { success: true, results };
     } catch (error) {
-      console.error('Bulk migration error:', error);
       return { success: false, error: 'Bulk migration failed' };
     }
   }

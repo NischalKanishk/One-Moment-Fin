@@ -92,13 +92,8 @@ export default function Assessments() {
   const loadAssessments = async () => {
     try {
       setIsLoading(true);
-      console.log('🔍 Frontend: Starting to load assessments...');
-      
       const token = await getToken();
-      console.log('🔍 Frontend: Got token, length:', token?.length);
-      
       if (!token) {
-        console.error('❌ Frontend: No token available');
         toast({
           title: "Authentication Error",
           description: "Please sign in again to access assessments",
@@ -107,37 +102,25 @@ export default function Assessments() {
         return;
       }
 
-      console.log('🔍 Frontend: Creating authenticated API...');
       const api = createAuthenticatedApi(token);
       
-      console.log('🔍 Frontend: Making API call to /api/assessments/forms...');
       const response = await api.get('/api/assessments/forms');
       
-      console.log('✅ Frontend: API response received:', response);
       const data = response.data;
-      console.log('✅ Frontend: Response data:', data);
-      
       if (!data.forms || data.forms.length === 0) {
-        console.log('ℹ️ Frontend: No forms in response, setting empty array');
         setAssessments([]);
         return;
       }
       
-      console.log('✅ Frontend: Setting assessments:', data.forms);
       setAssessments(data.forms);
       
       // Set the first active assessment as selected, or the first one if none active
       const activeAssessment = data.forms.find((a: Assessment) => a.is_active) || data.forms[0];
       setSelectedAssessment(activeAssessment);
-      console.log('✅ Frontend: Selected assessment:', activeAssessment);
-      
-    } catch (error: any) {
-      console.error("❌ Frontend: Failed to load assessments:", error);
-      
+      } catch (error: any) {
       let errorMessage = "Failed to load assessments. Please try again.";
       
       if (error.response) {
-        console.error('❌ Frontend: Error response:', error.response);
         if (error.response.status === 401) {
           errorMessage = "Authentication failed. Please sign in again.";
         } else if (error.response.status === 403) {
@@ -146,10 +129,8 @@ export default function Assessments() {
           errorMessage = error.response.data.error;
         }
       } else if (error.request) {
-        console.error('❌ Frontend: Network error:', error.request);
         errorMessage = "Network error. Please check your connection and try again.";
       } else if (error.message) {
-        console.error('❌ Frontend: Error message:', error.message);
         errorMessage = error.message;
       }
       
@@ -174,13 +155,10 @@ export default function Assessments() {
       
       if (response.data.questions && response.data.questions.length > 0) {
         setFrameworkQuestions(response.data.questions);
-        console.log('✅ CFA framework questions loaded:', response.data.questions.length);
-      } else {
-        console.warn('⚠️ No CFA framework questions received from API');
+        } else {
         setFrameworkQuestions([]);
       }
     } catch (error) {
-      console.error('❌ Failed to load CFA framework questions:', error);
       setFrameworkQuestions([]);
       
       // Show user-friendly error message

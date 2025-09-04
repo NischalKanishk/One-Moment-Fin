@@ -28,7 +28,6 @@ router.get('/', async (req: express.Request, res: express.Response) => {
     const { data: notifications, error } = await query;
 
     if (error) {
-      console.error('Error fetching notifications:', error);
       return res.status(500).json({ error: 'Failed to fetch notifications' });
     }
 
@@ -49,7 +48,6 @@ router.get('/', async (req: express.Request, res: express.Response) => {
       }
     });
   } catch (error: any) {
-    console.error('Get notifications error:', error);
     return res.status(500).json({ error: 'Failed to fetch notifications' });
   }
 });
@@ -64,13 +62,11 @@ router.get('/count', async (req: express.Request, res: express.Response) => {
       .eq('is_read', false);
 
     if (error) {
-      console.error('Error fetching notification count:', error);
       return res.status(500).json({ error: 'Failed to fetch notification count' });
     }
 
     return res.json({ unread_count: count || 0 });
   } catch (error: any) {
-    console.error('Get notification count error:', error);
     return res.status(500).json({ error: 'Failed to fetch notification count' });
   }
 });
@@ -90,13 +86,11 @@ router.put('/:id/read', async (req: express.Request, res: express.Response) => {
       .eq('user_id', req.user!.supabase_user_id);
 
     if (error) {
-      console.error('Error marking notification as read:', error);
       return res.status(500).json({ error: 'Failed to mark notification as read' });
     }
 
     return res.json({ success: true });
   } catch (error: any) {
-    console.error('Mark notification as read error:', error);
     return res.status(500).json({ error: 'Failed to mark notification as read' });
   }
 });
@@ -114,13 +108,11 @@ router.put('/read-all', async (req: express.Request, res: express.Response) => {
       .eq('is_read', false);
 
     if (error) {
-      console.error('Error marking all notifications as read:', error);
       return res.status(500).json({ error: 'Failed to mark all notifications as read' });
     }
 
     return res.json({ success: true });
   } catch (error: any) {
-    console.error('Mark all notifications as read error:', error);
     return res.status(500).json({ error: 'Failed to mark all notifications as read' });
   }
 });
@@ -156,13 +148,11 @@ router.post('/', [
       .single();
 
     if (error) {
-      console.error('Error creating notification:', error);
       return res.status(500).json({ error: 'Failed to create notification' });
     }
 
     return res.status(201).json(notification);
   } catch (error: any) {
-    console.error('Create notification error:', error);
     return res.status(500).json({ error: 'Failed to create notification' });
   }
 });

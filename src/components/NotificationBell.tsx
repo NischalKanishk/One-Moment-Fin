@@ -50,8 +50,7 @@ export default function NotificationBell({ className }: NotificationBellProps) {
         setUnreadCount(data.unread_count || 0);
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error);
-    } finally {
+      } finally {
       setIsLoading(false);
     }
   };
@@ -72,8 +71,7 @@ export default function NotificationBell({ className }: NotificationBellProps) {
         setUnreadCount(data.unread_count || 0);
       }
     } catch (error) {
-      console.error('Error fetching notification count:', error);
-    }
+      }
   };
 
   // Mark notification as read
@@ -99,8 +97,7 @@ export default function NotificationBell({ className }: NotificationBellProps) {
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
     } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
+      }
   };
 
   // Mark all as read
@@ -130,7 +127,6 @@ export default function NotificationBell({ className }: NotificationBellProps) {
         });
       }
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
       toast({
         title: "Error",
         description: "Failed to mark all notifications as read",

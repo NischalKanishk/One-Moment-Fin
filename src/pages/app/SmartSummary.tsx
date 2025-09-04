@@ -174,7 +174,6 @@ export default function SmartSummary() {
       const leadData = await leadsAPI.getById(token, id);
       setLead(leadData);
     } catch (error: any) {
-      console.error('Failed to load lead:', error);
       toast({
         title: "Error",
         description: "Failed to load lead details. Please try again.",
@@ -257,17 +256,7 @@ export default function SmartSummary() {
     
     try {
       setGeneratingPDF(true);
-      
-      // Debug: Log lead data to console
-      console.log('Generating PDF for lead:', lead);
-              console.log('Lead assessment data:', lead.assessment_submissions);
-      console.log('Lead notes:', lead.notes);
-      console.log('Lead CFA data:', {
-        goals: lead.cfa_goals,
-        minInvestment: lead.cfa_min_investment,
-        horizon: lead.cfa_investment_horizon
-      });
-      
+
       // Dynamic import of html2pdf to avoid SSR issues
       const html2pdf = (await import('html2pdf.js')).default;
       
@@ -402,8 +391,7 @@ export default function SmartSummary() {
       `;
       
       // Debug: Log the generated HTML
-      console.log('Generated PDF HTML:', pdfContent.innerHTML);
-      
+
       // Temporarily add to DOM for proper rendering
       pdfContent.style.position = 'absolute';
       pdfContent.style.left = '-9999px';
@@ -438,7 +426,6 @@ export default function SmartSummary() {
       try {
         await html2pdf().set(opt).from(pdfContent).save();
       } catch (pdfError) {
-        console.error('Custom HTML PDF generation failed, trying with page content:', pdfError);
         // Fallback: try with the actual page content
         await html2pdf().set(opt).from(contentRef.current).save();
       }
@@ -451,7 +438,6 @@ export default function SmartSummary() {
         description: "PDF generated and downloaded successfully!",
       });
     } catch (error) {
-      console.error('Failed to generate PDF:', error);
       toast({
         title: "Error",
         description: "Failed to generate PDF. Please try again.",

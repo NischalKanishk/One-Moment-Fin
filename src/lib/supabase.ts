@@ -5,15 +5,8 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!
 
 // Log environment variables (remove in production)
-console.log('🔧 Supabase Configuration:', {
-  url: supabaseUrl ? '✅ Set' : '❌ Missing',
-  anonKey: supabaseAnonKey ? '✅ Set' : '❌ Missing'
-})
-
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Missing Supabase environment variables!')
-  console.error('Please check your .env.local file')
-}
+  }
 
 // Create the base Supabase client (single instance)
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
@@ -177,8 +170,6 @@ export interface Meeting {
   is_synced: boolean
   created_at: string
 }
-
-
 
 export interface SubscriptionPlan {
   id: string

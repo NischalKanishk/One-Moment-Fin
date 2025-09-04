@@ -19,10 +19,7 @@ export const supabase = createClient(supabaseUrl, supabaseServiceKey || supabase
 
 // Warn if service role key is missing
 if (!supabaseServiceKey) {
-  console.warn('WARNING: SUPABASE_SERVICE_ROLE_KEY is not set!');
-  console.warn('This will cause database operations to fail due to RLS policies.');
-  console.warn('Please set the service role key in your .env file.');
-}
+  }
 
 // Create public client for auth operations
 // Public client is no longer needed for auth (moved to Clerk). For completeness,
