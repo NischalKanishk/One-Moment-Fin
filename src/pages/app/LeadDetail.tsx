@@ -17,9 +17,7 @@ import {
   Edit,
   Trash2,
   ArrowLeft,
-  Plus,
-  CheckCircle,
-  AlertTriangle
+  Plus
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -646,146 +644,87 @@ export default function LeadDetail() {
                           Current status: <span className="font-medium text-gray-900">{lead.status.replace('_', ' ')}</span>
                         </p>
                         <div className="text-xs text-gray-500">
-                          💡 You can change the lead status at any time to track their progress
+                          💡 Status can only progress forward and cannot be reversed
                         </div>
                       </div>
                       
-                      {/* Status Options Grid */}
+                      {/* Status Options Grid - Forward Only */}
                       <div className="grid grid-cols-1 gap-3">
-                        {/* New Lead */}
-                        <Button
-                          onClick={() => handleStatusChangeWithConfirmation('lead')}
-                          variant={lead.status === 'lead' ? 'default' : 'outline'}
-                          className={`w-full justify-start ${
-                            lead.status === 'lead' 
-                              ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                              : 'hover:bg-blue-50'
-                          }`}
-                          size="sm"
-                        >
-                          <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
-                          <div className="text-left">
-                            <div className="font-medium">New Lead</div>
-                            <div className="text-xs opacity-80">Initial contact made</div>
-                          </div>
-                        </Button>
+                        {/* New Lead - Only show if current status is 'lead' */}
+                        {lead.status === 'lead' && (
+                          <Button
+                            onClick={() => handleStatusChangeWithConfirmation('assessment_done')}
+                            variant="outline"
+                            className="w-full justify-start hover:bg-green-50"
+                            size="sm"
+                          >
+                            <div className="text-left">
+                              <div className="font-medium">Assessment Done</div>
+                              <div className="text-xs opacity-80">Risk profile completed</div>
+                            </div>
+                          </Button>
+                        )}
 
-                        {/* Assessment Done */}
-                        <Button
-                          onClick={() => handleStatusChangeWithConfirmation('assessment_done')}
-                          variant={lead.status === 'assessment_done' ? 'default' : 'outline'}
-                          className={`w-full justify-start ${
-                            lead.status === 'assessment_done' 
-                              ? 'bg-green-600 hover:bg-green-700 text-white' 
-                              : 'hover:bg-green-50'
-                          }`}
-                          size="sm"
-                        >
-                          <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-                          <div className="text-left">
-                            <div className="font-medium">Assessment Done</div>
-                            <div className="text-xs opacity-80">Risk profile completed</div>
-                          </div>
-                        </Button>
+                        {/* Assessment Done - Only show if current status is 'assessment_done' */}
+                        {lead.status === 'assessment_done' && (
+                          <Button
+                            onClick={() => handleStatusChangeWithConfirmation('meeting_scheduled')}
+                            variant="outline"
+                            className="w-full justify-start hover:bg-orange-50"
+                            size="sm"
+                          >
+                            <div className="text-left">
+                              <div className="font-medium">Meeting Scheduled</div>
+                              <div className="text-xs opacity-80">Appointment booked</div>
+                            </div>
+                          </Button>
+                        )}
 
-                        {/* Meeting Scheduled */}
-                        <Button
-                          onClick={() => handleStatusChangeWithConfirmation('meeting_scheduled')}
-                          variant={lead.status === 'meeting_scheduled' ? 'default' : 'outline'}
-                          className={`w-full justify-start ${
-                            lead.status === 'meeting_scheduled' 
-                              ? 'bg-orange-600 hover:bg-orange-700 text-white' 
-                              : 'hover:bg-orange-50'
-                          }`}
-                          size="sm"
-                        >
-                          <div className="w-3 h-3 bg-orange-500 rounded-full mr-3"></div>
-                          <div className="text-left">
-                            <div className="font-medium">Meeting Scheduled</div>
-                            <div className="text-xs opacity-80">Appointment booked</div>
-                          </div>
-                        </Button>
+                        {/* Meeting Scheduled - Only show if current status is 'meeting_scheduled' */}
+                        {lead.status === 'meeting_scheduled' && (
+                          <Button
+                            onClick={() => handleStatusChangeWithConfirmation('converted')}
+                            variant="outline"
+                            className="w-full justify-start hover:bg-purple-50"
+                            size="sm"
+                          >
+                            <div className="text-left">
+                              <div className="font-medium">Converted</div>
+                              <div className="text-xs opacity-80">Successfully onboarded</div>
+                            </div>
+                          </Button>
+                        )}
 
-                        {/* Converted */}
-                        <Button
-                          onClick={() => handleStatusChangeWithConfirmation('converted')}
-                          variant={lead.status === 'converted' ? 'default' : 'outline'}
-                          className={`w-full justify-start ${
-                            lead.status === 'converted' 
-                              ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                              : 'hover:bg-purple-50'
-                          }`}
-                          size="sm"
-                        >
-                          <CheckCircle className="h-4 w-4 mr-3" />
-                          <div className="text-left">
-                            <div className="font-medium">Converted</div>
-                            <div className="text-xs opacity-80">Successfully onboarded</div>
+                        {/* Final Statuses - Show current status as disabled */}
+                        {(lead.status === 'converted' || lead.status === 'dropped') && (
+                          <div className="w-full p-3 bg-gray-100 rounded-lg border border-gray-200">
+                            <div className="text-left">
+                              <div className="font-medium text-gray-600">
+                                {lead.status === 'converted' ? 'Converted' : 'Dropped'}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {lead.status === 'converted' 
+                                  ? 'Lead has been successfully converted' 
+                                  : 'Lead has been marked as dropped'}
+                              </div>
+                            </div>
                           </div>
-                        </Button>
+                        )}
 
-                        {/* Dropped */}
-                        <Button
-                          onClick={() => handleStatusChangeWithConfirmation('dropped')}
-                          variant={lead.status === 'dropped' ? 'default' : 'outline'}
-                          className={`w-full justify-start ${
-                            lead.status === 'dropped' 
-                              ? 'bg-red-600 hover:bg-red-700 text-white' 
-                              : 'hover:bg-red-50'
-                          }`}
-                          size="sm"
-                        >
-                          <AlertTriangle className="h-4 w-4 mr-3" />
-                          <div className="text-left">
-                            <div className="font-medium">Dropped</div>
-                            <div className="text-xs opacity-80">No longer interested</div>
-                          </div>
-                        </Button>
-
-                        {/* Halted */}
-                        <Button
-                          onClick={() => handleStatusChangeWithConfirmation('halted')}
-                          variant={lead.status === 'halted' ? 'default' : 'outline'}
-                          className={`w-full justify-start ${
-                            lead.status === 'halted' 
-                              ? 'bg-gray-600 hover:bg-gray-700 text-white' 
-                              : 'hover:bg-gray-50'
-                          }`}
-                          size="sm"
-                        >
-                          <div className="w-3 h-3 bg-gray-500 rounded-full mr-3"></div>
-                          <div className="text-left">
-                            <div className="font-medium">Halted</div>
-                            <div className="text-xs opacity-80">Temporarily paused</div>
-                          </div>
-                        </Button>
-
-                        {/* Rejected */}
-                        <Button
-                          onClick={() => handleStatusChangeWithConfirmation('rejected')}
-                          variant={lead.status === 'rejected' ? 'default' : 'outline'}
-                          className={`w-full justify-start ${
-                            lead.status === 'rejected' 
-                              ? 'bg-red-800 hover:bg-red-900 text-white' 
-                              : 'hover:bg-red-50'
-                          }`}
-                          size="sm"
-                        >
-                          <div className="w-3 h-3 bg-red-700 rounded-full mr-3"></div>
-                          <div className="text-left">
-                            <div className="font-medium">Rejected</div>
-                            <div className="text-xs opacity-80">Not suitable for service</div>
-                          </div>
-                        </Button>
-                      </div>
-
-                      {/* Status Change Info */}
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <p className="text-xs text-blue-700">
-                          💡 <strong>Status Flow:</strong> New Lead → Assessment Done → Meeting Scheduled → Converted
-                          <br />
-                          💡 <strong>Alternative Paths:</strong> Any status can be changed to Dropped, Halted, or Rejected
-                        </p>
+                        {/* Drop Lead Option - Available for all non-final statuses */}
+                        {lead.status !== 'converted' && lead.status !== 'dropped' && (
+                          <Button
+                            onClick={() => handleStatusChangeWithConfirmation('dropped')}
+                            variant="outline"
+                            className="w-full justify-start hover:bg-red-50 border-red-200 text-red-700"
+                            size="sm"
+                          >
+                            <div className="text-left">
+                              <div className="font-medium">Drop Lead</div>
+                              <div className="text-xs opacity-80">No longer interested</div>
+                            </div>
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </DialogContent>
