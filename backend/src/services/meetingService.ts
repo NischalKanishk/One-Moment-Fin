@@ -1,5 +1,4 @@
 import { supabase } from '../config/supabase';
-import GoogleCalendarService, { MeetingDetails, UserGoogleCredentials } from './googleCalendarService';
 import { LeadStatusService } from './leadStatusService';
 
 export interface CreateMeetingRequest {
@@ -8,8 +7,9 @@ export interface CreateMeetingRequest {
   start_time: string;
   end_time: string;
   description?: string;
-  platform: 'google_meet' | 'zoom' | 'manual';
+  platform: 'calendly' | 'zoom' | 'manual';
   attendees?: string[];
+  calendly_link?: string;
 }
 
 export interface UpdateMeetingRequest {
@@ -18,6 +18,7 @@ export interface UpdateMeetingRequest {
   end_time?: string;
   description?: string;
   attendees?: string[];
+  calendly_link?: string;
 }
 
 export interface MeetingResponse {
@@ -29,7 +30,7 @@ export interface MeetingResponse {
   meeting_link?: string;
   platform: string;
   status: string;
-  external_event_id?: string;
+  calendly_link?: string;
   lead_name?: string;
   lead_email?: string;
   created_by?: string;
@@ -38,73 +39,14 @@ export interface MeetingResponse {
 }
 
 export class MeetingService {
-  private googleCalendarService: GoogleCalendarService;
-
-  constructor() {
-    this.googleCalendarService = new GoogleCalendarService();
-  }
-
   // Create a new meeting
   async createMeeting(userId: string, request: CreateMeetingRequest): Promise<MeetingResponse> {
     try {
-      let externalEventId = null;
       let meetingLink = null;
 
-      // If Google Meet is selected, create calendar event
-      if (request.platform === 'google_meet') {
-        try {
-          // Get user's Google Calendar credentials
-          const { data: userSettings, error: settingsError } = await supabase
-            .from('user_settings')
-            .select('google_access_token, google_refresh_token, google_email, google_name')
-            .eq('user_id', userId)
-            .single();
-
-          if (settingsError || !userSettings?.google_access_token || !userSettings?.google_email) {
-            throw new Error('Google Calendar not connected. Please connect your Google account first.');
-          }
-
-          // Set Google Calendar credentials for this user
-          const userCredentials: UserGoogleCredentials = {
-            accessToken: userSettings.google_access_token,
-            refreshToken: userSettings.google_refresh_token,
-            email: userSettings.google_email,
-            name: userSettings.google_name
-          };
-
-          this.googleCalendarService.setUserCredentials(userCredentials);
-
-          // Create Google Calendar event
-          const meetingDetails: MeetingDetails = {
-            title: request.title,
-            description: request.description,
-            startTime: new Date(request.start_time),
-            endTime: new Date(request.end_time),
-            attendees: request.attendees || []
-          };
-
-          const calendarEvent = await this.googleCalendarService.createMeeting(meetingDetails);
-
-          externalEventId = calendarEvent.eventId;
-          meetingLink = calendarEvent.meetingLink;
-
-          // Send email invitation to lead using user's Gmail
-          if (request.attendees && request.attendees.length > 0) {
-            await this.sendMeetingInvitations(
-              request.attendees,
-              request.title,
-              request.description || '',
-              new Date(request.start_time),
-              new Date(request.end_time),
-              meetingLink || '',
-              userCredentials
-            );
-          }
-        } catch (error) {
-          console.error('Google Calendar integration failed:', error);
-          // Fall back to manual meeting creation
-          request.platform = 'manual';
-        }
+      // If Calendly is selected, use the provided link
+      if (request.platform === 'calendly' && request.calendly_link) {
+        meetingLink = request.calendly_link;
       }
 
       // Create meeting record in database
@@ -119,7 +61,7 @@ export class MeetingService {
           description: request.description,
           platform: request.platform,
           meeting_link: meetingLink,
-          external_event_id: externalEventId,
+          calendly_link: request.calendly_link,
           status: 'scheduled'
         })
         .select(`
@@ -171,60 +113,11 @@ export class MeetingService {
         throw new Error('Meeting not found');
       }
 
-      let externalEventId = existingMeeting.external_event_id;
       let meetingLink = existingMeeting.meeting_link;
 
-      // If meeting has Google Calendar integration, update there too
-      if (existingMeeting.external_event_id && existingMeeting.platform === 'google_meet') {
-        try {
-          const { data: userSettings, error: settingsError } = await supabase
-            .from('user_settings')
-            .select('google_access_token, google_refresh_token, google_email, google_name')
-            .eq('user_id', userId)
-            .single();
-
-          if (!settingsError && userSettings?.google_access_token && userSettings?.google_email) {
-            const userCredentials: UserGoogleCredentials = {
-              accessToken: userSettings.google_access_token,
-              refreshToken: userSettings.google_refresh_token,
-              email: userSettings.google_email,
-              name: userSettings.google_name
-            };
-
-            this.googleCalendarService.setUserCredentials(userCredentials);
-
-            const meetingDetails: MeetingDetails = {
-              title: request.title || existingMeeting.title,
-              description: request.description || existingMeeting.description || '',
-              startTime: new Date(request.start_time || existingMeeting.start_time),
-              endTime: new Date(request.end_time || existingMeeting.end_time),
-              attendees: request.attendees || []
-            };
-
-            const calendarEvent = await this.googleCalendarService.updateMeeting(
-              existingMeeting.external_event_id,
-              meetingDetails
-            );
-
-            meetingLink = calendarEvent.meetingLink;
-
-            // Send update notifications using user's Gmail
-            if (request.attendees && request.attendees.length > 0) {
-              await this.sendMeetingInvitations(
-                request.attendees,
-                request.title || existingMeeting.title,
-                request.description || existingMeeting.description || '',
-                new Date(request.start_time || existingMeeting.start_time),
-                new Date(request.end_time || existingMeeting.end_time),
-                meetingLink || '',
-                userCredentials,
-                true
-              );
-            }
-          }
-        } catch (error) {
-          console.error('Google Calendar update failed:', error);
-        }
+      // If meeting has Calendly integration, update the link
+      if (existingMeeting.platform === 'calendly' && request.calendly_link) {
+        meetingLink = request.calendly_link;
       }
 
       // Update meeting in database
@@ -236,6 +129,7 @@ export class MeetingService {
       if (request.start_time) updateData.start_time = request.start_time;
       if (request.end_time) updateData.end_time = request.end_time;
       if (request.description !== undefined) updateData.description = request.description;
+      if (request.calendly_link !== undefined) updateData.calendly_link = request.calendly_link;
       if (meetingLink) updateData.meeting_link = meetingLink;
 
       const { data: updatedMeeting, error } = await supabase
@@ -279,31 +173,6 @@ export class MeetingService {
 
       if (fetchError || !existingMeeting) {
         throw new Error('Meeting not found');
-      }
-
-      // If meeting has Google Calendar integration, cancel there too
-      if (existingMeeting.external_event_id && existingMeeting.platform === 'google_meet') {
-        try {
-          const { data: userSettings, error: settingsError } = await supabase
-            .from('user_settings')
-            .select('google_access_token, google_refresh_token, google_email, google_name')
-            .eq('user_id', userId)
-            .single();
-
-          if (!settingsError && userSettings?.google_access_token && userSettings?.google_email) {
-            const userCredentials: UserGoogleCredentials = {
-              accessToken: userSettings.google_access_token,
-              refreshToken: userSettings.google_refresh_token,
-              email: userSettings.google_email,
-              name: userSettings.google_name
-            };
-
-            this.googleCalendarService.setUserCredentials(userCredentials);
-            await this.googleCalendarService.cancelMeeting(existingMeeting.external_event_id, reason);
-          }
-        } catch (error) {
-          console.error('Google Calendar cancellation failed:', error);
-        }
       }
 
       // Update meeting status in database
@@ -397,82 +266,6 @@ export class MeetingService {
     }
   }
 
-  // Check if user has Google Calendar connected
-  async checkGoogleCalendarConnection(userId: string): Promise<{
-    isConnected: boolean;
-    email?: string;
-    name?: string;
-  }> {
-    try {
-      const { data: userSettings, error } = await supabase
-        .from('user_settings')
-        .select('google_access_token, google_email, google_name')
-        .eq('user_id', userId)
-        .single();
-
-      if (error || !userSettings) {
-        return { isConnected: false };
-      }
-
-      // Check if user has Google credentials (temporary fix until google_calendar_connected column is added)
-      const hasGoogleCredentials = !!(userSettings.google_access_token && userSettings.google_email);
-      
-      return {
-        isConnected: hasGoogleCredentials,
-        email: userSettings.google_email,
-        name: userSettings.google_name
-      };
-    } catch (error) {
-      console.error('Error checking Google Calendar connection:', error);
-      return { isConnected: false };
-    }
-  }
-
-  // Send meeting invitations via email using user's Gmail
-  private async sendMeetingInvitations(
-    attendees: string[],
-    title: string,
-    description: string,
-    startTime: Date,
-    endTime: Date,
-    meetingLink: string,
-    userCredentials: UserGoogleCredentials,
-    isUpdate: boolean = false
-  ) {
-    try {
-      const subject = isUpdate 
-        ? `Meeting Updated: ${title}`
-        : `Meeting Invitation: ${title}`;
-
-      const htmlContent = this.googleCalendarService.generateMeetingInviteHTML(
-        title,
-        description,
-        startTime,
-        endTime,
-        meetingLink,
-        userCredentials.name || 'OneMFin User',
-        userCredentials.email,
-        isUpdate
-      );
-
-      // Send to all attendees using user's Gmail
-      for (const attendeeEmail of attendees) {
-        try {
-          await this.googleCalendarService.sendMeetingEmail(
-            attendeeEmail,
-            subject,
-            htmlContent,
-            userCredentials
-          );
-        } catch (emailError) {
-          console.error(`Failed to send email to ${attendeeEmail}:`, emailError);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to send meeting invitations:', error);
-    }
-  }
-
   // Transform database meeting data to response format
   private transformMeetingData(meeting: any): MeetingResponse {
     return {
@@ -484,7 +277,7 @@ export class MeetingService {
       meeting_link: meeting.meeting_link,
       platform: meeting.platform,
       status: meeting.status,
-      external_event_id: meeting.external_event_id,
+      calendly_link: meeting.calendly_link,
       lead_name: meeting.leads?.full_name,
       lead_email: meeting.leads?.email,
       created_by: meeting.users?.full_name,

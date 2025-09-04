@@ -3,9 +3,11 @@ import { body, validationResult } from 'express-validator';
 import { supabase } from '../config/supabase';
 import { authenticateUser } from '../middleware/auth';
 import MeetingService, { CreateMeetingRequest, UpdateMeetingRequest } from '../services/meetingService';
+import CalendlyService from '../services/calendlyService';
 
 const router = express.Router();
 const meetingService = new MeetingService();
+const calendlyService = new CalendlyService();
 
 // GET /api/meetings
 router.get('/', authenticateUser, async (req: express.Request, res: express.Response) => {
@@ -43,20 +45,115 @@ router.get('/lead/:leadId', authenticateUser, async (req: express.Request, res: 
   }
 });
 
-// GET /api/meetings/google-status
-router.get('/google-status', authenticateUser, async (req: express.Request, res: express.Response) => {
+// GET /api/meetings/calendly-config - Get user's Calendly configuration
+router.get('/calendly-config', authenticateUser, async (req: express.Request, res: express.Response) => {
   try {
-    const userId = req.user!.supabase_user_id;
-    
+    const userId = req.user?.id;
     if (!userId) {
-      return res.status(400).json({ error: 'User not found. Please complete your profile first.' });
+      return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    const connectionStatus = await meetingService.checkGoogleCalendarConnection(userId);
-    return res.json(connectionStatus);
+    const calendlyService = new CalendlyService();
+    const config = await calendlyService.getUserConfig(userId);
+
+    res.json({ config });
   } catch (error) {
-    console.error('Google Calendar status check error:', error);
-    return res.status(500).json({ error: 'Failed to check Google Calendar connection' });
+    console.error('Error fetching Calendly config:', error);
+    res.status(500).json({ error: 'Failed to fetch Calendly configuration' });
+  }
+});
+
+// POST /api/meetings/calendly-config - Save user's Calendly configuration
+router.post('/calendly-config', authenticateUser, [
+  body('username').notEmpty().withMessage('Calendly username is required')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const { username } = req.body;
+
+    const calendlyService = new CalendlyService();
+    const success = await calendlyService.saveUserConfig(userId, username);
+
+    if (success) {
+      res.json({ 
+        message: 'Calendly configuration saved successfully',
+        config: { username }
+      });
+    } else {
+      res.status(500).json({ error: 'Failed to save Calendly configuration' });
+    }
+  } catch (error: any) {
+    console.error('Error saving Calendly config:', error);
+    res.status(400).json({ 
+      error: error.message || 'Failed to save Calendly configuration' 
+    });
+  }
+});
+
+// POST /api/meetings/calendly-validate - Validate Calendly username
+router.post('/calendly-validate', authenticateUser, [
+  body('username').notEmpty().withMessage('Calendly username is required')
+], async (req: express.Request, res: express.Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { username } = req.body;
+
+    const calendlyService = new CalendlyService();
+    const isValid = await calendlyService.validateCalendlyUsername(username);
+
+    if (isValid) {
+      res.json({ 
+        isValid: true,
+        message: 'Username validated successfully'
+      });
+    } else {
+      res.json({ 
+        isValid: false,
+        error: 'Username not found on Calendly. Please check and try again.'
+      });
+    }
+  } catch (error) {
+    console.error('Error validating Calendly username:', error);
+    res.status(500).json({ 
+      isValid: false,
+      error: 'Failed to validate username' 
+    });
+  }
+});
+
+// GET /api/meetings/calendly-event-types - Get user's Calendly event types
+router.get('/calendly-event-types', authenticateUser, async (req: express.Request, res: express.Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const calendlyService = new CalendlyService();
+    const config = await calendlyService.getUserConfig(userId);
+    
+    if (!config?.username) {
+      return res.status(400).json({ error: 'Calendly username not configured' });
+    }
+
+    const eventTypes = await calendlyService.getEventTypes(config.username);
+    res.json({ eventTypes });
+  } catch (error) {
+    console.error('Error fetching Calendly event types:', error);
+    res.status(500).json({ error: 'Failed to fetch event types' });
   }
 });
 
@@ -67,8 +164,9 @@ router.post('/', authenticateUser, [
   body('start_time').isISO8601().withMessage('Valid start time required'),
   body('end_time').isISO8601().withMessage('Valid end time required'),
   body('description').optional().isString().withMessage('Description must be a string'),
-  body('platform').isIn(['google_meet', 'zoom', 'manual']).withMessage('Valid platform required'),
-  body('attendees').optional().isArray().withMessage('Attendees must be an array')
+  body('platform').isIn(['calendly', 'zoom', 'manual']).withMessage('Valid platform required'),
+  body('attendees').optional().isArray().withMessage('Attendees must be an array'),
+  body('calendly_link').optional().isURL().withMessage('Calendly link must be a valid URL')
 ], async (req: express.Request, res: express.Response) => {
   try {
     const errors = validationResult(req);
@@ -89,7 +187,8 @@ router.post('/', authenticateUser, [
       end_time: req.body.end_time,
       description: req.body.description,
       platform: req.body.platform,
-      attendees: req.body.attendees || []
+      attendees: req.body.attendees || [],
+      calendly_link: req.body.calendly_link
     };
 
     const meeting = await meetingService.createMeeting(userId, meetingRequest);
@@ -107,7 +206,8 @@ router.put('/:id', authenticateUser, [
   body('start_time').optional().isISO8601().withMessage('Valid start time required'),
   body('end_time').optional().isISO8601().withMessage('Valid end time required'),
   body('description').optional().isString().withMessage('Description must be a string'),
-  body('attendees').optional().isArray().withMessage('Attendees must be an array')
+  body('attendees').optional().isArray().withMessage('Attendees must be an array'),
+  body('calendly_link').optional().isURL().withMessage('Calendly link must be a valid URL')
 ], async (req: express.Request, res: express.Response) => {
   try {
     const errors = validationResult(req);
@@ -127,7 +227,8 @@ router.put('/:id', authenticateUser, [
       start_time: req.body.start_time,
       end_time: req.body.end_time,
       description: req.body.description,
-      attendees: req.body.attendees
+      attendees: req.body.attendees,
+      calendly_link: req.body.calendly_link
     };
 
     const meeting = await meetingService.updateMeeting(userId, id, updateRequest);
@@ -200,67 +301,6 @@ router.patch('/:id/status', authenticateUser, [
   } catch (error) {
     console.error('Meeting status update error:', error);
     return res.status(500).json({ error: 'Failed to update meeting status' });
-  }
-});
-
-// POST /api/meetings/google-auth
-router.post('/google-auth', authenticateUser, async (req: express.Request, res: express.Response) => {
-  try {
-    const userId = req.user!.supabase_user_id;
-    
-    if (!userId) {
-      return res.status(400).json({ error: 'User not found. Please complete your profile first.' });
-    }
-
-    const authUrl = meetingService['googleCalendarService'].getAuthUrl();
-    return res.json({ authUrl });
-  } catch (error) {
-    console.error('Google auth error:', error);
-    return res.status(500).json({ error: 'Failed to generate Google auth URL' });
-  }
-});
-
-// POST /api/meetings/google-callback
-router.post('/google-callback', authenticateUser, async (req: express.Request, res: express.Response) => {
-  try {
-    const { code } = req.body;
-    if (!code) {
-      return res.status(400).json({ error: 'Authorization code is required' });
-    }
-
-    const userId = req.user!.supabase_user_id;
-    
-    if (!userId) {
-      return res.status(400).json({ error: 'User not found. Please complete your profile first.' });
-    }
-
-    const tokens = await meetingService['googleCalendarService'].getTokensFromCode(code);
-
-    // Store tokens in user_settings table
-    const { error: updateError } = await supabase
-      .from('user_settings')
-      .upsert({
-        user_id: userId,
-        google_access_token: tokens.access_token,
-        google_refresh_token: tokens.refresh_token,
-        google_email: tokens.email,
-        google_name: tokens.name
-        // Note: google_calendar_connected column will be added via migration
-      });
-
-    if (updateError) {
-      throw new Error('Failed to store Google Calendar tokens');
-    }
-
-    return res.json({ 
-      message: 'Google Calendar connected successfully',
-      email: tokens.email,
-      name: tokens.name
-    });
-  } catch (error) {
-    console.error('Google callback error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to connect Google Calendar';
-    return res.status(500).json({ error: errorMessage });
   }
 });
 

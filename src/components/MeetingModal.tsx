@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Clock, Video, Mail, Plus, Edit, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, Video, Mail, Plus, Edit, X, Link as LinkIcon } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@clerk/clerk-react';
 
@@ -33,6 +33,7 @@ interface MeetingData {
   platform: string;
   lead_id: string;
   attendees?: string[];
+  calendly_link?: string;
 }
 
 interface MeetingFormData {
@@ -41,14 +42,9 @@ interface MeetingFormData {
   start_time: string;
   end_time: string;
   description: string;
-  platform: 'google_meet' | 'zoom' | 'manual';
+  platform: 'calendly' | 'zoom' | 'manual';
   attendees: string[];
-}
-
-interface GoogleCalendarStatus {
-  isConnected: boolean;
-  email?: string;
-  name?: string;
+  calendly_link: string;
 }
 
 export default function MeetingModal({
@@ -66,13 +62,12 @@ export default function MeetingModal({
     start_time: '',
     end_time: '',
     description: '',
-    platform: 'google_meet',
-    attendees: []
+    platform: 'calendly',
+    attendees: [],
+    calendly_link: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [newAttendee, setNewAttendee] = useState('');
-  const [googleStatus, setGoogleStatus] = useState<GoogleCalendarStatus>({ isConnected: false });
-  const [isCheckingGoogle, setIsCheckingGoogle] = useState(true);
 
   useEffect(() => {
     if (meeting && mode === 'edit') {
@@ -82,8 +77,9 @@ export default function MeetingModal({
         start_time: meeting.start_time,
         end_time: meeting.end_time,
         description: meeting.description || '',
-        platform: meeting.platform as 'google_meet' | 'zoom' | 'manual',
-        attendees: meeting.attendees || []
+        platform: meeting.platform as 'calendly' | 'zoom' | 'manual',
+        attendees: meeting.attendees || [],
+        calendly_link: meeting.calendly_link || ''
       });
     } else {
       // Set default times for new meetings
@@ -97,41 +93,12 @@ export default function MeetingModal({
         start_time: startTime.toISOString().slice(0, 16),
         end_time: endTime.toISOString().slice(0, 16),
         description: '',
-        platform: 'google_meet',
-        attendees: []
+        platform: 'calendly',
+        attendees: [],
+        calendly_link: ''
       });
     }
   }, [meeting, mode]);
-
-  useEffect(() => {
-    if (isOpen) {
-      checkGoogleConnection();
-    }
-  }, [isOpen]);
-
-  const checkGoogleConnection = async () => {
-    try {
-      setIsCheckingGoogle(true);
-      const token = await getToken();
-      if (!token) return;
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/google-status`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const status = await response.json();
-        setGoogleStatus(status);
-      }
-    } catch (error) {
-      console.error('Failed to check Google connection:', error);
-    } finally {
-      setIsCheckingGoogle(false);
-    }
-  };
 
   const handleInputChange = (field: keyof MeetingFormData, value: string | string[]) => {
     setFormData(prev => ({
@@ -178,11 +145,11 @@ export default function MeetingModal({
       return;
     }
 
-    // Check if user is trying to use Google Meet without connecting
-    if (formData.platform === 'google_meet' && !googleStatus.isConnected) {
+    // Check if user is trying to use Calendly without providing a link
+    if (formData.platform === 'calendly' && !formData.calendly_link.trim()) {
       toast({
-        title: "Google Calendar Not Connected",
-        description: "Please connect your Google Calendar first to use Google Meet.",
+        title: "Calendly Link Required",
+        description: "Please provide a Calendly link when using Calendly as the platform.",
         variant: "destructive"
       });
       return;
@@ -205,41 +172,6 @@ export default function MeetingModal({
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const connectGoogleCalendar = async () => {
-    try {
-      const token = await getToken();
-      if (!token) return;
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/google-auth`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const { authUrl } = await response.json();
-        const popup = window.open(authUrl, '_blank', 'width=600,height=600');
-        
-        // Check for popup closure and refresh status
-        const checkClosed = setInterval(() => {
-          if (popup?.closed) {
-            clearInterval(checkClosed);
-            checkGoogleConnection();
-          }
-        }, 1000);
-      }
-    } catch (error) {
-      console.error('Failed to get Google auth URL:', error);
-      toast({
-        title: "Error",
-        description: "Failed to connect Google Calendar. Please try again.",
-        variant: "destructive"
-      });
     }
   };
 
@@ -331,7 +263,7 @@ export default function MeetingModal({
             <Label htmlFor="platform">Meeting Platform *</Label>
             <Select
               value={formData.platform}
-              onValueChange={(value: 'google_meet' | 'zoom' | 'manual') => 
+              onValueChange={(value: 'calendly' | 'zoom' | 'manual') => 
                 handleInputChange('platform', value)
               }
             >
@@ -339,10 +271,10 @@ export default function MeetingModal({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="google_meet">
+                <SelectItem value="calendly">
                   <div className="flex items-center gap-2">
-                    <Video className="h-4 w-4" />
-                    Google Meet
+                    <LinkIcon className="h-4 w-4" />
+                    Calendly
                   </div>
                 </SelectItem>
                 <SelectItem value="zoom">
@@ -359,50 +291,25 @@ export default function MeetingModal({
                 </SelectItem>
               </SelectContent>
             </Select>
-            
-            {/* Google Calendar Connection Status */}
-            {formData.platform === 'google_meet' && (
-              <div className="mt-2">
-                {isCheckingGoogle ? (
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-                    <div className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
-                      <span className="text-sm text-gray-600">Checking Google Calendar connection...</span>
-                    </div>
-                  </div>
-                ) : googleStatus.isConnected ? (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span className="text-sm text-green-700">
-                        Connected to Google Calendar ({googleStatus.email})
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm text-amber-800 mb-2">
-                          Connect your Google Calendar to automatically create Google Meet links and send invitations from your email.
-                        </p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={connectGoogleCalendar}
-                          className="text-amber-700 border-amber-300 hover:bg-amber-100"
-                        >
-                          Connect Google Calendar
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
+
+          {/* Calendly Link Input */}
+          {formData.platform === 'calendly' && (
+            <div className="space-y-2">
+              <Label htmlFor="calendly_link">Calendly Link *</Label>
+              <Input
+                id="calendly_link"
+                type="url"
+                value={formData.calendly_link}
+                onChange={(e) => handleInputChange('calendly_link', e.target.value)}
+                placeholder="https://calendly.com/your-link"
+                required
+              />
+              <p className="text-sm text-muted-foreground">
+                Enter your Calendly scheduling link. This will be shared with the lead for easy scheduling.
+              </p>
+            </div>
+          )}
 
           {/* Description */}
           <div className="space-y-2">
@@ -466,8 +373,8 @@ export default function MeetingModal({
                 <strong>Lead:</strong> {getSelectedLead()?.full_name} ({getSelectedLead()?.email})
               </p>
               <p className="text-sm text-gray-600 mt-1">
-                {formData.platform === 'google_meet' && googleStatus.isConnected
-                  ? `Meeting invitation will be sent automatically via email from ${googleStatus.email}`
+                {formData.platform === 'calendly' && formData.calendly_link
+                  ? `Calendly link will be shared with the lead for easy scheduling`
                   : 'You can manually share meeting details with the lead'}
               </p>
             </div>

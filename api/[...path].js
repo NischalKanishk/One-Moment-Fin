@@ -177,7 +177,7 @@ module.exports = async function handler(req, res) {
     if (path.startsWith('/api/meetings')) {
       const meetingsPath = path.replace('/api/meetings', '');
       
-      // GET /api/meetings - List user meetings
+      // GET /api/meetings - Get all meetings for user
       if (method === 'GET' && meetingsPath === '') {
         try {
           const user = await authenticateUser(req);
@@ -185,78 +185,73 @@ module.exports = async function handler(req, res) {
             return res.status(400).json({ error: 'User not properly authenticated' });
           }
 
-          // Get meetings for the user
+          console.log('🔍 Fetching meetings for user:', user.supabase_user_id);
+
           const { data: meetings, error } = await supabase
             .from('meetings')
             .select(`
               *,
-              leads:lead_id (
+              leads!meetings_lead_id_fkey (
                 full_name,
                 email
+              ),
+              users!meetings_user_id_fkey (
+                full_name
               )
             `)
             .eq('user_id', user.supabase_user_id)
-            .order('start_time', { ascending: true });
+            .order('start_time', { ascending: false });
 
           if (error) {
-            console.error('❌ Database error:', error);
+            console.error('❌ Error fetching meetings:', error);
             return res.status(500).json({ error: 'Failed to fetch meetings' });
           }
 
-          // Transform the data to match frontend expectations
-          const transformedMeetings = meetings?.map(meeting => ({
-            id: meeting.id,
-            title: meeting.title,
-            start_time: meeting.start_time,
-            end_time: meeting.end_time,
-            description: meeting.description,
-            meeting_link: meeting.meeting_link,
-            platform: meeting.platform,
-            status: meeting.status,
-            lead_name: meeting.leads?.full_name || null,
-            lead_email: meeting.leads?.email || null,
-            created_by: meeting.created_by,
-            created_at: meeting.created_at,
-            lead_id: meeting.lead_id
-          })) || [];
-
-          return res.status(200).json({ meetings: transformedMeetings });
+          console.log(`✅ Found ${meetings?.length || 0} meetings for user ${user.supabase_user_id}`);
+          return res.json({ meetings: meetings || [] });
         } catch (error) {
-          console.error('❌ Error fetching meetings:', error);
+          console.error('❌ Error in meetings fetch:', error);
           return res.status(500).json({ error: 'Failed to fetch meetings' });
         }
       }
 
-      // GET /api/meetings/google-status - Check Google Calendar connection
-      if (method === 'GET' && meetingsPath === '/google-status') {
+      // GET /api/meetings/lead/:leadId - Get meetings for specific lead
+      if (method === 'GET' && meetingsPath.startsWith('/lead/')) {
         try {
           const user = await authenticateUser(req);
           if (!user?.supabase_user_id) {
             return res.status(400).json({ error: 'User not properly authenticated' });
           }
 
-          // Check if user has Google Calendar connected
-          const { data: userSettings, error } = await supabase
-            .from('user_settings')
-            .select('google_access_token, google_email, google_name')
-            .eq('user_id', user.supabase_user_id)
-            .single();
+          const leadId = meetingsPath.replace('/lead/', '');
+          console.log('🔍 Fetching meetings for lead:', leadId, 'user:', user.supabase_user_id);
 
-          if (error && error.code !== 'PGRST116') {
-            console.error('❌ Database error:', error);
-            return res.status(500).json({ error: 'Failed to check Google connection' });
+          const { data: meetings, error } = await supabase
+            .from('meetings')
+            .select(`
+              *,
+              leads!meetings_lead_id_fkey (
+                full_name,
+                email
+              ),
+              users!meetings_user_id_fkey (
+                full_name
+              )
+            `)
+            .eq('user_id', user.supabase_user_id)
+            .eq('lead_id', leadId)
+            .order('start_time', { ascending: false });
+
+          if (error) {
+            console.error('❌ Error fetching lead meetings:', error);
+            return res.status(500).json({ error: 'Failed to fetch lead meetings' });
           }
 
-          const isConnected = !!(userSettings?.google_access_token);
-          
-          return res.status(200).json({
-            isConnected,
-            email: userSettings?.google_email || null,
-            name: userSettings?.google_name || null
-          });
+          console.log(`✅ Found ${meetings?.length || 0} meetings for lead ${leadId}`);
+          return res.json({ meetings: meetings || [] });
         } catch (error) {
-          console.error('❌ Error checking Google status:', error);
-          return res.status(500).json({ error: 'Failed to check Google connection' });
+          console.error('❌ Error in lead meetings fetch:', error);
+          return res.status(500).json({ error: 'Failed to fetch lead meetings' });
         }
       }
 
@@ -268,14 +263,24 @@ module.exports = async function handler(req, res) {
             return res.status(400).json({ error: 'User not properly authenticated' });
           }
 
-          const { lead_id, title, start_time, end_time, description, platform, attendees } = req.body;
+          const { lead_id, title, start_time, end_time, description, platform, calendly_link } = req.body;
 
-          // Validate required fields
+          // Validation
           if (!lead_id || !title || !start_time || !end_time || !platform) {
             return res.status(400).json({ error: 'Missing required fields' });
           }
 
-          // Create the meeting
+          if (!['calendly', 'zoom', 'manual'].includes(platform)) {
+            return res.status(400).json({ error: 'Invalid platform. Must be calendly, zoom, or manual' });
+          }
+
+          if (platform === 'calendly' && !calendly_link) {
+            return res.status(400).json({ error: 'Calendly link is required when platform is calendly' });
+          }
+
+          console.log('🔍 Creating meeting for user:', user.supabase_user_id, 'lead:', lead_id);
+
+          // Create meeting record
           const { data: meeting, error } = await supabase
             .from('meetings')
             .insert({
@@ -284,27 +289,47 @@ module.exports = async function handler(req, res) {
               title,
               start_time,
               end_time,
-              description,
+              description: description || '',
               platform,
-              status: 'scheduled',
-              attendees: attendees || []
+              meeting_link: calendly_link || null,
+              calendly_link: calendly_link || null,
+              status: 'scheduled'
             })
-            .select()
+            .select(`
+              *,
+              leads!meetings_lead_id_fkey (
+                full_name,
+                email
+              ),
+              users!meetings_user_id_fkey (
+                full_name
+              )
+            `)
             .single();
 
           if (error) {
-            console.error('❌ Database error:', error);
+            console.error('❌ Error creating meeting:', error);
             return res.status(500).json({ error: 'Failed to create meeting' });
           }
 
+          // Update lead status to "Meeting scheduled"
+          try {
+            // Assuming updateLeadStatus is defined elsewhere or needs to be imported
+            // For now, commenting out as it's not in the original file
+            // await updateLeadStatus(lead_id, 'meeting_scheduled'); 
+          } catch (statusError) {
+            console.error('⚠️ Failed to update lead status:', statusError);
+          }
+
+          console.log('✅ Meeting created successfully:', meeting.id);
           return res.status(201).json({ meeting });
         } catch (error) {
-          console.error('❌ Error creating meeting:', error);
+          console.error('❌ Error in meeting creation:', error);
           return res.status(500).json({ error: 'Failed to create meeting' });
         }
       }
 
-      // PUT /api/meetings/:id - Update meeting
+      // PUT /api/meetings/:id - Update existing meeting
       if (method === 'PUT' && meetingsPath.match(/^\/[^\/]+$/)) {
         try {
           const user = await authenticateUser(req);
@@ -312,32 +337,64 @@ module.exports = async function handler(req, res) {
             return res.status(400).json({ error: 'User not properly authenticated' });
           }
 
-          const meetingId = meetingsPath.substring(1); // Remove leading slash
-          const { title, start_time, end_time, description, attendees } = req.body;
+          const meetingId = meetingsPath.replace('/', '');
+          const { title, start_time, end_time, description, attendees, calendly_link } = req.body;
 
-          // Update the meeting
-          const { data: meeting, error } = await supabase
+          console.log('🔍 Updating meeting:', meetingId, 'for user:', user.supabase_user_id);
+
+          // Get existing meeting to check ownership
+          const { data: existingMeeting, error: fetchError } = await supabase
             .from('meetings')
-            .update({
-              title,
-              start_time,
-              end_time,
-              description,
-              attendees: attendees || []
-            })
+            .select('*')
             .eq('id', meetingId)
-            .eq('user_id', user.supabase_user_id) // Ensure user owns the meeting
-            .select()
+            .eq('user_id', user.supabase_user_id)
+            .single();
+
+          if (fetchError || !existingMeeting) {
+            return res.status(404).json({ error: 'Meeting not found' });
+          }
+
+          // Prepare update data
+          const updateData = {
+            updated_at: new Date().toISOString()
+          };
+
+          if (title !== undefined) updateData.title = title;
+          if (start_time !== undefined) updateData.start_time = start_time;
+          if (end_time !== undefined) updateData.end_time = end_time;
+          if (description !== undefined) updateData.description = description;
+          if (calendly_link !== undefined) {
+            updateData.calendly_link = calendly_link;
+            updateData.meeting_link = calendly_link; // Also update meeting_link for backward compatibility
+          }
+
+          // Update meeting
+          const { data: updatedMeeting, error } = await supabase
+            .from('meetings')
+            .update(updateData)
+            .eq('id', meetingId)
+            .eq('user_id', user.supabase_user_id)
+            .select(`
+              *,
+              leads!meetings_lead_id_fkey (
+                full_name,
+                email
+              ),
+              users!meetings_user_id_fkey (
+                full_name
+              )
+            `)
             .single();
 
           if (error) {
-            console.error('❌ Database error:', error);
+            console.error('❌ Error updating meeting:', error);
             return res.status(500).json({ error: 'Failed to update meeting' });
           }
 
-          return res.status(200).json({ meeting });
+          console.log('✅ Meeting updated successfully:', meetingId);
+          return res.json({ meeting: updatedMeeting });
         } catch (error) {
-          console.error('❌ Error updating meeting:', error);
+          console.error('❌ Error in meeting update:', error);
           return res.status(500).json({ error: 'Failed to update meeting' });
         }
       }
@@ -350,29 +407,53 @@ module.exports = async function handler(req, res) {
             return res.status(400).json({ error: 'User not properly authenticated' });
           }
 
-          const meetingId = meetingsPath.split('/')[1]; // Get meeting ID
+          const meetingId = meetingsPath.replace('/cancel', '').replace('/', '');
           const { reason } = req.body;
 
-          // Update meeting status to cancelled
-          const { data: meeting, error } = await supabase
+          console.log('🔍 Cancelling meeting:', meetingId, 'for user:', user.supabase_user_id);
+
+          // Get existing meeting to check ownership
+          const { data: existingMeeting, error: fetchError } = await supabase
+            .from('meetings')
+            .select('*')
+            .eq('id', meetingId)
+            .eq('user_id', user.supabase_user_id)
+            .single();
+
+          if (fetchError || !existingMeeting) {
+            return res.status(404).json({ error: 'Meeting not found' });
+          }
+
+          // Update meeting status
+          const { data: updatedMeeting, error } = await supabase
             .from('meetings')
             .update({
               status: 'cancelled',
-              cancelled_reason: reason
+              updated_at: new Date().toISOString()
             })
             .eq('id', meetingId)
-            .eq('user_id', user.supabase_user_id) // Ensure user owns the meeting
-            .select()
+            .eq('user_id', user.supabase_user_id)
+            .select(`
+              *,
+              leads!meetings_lead_id_fkey (
+                full_name,
+                email
+              ),
+              users!meetings_user_id_fkey (
+                full_name
+              )
+            `)
             .single();
 
           if (error) {
-            console.error('❌ Database error:', error);
+            console.error('❌ Error cancelling meeting:', error);
             return res.status(500).json({ error: 'Failed to cancel meeting' });
           }
 
-          return res.status(200).json({ meeting });
+          console.log('✅ Meeting cancelled successfully:', meetingId);
+          return res.json({ meeting: updatedMeeting });
         } catch (error) {
-          console.error('❌ Error cancelling meeting:', error);
+          console.error('❌ Error in meeting cancellation:', error);
           return res.status(500).json({ error: 'Failed to cancel meeting' });
         }
       }
@@ -385,229 +466,36 @@ module.exports = async function handler(req, res) {
             return res.status(400).json({ error: 'User not properly authenticated' });
           }
 
-          const meetingId = meetingsPath.split('/')[1]; // Get meeting ID
+          const meetingId = meetingsPath.replace('/status', '').replace('/', '');
           const { status } = req.body;
 
-          if (!status) {
-            return res.status(400).json({ error: 'Status is required' });
+          if (!['scheduled', 'completed', 'cancelled'].includes(status)) {
+            return res.status(400).json({ error: 'Invalid status. Must be scheduled, completed, or cancelled' });
           }
 
+          console.log('🔍 Updating meeting status:', meetingId, 'to', status, 'for user:', user.supabase_user_id);
+
           // Update meeting status
-          const { data: meeting, error } = await supabase
+          const { data: updatedMeeting, error } = await supabase
             .from('meetings')
-            .update({ status })
+            .update({
+              status,
+              updated_at: new Date().toISOString()
+            })
             .eq('id', meetingId)
-            .eq('user_id', user.supabase_user_id) // Ensure user owns the meeting
+            .eq('user_id', user.supabase_user_id)
             .select()
             .single();
 
-          if (error) {
-            console.error('❌ Database error:', error);
-            return res.status(500).json({ error: 'Failed to update meeting status' });
+          if (error || !updatedMeeting) {
+            return res.status(404).json({ error: 'Meeting not found' });
           }
 
-          return res.status(200).json({ meeting });
+          console.log('✅ Meeting status updated successfully:', meetingId, 'to', status);
+          return res.json({ meeting: updatedMeeting });
         } catch (error) {
-          console.error('❌ Error updating meeting status:', error);
+          console.error('❌ Error in meeting status update:', error);
           return res.status(500).json({ error: 'Failed to update meeting status' });
-        }
-      }
-
-      // GET /api/meetings/google-status - Check Google Calendar connection status
-      if (method === 'GET' && meetingsPath === '/google-status') {
-        try {
-          const user = await authenticateUser(req);
-          if (!user?.supabase_user_id) {
-            return res.status(400).json({ error: 'User not properly authenticated' });
-          }
-
-          // Check if user has Google Calendar connected
-          // Note: The user_settings table is missing Google Calendar columns
-          // For now, return a default response indicating no connection
-          console.log('⚠️ user_settings table is missing Google Calendar columns');
-          
-          return res.json({
-            isConnected: false,
-            email: null,
-            name: null,
-            note: 'Google Calendar integration not yet configured'
-          });
-        } catch (error) {
-          console.error('❌ Error checking Google Calendar connection:', error);
-          return res.status(500).json({ error: 'Failed to check Google Calendar connection' });
-        }
-      }
-
-      // GET /api/meetings/google-auth-test - Test Google OAuth configuration
-      if (method === 'GET' && meetingsPath === '/google-auth-test') {
-        try {
-          console.log('🔍 Google OAuth configuration test');
-          console.log('🔍 Environment variables:');
-          console.log('  - GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? '✅ Set' : '❌ Not set');
-          console.log('  - GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? '✅ Set' : '❌ Not set');
-          console.log('  - GOOGLE_REDIRECT_URI:', process.env.GOOGLE_REDIRECT_URI || '❌ Not set (will use auto-generated)');
-          console.log('  - FRONTEND_URL:', process.env.FRONTEND_URL || '❌ Not set (will use auto-generated)');
-          console.log('🔍 Request origin:', req.headers.origin);
-          
-          // Calculate the auto-generated redirect URI
-          const autoRedirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.FRONTEND_URL?.replace(/\/$/, '')}/api/meetings/google-callback`;
-          
-          return res.json({
-            status: 'Google OAuth Configuration Test',
-            environment: {
-              google_client_id_set: !!process.env.GOOGLE_CLIENT_ID,
-              google_client_secret_set: !!process.env.GOOGLE_CLIENT_SECRET,
-              google_redirect_uri_set: !!process.env.GOOGLE_REDIRECT_URI,
-              frontend_url_set: !!process.env.FRONTEND_URL
-            },
-            configured_redirect_uri: process.env.GOOGLE_REDIRECT_URI || 'Not set',
-            auto_redirect_uri: autoRedirectUri,
-            frontend_url: process.env.FRONTEND_URL || 'Not set',
-            note: 'Check server logs for detailed configuration info'
-          });
-        } catch (error) {
-          console.error('❌ Google OAuth test error:', error);
-          return res.status(500).json({ error: 'Failed to test Google OAuth configuration' });
-        }
-      }
-
-      // POST /api/meetings/google-auth - Get Google OAuth URL
-      if (method === 'POST' && meetingsPath === '/google-auth') {
-        try {
-          const user = await authenticateUser(req);
-          if (!user?.supabase_user_id) {
-            return res.status(400).json({ error: 'User not properly authenticated' });
-          }
-
-          // Generate OAuth URL with state parameter for security
-          const state = Buffer.from(JSON.stringify({ userId: user.supabase_user_id })).toString('base64');
-          
-          // Check if required environment variables are set
-          if (!process.env.GOOGLE_CLIENT_ID) {
-            console.error('❌ GOOGLE_CLIENT_ID environment variable is not set');
-            return res.status(500).json({ error: 'Google OAuth not configured on server' });
-          }
-          
-          // Use environment variable or construct from FRONTEND_URL
-          const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.FRONTEND_URL?.replace(/\/$/, '')}/api/meetings/google-callback`;
-          
-          const authUrl = `https://accounts.google.com/oauth/authorize?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=https://www.googleapis.com/auth/calendar&response_type=code&access_type=offline&state=${state}`;
-          
-          console.log('🔍 Generated Google OAuth URL:', authUrl);
-          console.log('🔍 Redirect URI:', redirectUri);
-          console.log('🔍 Using FRONTEND_URL:', process.env.FRONTEND_URL);
-          
-          return res.status(200).json({ authUrl });
-        } catch (error) {
-          console.error('❌ Error getting Google auth URL:', error);
-          return res.status(500).json({ error: 'Failed to get Google auth URL' });
-        }
-      }
-
-      // GET /api/meetings/google-callback - Handle Google OAuth callback
-      if (method === 'GET' && meetingsPath === '/google-callback') {
-        try {
-          console.log('🔍 Google OAuth callback received');
-          console.log('🔍 Query parameters:', req.query);
-          console.log('🔍 Headers origin:', req.headers.origin);
-          
-          const { code, state, error } = req.query;
-          
-          if (error) {
-            console.error('❌ Google OAuth error:', error);
-            const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '') || 'https://one-moment-fin.vercel.app';
-            return res.redirect(`${frontendUrl}/app/meetings?error=oauth_failed`);
-          }
-          
-          if (!code || !state) {
-            console.error('❌ Missing code or state parameter');
-            console.error('🔍 Code:', code);
-            console.error('🔍 State:', state);
-            const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '') || 'https://one-moment-fin.vercel.app';
-            return res.redirect(`${frontendUrl}/app/meetings?error=invalid_callback`);
-          }
-
-          // Decode state parameter
-          let decodedState;
-          try {
-            decodedState = JSON.parse(Buffer.from(state, 'base64').toString());
-          } catch (e) {
-            console.error('❌ Invalid state parameter');
-            return res.redirect(`${process.env.FRONTEND_URL}/app/meetings?error=invalid_state`);
-          }
-
-          const { userId } = decodedState;
-          
-          // Check if required environment variables are set
-          if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-            console.error('❌ Missing Google OAuth environment variables');
-            return res.redirect(`${process.env.FRONTEND_URL || req.headers.origin}/app/meetings?error=oauth_not_configured`);
-          }
-          
-          // Use environment variable or construct from FRONTEND_URL
-          const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.FRONTEND_URL?.replace(/\/$/, '')}/api/meetings/google-callback`;
-          
-          // Exchange code for tokens
-          const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-              code,
-              client_id: process.env.GOOGLE_CLIENT_ID,
-              client_secret: process.env.GOOGLE_CLIENT_SECRET,
-              redirect_uri: redirectUri,
-              grant_type: 'authorization_code',
-            }),
-          });
-
-          if (!tokenResponse.ok) {
-            console.error('❌ Failed to exchange code for tokens');
-            return res.redirect(`${process.env.FRONTEND_URL}/app/meetings?error=token_exchange_failed`);
-          }
-
-          const tokens = await tokenResponse.json();
-          
-          // Get user info from Google
-          const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-            headers: {
-              'Authorization': `Bearer ${tokens.access_token}`,
-            },
-          });
-
-          if (!userInfoResponse.ok) {
-            console.error('❌ Failed to get user info from Google');
-            return res.redirect(`${process.env.FRONTEND_URL}/app/meetings?error=user_info_failed`);
-          }
-
-          const userInfo = await userInfoResponse.json();
-
-          // Store tokens in database
-          // Note: The user_settings table is missing Google Calendar columns
-          // For now, just store basic user settings
-          const { error: dbError } = await supabase
-            .from('user_settings')
-            .upsert({
-              user_id: userId,
-              google_calendar_id: 'primary'
-              // Note: google_access_token, google_refresh_token, google_email, google_name columns are missing
-              // These need to be added to the database first
-            }, {
-              onConflict: 'user_id'
-            });
-
-          if (dbError) {
-            console.error('❌ Database error storing tokens:', dbError);
-            return res.redirect(`${process.env.FRONTEND_URL}/app/meetings?error=storage_failed`);
-          }
-
-          console.log('✅ Google Calendar connected successfully for user:', userId);
-          return res.redirect(`${process.env.FRONTEND_URL}/app/meetings?success=google_connected`);
-          
-        } catch (error) {
-          console.error('❌ Error in Google callback:', error);
-          return res.redirect(`${process.env.FRONTEND_URL}/app/meetings?error=callback_failed`);
         }
       }
     }

@@ -5,9 +5,10 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calendar, Clock, Video, ExternalLink, Plus, Edit, X, MoreHorizontal, CheckCircle, AlertCircle, Link } from "lucide-react";
+import { Calendar, Clock, Video, ExternalLink, Plus, Edit, X, MoreHorizontal, Link as LinkIcon, Settings } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import MeetingModal from "@/components/MeetingModal";
+import CalendlyConfigModal from "@/components/CalendlyConfigModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +30,7 @@ interface Meeting {
   created_by: string | null;
   created_at: string;
   lead_id: string;
+  calendly_link?: string;
 }
 
 interface Lead {
@@ -37,10 +39,11 @@ interface Lead {
   email: string;
 }
 
-interface GoogleCalendarStatus {
-  isConnected: boolean;
-  email?: string;
-  name?: string;
+interface CalendlyConfig {
+  username: string;
+  apiKey?: string;
+  organizationUri?: string;
+  userUri?: string;
 }
 
 export default function Meetings() {
@@ -52,66 +55,15 @@ export default function Meetings() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
-  const [googleStatus, setGoogleStatus] = useState<GoogleCalendarStatus>({ isConnected: false });
-  const [isCheckingGoogle, setIsCheckingGoogle] = useState(true);
+  const [isCalendlyConfigOpen, setIsCalendlyConfigOpen] = useState(false);
+  const [calendlyConfig, setCalendlyConfig] = useState<CalendlyConfig | null>(null);
+  const [isCheckingCalendly, setIsCheckingCalendly] = useState(true);
 
   // Fetch meetings and leads on component mount
   useEffect(() => {
     fetchMeetings();
     fetchLeads();
-    checkGoogleConnection();
-    
-    // Check for OAuth callback parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const success = urlParams.get('success');
-    const error = urlParams.get('error');
-    
-    if (success === 'google_connected') {
-      toast({
-        title: "Success",
-        description: "Google Calendar connected successfully!",
-      });
-      // Refresh Google connection status
-      checkGoogleConnection();
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-    
-    if (error) {
-      let errorMessage = "Failed to connect Google Calendar";
-      switch (error) {
-        case 'oauth_failed':
-          errorMessage = "Google OAuth authentication failed";
-          break;
-        case 'invalid_callback':
-          errorMessage = "Invalid OAuth callback";
-          break;
-        case 'invalid_state':
-          errorMessage = "Invalid OAuth state";
-          break;
-        case 'token_exchange_failed':
-          errorMessage = "Failed to exchange OAuth tokens";
-          break;
-        case 'user_info_failed':
-          errorMessage = "Failed to get user information from Google";
-          break;
-        case 'storage_failed':
-          errorMessage = "Failed to store authentication tokens";
-          break;
-        case 'callback_failed':
-          errorMessage = "OAuth callback processing failed";
-          break;
-      }
-      
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive"
-      });
-      
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
+    checkCalendlyConfig();
   }, []);
 
   const fetchMeetings = async () => {
@@ -226,89 +178,27 @@ export default function Meetings() {
     }
   };
 
-  const checkGoogleConnection = async () => {
+  const checkCalendlyConfig = async () => {
     try {
-      setIsCheckingGoogle(true);
+      setIsCheckingCalendly(true);
       const token = await getToken();
       if (!token) return;
 
-      console.log('🔍 Frontend: Google status check - token length:', token.length);
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/google-status`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/calendly-config`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('🔍 Frontend: Google status API error:', response.status, errorData);
-        return;
-      }
-
-      try {
-        const responseText = await response.text();
-        console.log('🔍 Raw Google status response text:', responseText);
-        
-        if (!responseText) {
-          console.warn('⚠️ Empty Google status response received');
-          return;
-        }
-        
-        const status = JSON.parse(responseText);
-        console.log('🔍 Parsed Google status data:', status);
-        setGoogleStatus(status);
-      } catch (jsonError) {
-        console.error('Failed to parse Google status JSON:', jsonError);
-        console.error('Google status response status:', response.status);
-        console.error('Google status response headers:', response.headers);
+      if (response.ok) {
+        const data = await response.json();
+        setCalendlyConfig(data.config);
       }
     } catch (error) {
-      console.error('Failed to check Google connection:', error);
+      console.error('Failed to check Calendly config:', error);
     } finally {
-      setIsCheckingGoogle(false);
-    }
-  };
-
-  const connectGoogleCalendar = async () => {
-    try {
-      const token = await getToken();
-      if (!token) return;
-
-      console.log('🔍 Frontend: Google auth - token length:', token.length);
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings/google-auth`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('🔍 Frontend: Google auth API error:', response.status, errorData);
-        throw new Error('Failed to get Google auth URL');
-      }
-
-      const { authUrl } = await response.json();
-      const popup = window.open(authUrl, '_blank', 'width=600,height=600');
-      
-      // Check for popup closure and refresh status
-      const checkClosed = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(checkClosed);
-          checkGoogleConnection();
-        }
-      }, 1000);
-    } catch (error) {
-      console.error('Failed to get Google auth URL:', error);
-      toast({
-        title: "Error",
-        description: "Failed to connect Google Calendar. Please try again.",
-        variant: "destructive"
-      });
+      setIsCheckingCalendly(false);
     }
   };
 
@@ -477,6 +367,18 @@ export default function Meetings() {
     }
   };
 
+  const openCalendlyConfig = () => {
+    setIsCalendlyConfigOpen(true);
+  };
+
+  const closeCalendlyConfig = () => {
+    setIsCalendlyConfigOpen(false);
+  };
+
+  const handleCalendlyConfigSaved = () => {
+    checkCalendlyConfig();
+  };
+
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString('en-IN', {
@@ -504,8 +406,8 @@ export default function Meetings() {
 
   const getPlatformIcon = (platform: string) => {
     switch (platform.toLowerCase()) {
-      case 'google_meet':
-        return <Video className="h-4 w-4 text-blue-600" />;
+      case 'calendly':
+        return <LinkIcon className="h-4 w-4 text-purple-600" />;
       case 'zoom':
         return <Video className="h-4 w-4 text-blue-500" />;
       default:
@@ -542,59 +444,93 @@ export default function Meetings() {
             Schedule and manage your client meetings
           </p>
         </div>
-        <Button onClick={openCreateModal} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Schedule Meeting
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={openCalendlyConfig}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Calendly Config
+          </Button>
+          <Button onClick={openCreateModal} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Schedule Meeting
+          </Button>
+        </div>
       </div>
 
-      {/* Google Calendar Connection Status */}
-      <Card className="border-l-4 border-l-blue-500">
+      {/* Calendly Integration Status */}
+      <Card className="border-l-4 border-l-purple-500">
         <CardContent className="p-6">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-4">
-              {isCheckingGoogle ? (
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-              ) : googleStatus.isConnected ? (
-                <CheckCircle className="h-6 w-6 text-green-600 mt-0.5" />
+              {isCheckingCalendly ? (
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+              ) : calendlyConfig?.username ? (
+                <div className="flex items-center gap-2 text-green-600">
+                  <LinkIcon className="h-6 w-6" />
+                  <span className="text-lg font-semibold">✓ Connected</span>
+                </div>
               ) : (
-                <AlertCircle className="h-6 w-6 text-amber-600 mt-0.5" />
+                <LinkIcon className="h-6 w-6 text-purple-600 mt-0.5" />
               )}
               
               <div>
                 <h3 className="text-lg font-semibold mb-2">
-                  {isCheckingGoogle 
-                    ? 'Checking Google Calendar connection...'
-                    : googleStatus.isConnected 
-                    ? 'Google Calendar Connected'
-                    : 'Connect Your Google Calendar'
+                  {isCheckingCalendly 
+                    ? 'Checking Calendly configuration...'
+                    : calendlyConfig?.username 
+                    ? 'Calendly Connected'
+                    : 'Configure Calendly Integration'
                   }
                 </h3>
                 
-                {!isCheckingGoogle && (
+                {!isCheckingCalendly && (
                   <div className="space-y-2">
-                    {googleStatus.isConnected ? (
-                      <p className="text-green-700">
-                        ✅ You're connected to Google Calendar as <strong>{googleStatus.email}</strong>. 
-                        All meetings will be automatically synced and invitations sent from your email.
-                      </p>
+                    {calendlyConfig?.username ? (
+                      <div className="space-y-3">
+                        <p className="text-green-700">
+                          ✅ Connected to Calendly as <strong>@{calendlyConfig.username}</strong>
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            onClick={openCalendlyConfig}
+                            variant="outline"
+                            size="sm"
+                            className="text-green-700 border-green-300 hover:bg-green-100"
+                          >
+                            <Settings className="h-4 w-4 mr-1" />
+                            Manage Configuration
+                          </Button>
+                          <Button
+                            onClick={() => window.open(`https://calendly.com/${calendlyConfig.username}`, '_blank')}
+                            variant="outline"
+                            size="sm"
+                            className="text-green-700 border-green-300 hover:bg-green-100"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            View Calendly
+                          </Button>
+                        </div>
+                      </div>
                     ) : (
                       <div className="space-y-3">
-                        <p className="text-amber-700">
-                          🔗 Connect your Google Calendar to unlock powerful meeting features:
+                        <p className="text-purple-700">
+                          🔗 Configure Calendly to streamline your meeting scheduling:
                         </p>
-                        <ul className="text-sm text-amber-700 space-y-1 ml-4">
-                          <li>• Automatic Google Meet link generation</li>
-                          <li>• Send meeting invitations from your email</li>
-                          <li>• Sync meetings with your Google Calendar</li>
-                          <li>• Professional email templates</li>
+                        <ul className="text-sm text-purple-700 space-y-1 ml-4">
+                          <li>• Add your Calendly username and API key</li>
+                          <li>• Automatic link generation for meetings</li>
+                          <li>• Professional scheduling experience</li>
+                          <li>• Future Scheduling API integration ready</li>
                         </ul>
                         <Button
-                          onClick={connectGoogleCalendar}
-                          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+                          onClick={openCalendlyConfig}
+                          className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700"
                         >
-                          <Link className="h-4 w-4" />
-                          Connect Google Calendar
+                          <Settings className="h-4 w-4" />
+                          Configure Calendly
                         </Button>
                       </div>
                     )}
@@ -685,6 +621,16 @@ export default function Meetings() {
                       >
                         <ExternalLink className="h-3 w-3 mr-1" />
                         Join
+                      </Button>
+                    )}
+                    {meeting.calendly_link && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(meeting.calendly_link, '_blank')}
+                      >
+                        <LinkIcon className="h-3 w-3 mr-1" />
+                        Schedule
                       </Button>
                     )}
                     <Button
@@ -789,6 +735,17 @@ export default function Meetings() {
                             </Button>
                           )}
                           
+                          {meeting.calendly_link && meeting.status === 'scheduled' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(meeting.calendly_link, '_blank')}
+                            >
+                              <LinkIcon className="h-3 w-3 mr-1" />
+                              Schedule
+                            </Button>
+                          )}
+                          
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm">
@@ -841,6 +798,13 @@ export default function Meetings() {
         meeting={editingMeeting}
         leads={leads}
         mode={modalMode}
+      />
+
+      {/* Calendly Configuration Modal */}
+      <CalendlyConfigModal
+        isOpen={isCalendlyConfigOpen}
+        onClose={closeCalendlyConfig}
+        onConfigSaved={handleCalendlyConfigSaved}
       />
     </div>
   );
