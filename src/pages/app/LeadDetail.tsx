@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
-  Calendar, 
+  Calendar,
   Phone, 
   Mail, 
   ExternalLink,
@@ -194,7 +194,7 @@ export default function LeadDetail() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [canDelete, setCanDelete] = useState(false);
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+
   const [savingNotes, setSavingNotes] = useState(false);
   const [savingSipForecast, setSavingSipForecast] = useState(false);
   const [savedSipForecast, setSavedSipForecast] = useState<{
@@ -622,206 +622,171 @@ export default function LeadDetail() {
               </div>
               
               <div className="flex gap-3">
-                <Button 
-                  onClick={() => setIsScheduleModalOpen(true)}
-                  size="sm"
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
-                >
-                  <Calendar className="h-4 w-4" />
-                  Schedule
-                </Button>
+
                 
-                {/* Status Change Button - Only enabled when meetings are scheduled */}
+                {/* Enhanced Status Change Button */}
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button 
                       variant="outline" 
                       size="sm"
-                      disabled={
-                        !lead.meetings || 
-                        lead.meetings.length === 0 || 
-                        lead.status === 'converted' || 
-                        lead.status === 'dropped'
-                      }
-                      className={`flex items-center gap-2 ${
-                        !lead.meetings || 
-                        lead.meetings.length === 0 || 
-                        lead.status === 'converted' || 
-                        lead.status === 'dropped'
-                          ? 'opacity-50 cursor-not-allowed' 
-                          : 'hover:bg-gray-100'
-                      }`}
+                      className="flex items-center gap-2 hover:bg-gray-100"
                     >
                       <TrendingUp className="h-4 w-4" />
-                      {lead.status === 'converted' ? 'Converted' : 
-                       lead.status === 'dropped' ? 'Dropped' : 'Change Status'}
+                      Change Status
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-[400px]">
+                  <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
                       <DialogTitle>Change Lead Status</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
-                      <p className="text-sm text-gray-600">
-                        Current status: <span className="font-medium">{lead.status.replace('_', ' ')}</span>
-                      </p>
-                      
-                      {/* Show current status info */}
-                      {lead.status === 'converted' && (
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                          <p className="text-sm text-green-800">
-                            🎉 This lead has been successfully converted!
-                          </p>
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <p className="text-sm text-gray-600 mb-2">
+                          Current status: <span className="font-medium text-gray-900">{lead.status.replace('_', ' ')}</span>
+                        </p>
+                        <div className="text-xs text-gray-500">
+                          💡 You can change the lead status at any time to track their progress
                         </div>
-                      )}
+                      </div>
                       
-                      {lead.status === 'dropped' && (
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                          <p className="text-sm text-red-800">
-                            ❌ This lead has been marked as dropped.
-                          </p>
-                        </div>
-                      )}
-                      
-                      {/* Only show status change options if not in final state */}
-                      {lead.status !== 'converted' && lead.status !== 'dropped' && (
-                        <>
-                          <div className="space-y-3">
-                            <Button
-                              onClick={() => handleStatusChangeWithConfirmation('converted')}
-                              className="w-full bg-green-600 hover:bg-green-700 text-white"
-                              size="sm"
-                            >
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Mark as Converted
-                            </Button>
-                            <Button
-                              onClick={() => handleStatusChangeWithConfirmation('dropped')}
-                              variant="destructive"
-                              className="w-full"
-                              size="sm"
-                            >
-                              <AlertTriangle className="h-4 w-4 mr-2" />
-                              Mark as Dropped
-                            </Button>
+                      {/* Status Options Grid */}
+                      <div className="grid grid-cols-1 gap-3">
+                        {/* New Lead */}
+                        <Button
+                          onClick={() => handleStatusChangeWithConfirmation('lead')}
+                          variant={lead.status === 'lead' ? 'default' : 'outline'}
+                          className={`w-full justify-start ${
+                            lead.status === 'lead' 
+                              ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                              : 'hover:bg-blue-50'
+                          }`}
+                          size="sm"
+                        >
+                          <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
+                          <div className="text-left">
+                            <div className="font-medium">New Lead</div>
+                            <div className="text-xs opacity-80">Initial contact made</div>
                           </div>
-                          
-                          <div className="text-xs text-gray-500 text-center">
-                            💡 You can only change status after scheduling a meeting
+                        </Button>
+
+                        {/* Assessment Done */}
+                        <Button
+                          onClick={() => handleStatusChangeWithConfirmation('assessment_done')}
+                          variant={lead.status === 'assessment_done' ? 'default' : 'outline'}
+                          className={`w-full justify-start ${
+                            lead.status === 'assessment_done' 
+                              ? 'bg-green-600 hover:bg-green-700 text-white' 
+                              : 'hover:bg-green-50'
+                          }`}
+                          size="sm"
+                        >
+                          <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                          <div className="text-left">
+                            <div className="font-medium">Assessment Done</div>
+                            <div className="text-xs opacity-80">Risk profile completed</div>
                           </div>
-                        </>
-                      )}
-                    </div>
-                  </DialogContent>
-                </Dialog>
-                
-                <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-visible">
-                    <DialogHeader className="pb-4">
-                      <DialogTitle className="text-xl font-semibold">Edit Lead</DialogTitle>
-                    </DialogHeader>
-                    <div 
-                      className="max-h-[calc(90vh-120px)] overflow-y-auto scroll-smooth"
-                      style={{ 
-                        scrollBehavior: 'smooth',
-                        scrollbarWidth: 'thin',
-                        scrollbarColor: 'hsl(var(--border)) hsl(var(--background))'
-                      }}
-                    >
-                      <Form {...form}>
-                        <form onSubmit={form.handleSubmit(handleSaveEdit)} className="space-y-4">
-                          <div className="grid grid-cols-1 gap-4">
-                            <FormField
-                              control={form.control}
-                              name="full_name"
-                              rules={{ required: 'Full name is required' }}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Full Name *</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="Enter full name" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <div className="grid grid-cols-2 gap-4">
-                              <FormField
-                                control={form.control}
-                                name="email"
-                                rules={{ 
-                                  pattern: { 
-                                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i, 
-                                    message: 'Invalid email address' 
-                                  } 
-                                }}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Email</FormLabel>
-                                    <FormControl>
-                                      <Input type="email" placeholder="Enter email address" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name="phone"
-                                rules={{ 
-                                  pattern: { 
-                                    value: /^[0-9]{10}$/, 
-                                    message: 'Phone number must be 10 digits' 
-                                  } 
-                                }}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Phone</FormLabel>
-                                    <FormControl>
-                                      <Input type="tel" placeholder="Enter phone number" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <FormField
-                                control={form.control}
-                                name="age"
-                                rules={{ 
-                                  pattern: { 
-                                    value: /^[0-9]+$/, 
-                                    message: 'Age must be a number' 
-                                  },
-                                  min: { value: 18, message: 'Age must be at least 18' },
-                                  max: { value: 120, message: 'Age must be less than 120' }
-                                }}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Age</FormLabel>
-                                    <FormControl>
-                                      <Input type="number" placeholder="Enter age" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
+                        </Button>
+
+                        {/* Meeting Scheduled */}
+                        <Button
+                          onClick={() => handleStatusChangeWithConfirmation('meeting_scheduled')}
+                          variant={lead.status === 'meeting_scheduled' ? 'default' : 'outline'}
+                          className={`w-full justify-start ${
+                            lead.status === 'meeting_scheduled' 
+                              ? 'bg-orange-600 hover:bg-orange-700 text-white' 
+                              : 'hover:bg-orange-50'
+                          }`}
+                          size="sm"
+                        >
+                          <div className="w-3 h-3 bg-orange-500 rounded-full mr-3"></div>
+                          <div className="text-left">
+                            <div className="font-medium">Meeting Scheduled</div>
+                            <div className="text-xs opacity-80">Appointment booked</div>
                           </div>
-                          <DialogFooter>
-                            <DialogClose asChild>
-                              <Button type="button" variant="outline">Cancel</Button>
-                            </DialogClose>
-                            <Button type="submit">Save Changes</Button>
-                          </DialogFooter>
-                        </form>
-                      </Form>
+                        </Button>
+
+                        {/* Converted */}
+                        <Button
+                          onClick={() => handleStatusChangeWithConfirmation('converted')}
+                          variant={lead.status === 'converted' ? 'default' : 'outline'}
+                          className={`w-full justify-start ${
+                            lead.status === 'converted' 
+                              ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+                              : 'hover:bg-purple-50'
+                          }`}
+                          size="sm"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-3" />
+                          <div className="text-left">
+                            <div className="font-medium">Converted</div>
+                            <div className="text-xs opacity-80">Successfully onboarded</div>
+                          </div>
+                        </Button>
+
+                        {/* Dropped */}
+                        <Button
+                          onClick={() => handleStatusChangeWithConfirmation('dropped')}
+                          variant={lead.status === 'dropped' ? 'default' : 'outline'}
+                          className={`w-full justify-start ${
+                            lead.status === 'dropped' 
+                              ? 'bg-red-600 hover:bg-red-700 text-white' 
+                              : 'hover:bg-red-50'
+                          }`}
+                          size="sm"
+                        >
+                          <AlertTriangle className="h-4 w-4 mr-3" />
+                          <div className="text-left">
+                            <div className="font-medium">Dropped</div>
+                            <div className="text-xs opacity-80">No longer interested</div>
+                          </div>
+                        </Button>
+
+                        {/* Halted */}
+                        <Button
+                          onClick={() => handleStatusChangeWithConfirmation('halted')}
+                          variant={lead.status === 'halted' ? 'default' : 'outline'}
+                          className={`w-full justify-start ${
+                            lead.status === 'halted' 
+                              ? 'bg-gray-600 hover:bg-gray-700 text-white' 
+                              : 'hover:bg-gray-50'
+                          }`}
+                          size="sm"
+                        >
+                          <div className="w-3 h-3 bg-gray-500 rounded-full mr-3"></div>
+                          <div className="text-left">
+                            <div className="font-medium">Halted</div>
+                            <div className="text-xs opacity-80">Temporarily paused</div>
+                          </div>
+                        </Button>
+
+                        {/* Rejected */}
+                        <Button
+                          onClick={() => handleStatusChangeWithConfirmation('rejected')}
+                          variant={lead.status === 'rejected' ? 'default' : 'outline'}
+                          className={`w-full justify-start ${
+                            lead.status === 'rejected' 
+                              ? 'bg-red-800 hover:bg-red-900 text-white' 
+                              : 'hover:bg-red-50'
+                          }`}
+                          size="sm"
+                        >
+                          <div className="w-3 h-3 bg-red-700 rounded-full mr-3"></div>
+                          <div className="text-left">
+                            <div className="font-medium">Rejected</div>
+                            <div className="text-xs opacity-80">Not suitable for service</div>
+                          </div>
+                        </Button>
+                      </div>
+
+                      {/* Status Change Info */}
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-xs text-blue-700">
+                          💡 <strong>Status Flow:</strong> New Lead → Assessment Done → Meeting Scheduled → Converted
+                          <br />
+                          💡 <strong>Alternative Paths:</strong> Any status can be changed to Dropped, Halted, or Rejected
+                        </p>
+                      </div>
                     </div>
                   </DialogContent>
                 </Dialog>
@@ -1145,149 +1110,23 @@ export default function LeadDetail() {
           
           <TabsContent value="meetings" className="space-y-8">
             <div className="bg-white rounded-2xl p-8 shadow-xl shadow-gray-200/50 border border-gray-100">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl flex items-center justify-center shadow-lg">
-                    <Calendar className="w-7 h-7 text-green-600" />
-                  </div>
-                  <div>
-                    <h2 className="text-3xl font-bold text-gray-900">Meetings & Appointments</h2>
-                    <p className="text-gray-600 text-lg">Schedule and manage meetings with this lead</p>
-                  </div>
+              <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border-2 border-dashed border-gray-300">
+                <div className="w-20 h-20 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                  <Calendar className="h-10 w-10 text-gray-500" />
                 </div>
-                <Button 
-                  onClick={() => navigate('/app/meetings')}
-                  className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                >
-                  <Plus className="h-4 w-4" />
-                  Schedule Meeting
-                </Button>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Meeting Management</h3>
+                <p className="text-gray-600 max-w-md mx-auto mb-8 text-lg">
+                  Meeting scheduling functionality has been removed from this application. 
+                  You can still manage lead status and track their progress through the status change feature.
+                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+                  <p className="text-sm text-blue-700">
+                    💡 <strong>Use the "Change Status" button above</strong> to track lead progress and manage their journey from initial contact to conversion.
+                  </p>
+                </div>
               </div>
               
-              {lead.meetings && lead.meetings.length > 0 ? (
-                <div className="space-y-6">
-                  {lead.meetings.map((meeting: any) => (
-                    <div key={meeting.id} className="border border-gray-200 rounded-xl p-6 hover:border-gray-300 hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-white to-gray-50">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-3 flex-1">
-                          <div className="flex items-center gap-3">
-                            <h4 className="font-semibold text-gray-900">{meeting.title}</h4>
-                            <Badge 
-                              variant={meeting.status === 'completed' ? 'default' : 
-                                     meeting.status === 'cancelled' ? 'destructive' : 'secondary'}
-                              className="text-xs"
-                            >
-                              {meeting.status}
-                            </Badge>
-                            {meeting.platform && (
-                              <Badge variant="outline" className="text-xs">
-                                {meeting.platform.replace('_', ' ')}
-                              </Badge>
-                            )}
-                          </div>
-                          
-                          {meeting.description && (
-                            <p className="text-sm text-gray-600">{meeting.description}</p>
-                          )}
-                          
-                          <div className="flex items-center gap-4 text-xs text-gray-500">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {new Date(meeting.start_time).toLocaleDateString('en-IN', {
-                                timeZone: 'Asia/Kolkata',
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                              {new Date(meeting.start_time).toLocaleTimeString('en-IN', { 
-                                timeZone: 'Asia/Kolkata',
-                                hour: '2-digit', 
-                                minute: '2-digit' 
-                              })} - {new Date(meeting.end_time).toLocaleTimeString('en-IN', { 
-                                timeZone: 'Asia/Kolkata',
-                                hour: '2-digit', 
-                                minute: '2-digit' 
-                              })}
-                            </div>
-                          </div>
-                          
-                          {meeting.meeting_link && meeting.status === 'scheduled' && (
-                            <div className="pt-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.open(meeting.meeting_link, '_blank')}
-                                className="flex items-center gap-2"
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                                Join Meeting
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate('/app/meetings')}
-                          >
-                            <Edit className="h-3 w-3 mr-1" />
-                            Edit
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border-2 border-dashed border-gray-300">
-                  <div className="w-20 h-20 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-                    <Calendar className="h-10 w-10 text-gray-500" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3">No Meetings Scheduled</h3>
-                  <p className="text-gray-600 max-w-md mx-auto mb-8 text-lg">
-                    No meetings have been scheduled with this lead yet. Schedule a meeting to discuss their financial goals and provide personalized recommendations.
-                  </p>
-                  <Button 
-                    onClick={() => navigate('/app/meetings')}
-                    className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-3"
-                  >
-                    <Plus className="h-5 w-5" />
-                    Schedule First Meeting
-                  </Button>
-                </div>
-              )}
-              
-              {/* Meeting Statistics */}
-              {lead.meetings && lead.meetings.length > 0 && (
-                <div className="mt-8 pt-8 border-t border-gray-200">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">Meeting Summary</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300">
-                      <div className="text-3xl font-bold text-blue-600 mb-2">
-                        {lead.meetings.filter((m: any) => m.status === 'scheduled').length}
-                      </div>
-                      <div className="text-blue-700 font-semibold">Upcoming</div>
-                    </div>
-                    <div className="text-center p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 shadow-lg hover:shadow-xl transition-all duration-300">
-                      <div className="text-3xl font-bold text-green-600 mb-2">
-                        {lead.meetings.filter((m: any) => m.status === 'completed').length}
-                      </div>
-                      <div className="text-green-700 font-semibold">Completed</div>
-                    </div>
-                    <div className="text-center p-6 bg-gradient-to-br from-red-50 to-pink-50 rounded-xl border border-red-200 shadow-lg hover:shadow-xl transition-all duration-300">
-                      <div className="text-3xl font-bold text-red-600 mb-2">
-                        {lead.meetings.filter((m: any) => m.status === 'cancelled').length}
-                      </div>
-                      <div className="text-red-700 font-semibold">Cancelled</div>
-                    </div>
-                  </div>
-                </div>
-              )}
+
             </div>
           </TabsContent>
         

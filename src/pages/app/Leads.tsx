@@ -114,14 +114,7 @@ export default function Leads(){
     setEditOpen(true);
   };
 
-  // Handle opening schedule modal (placeholder for now)
-  const handleScheduleMeeting = (lead: Lead) => {
-    // TODO: Implement schedule meeting modal
-    toast({
-      title: "Schedule Meeting",
-      description: `Schedule meeting functionality for ${lead.full_name} will be implemented soon.`,
-    });
-  };
+
 
   // Handle form submission for editing
   const onSubmitEdit = async (data: LeadFormData) => {
@@ -834,13 +827,7 @@ export default function Leads(){
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem 
-                          onClick={() => handleScheduleMeeting(lead)}
-                          className="flex items-center gap-2 cursor-pointer"
-                        >
-                          <Calendar className="h-4 w-4" />
-                          Schedule
-                        </DropdownMenuItem>
+
                         <DropdownMenuItem 
                           onClick={() => handleEditLead(lead)}
                           className="flex items-center gap-2 cursor-pointer"
