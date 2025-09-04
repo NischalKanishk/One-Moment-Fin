@@ -29,14 +29,6 @@
       "destination": "/api/auth.js"
     },
     {
-      "source": "/api/meetings/(.*)",
-      "destination": "/api/meetings.js"
-    },
-    {
-      "source": "/api/meetings",
-      "destination": "/api/meetings.js"
-    },
-    {
       "source": "/api/ai/(.*)",
       "destination": "/api/[...path].js"
     },

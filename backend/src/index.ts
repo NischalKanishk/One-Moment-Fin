@@ -24,7 +24,7 @@ import publicAssessmentsRoutes from './routes/publicAssessments';
 import userAssessmentLinksRoutes from './routes/userAssessmentLinks';
 import aiRoutes from './routes/ai';
 import notificationsRoutes from './routes/notifications';
-import meetingsRoutes from './routes/meetings';
+
 import testRoutes from './routes/test';
 import debugRoutes from './routes/debug';
 
@@ -88,8 +88,7 @@ app.get('/', (req, res) => {
       leads: '/api/leads',
       assessments: '/api/assessments',
       publicAssessments: '/api/public-assessments',
-      ai: '/api/ai',
-      meetings: '/api/meetings'
+      ai: '/api/ai'
     },
     documentation: 'Check /health for server status'
   });
@@ -111,7 +110,7 @@ app.use('/api/assessments', assessmentsRoutes);
 app.use('/api/public-assessments', publicAssessmentsRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationsRoutes);
-app.use('/api/meetings', meetingsRoutes);
+
 app.use('/api/test', testRoutes);
 app.use('/api/debug', debugRoutes);
 
